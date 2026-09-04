@@ -1,0 +1,84 @@
+{
+  "description": "Agent Harness · Codex hooks（跨平台版）。Windows 使用 Python，macOS/Linux 通过 sh 包装器调用同一实现。",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/detect-feedback-signal.sh\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$root = git rev-parse --show-toplevel; python -X utf8 (Join-Path $root '.codex/hooks/harness_hook.py') 'detect-feedback-signal'\"",
+            "timeout": 5,
+            "statusMessage": "记录反馈信号"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/check-evolution.sh\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$root = git rev-parse --show-toplevel; python -X utf8 (Join-Path $root '.codex/hooks/harness_hook.py') 'check-evolution'\"",
+            "timeout": 10,
+            "statusMessage": "检查进化队列"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/pre-tool-shell.sh\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$root = git rev-parse --show-toplevel; python -X utf8 (Join-Path $root '.codex/hooks/harness_hook.py') 'pre-tool-shell'\"",
+            "timeout": 30,
+            "statusMessage": "执行提交前门禁"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/auto-push.sh\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$root = git rev-parse --show-toplevel; python -X utf8 (Join-Path $root '.codex/hooks/harness_hook.py') 'auto-push'\"",
+            "timeout": 15,
+            "statusMessage": "检查自动推送"
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/mark-review-needed.sh\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$root = git rev-parse --show-toplevel; python -X utf8 (Join-Path $root '.codex/hooks/harness_hook.py') 'mark-review-needed'\"",
+            "timeout": 5,
+            "statusMessage": "标记代码审查状态"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/stop-gate.sh\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$root = git rev-parse --show-toplevel; python -X utf8 (Join-Path $root '.codex/hooks/harness_hook.py') 'stop-gate'\"",
+            "timeout": 5,
+            "statusMessage": "检查代码审查门禁"
+          }
+        ]
+      }
+    ]
+  }
+}
