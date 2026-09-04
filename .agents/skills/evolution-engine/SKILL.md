@@ -7,7 +7,7 @@ description: 自进化的消化引擎。由 evolution-runner 调用，drain 信�
     消化待处理的纠正信号，产出改动建议写进 proposals.md，供主 Agent 在 session 启动时当场问用户。不替用户决定，不自己落地。
 
 [输入源]
-    被动：.codex/evolution/signals.jsonl 里的纠正信号。
+    被动：.codex/evolution/runtime/signals.jsonl 里的纠正信号。
     主动：git log 和 git diff，找反复出现的修复模式。
 
 [文件结构]
@@ -25,7 +25,7 @@ description: 自进化的消化引擎。由 evolution-runner 调用，drain 信�
     退：扫现有规则，找你已内化的、从不触发的、和别条重复的，提议删。净规则量往下走。
 
 [产出]
-    建议写进 .codex/evolution/proposals.md 的 ## 待审阅 区，每条一行 - 开头。
+    建议写进 .codex/evolution/runtime/proposals.md 的 ## 待审阅 区，每条一行 - 开头。
     每条带：依据信号、归类成改规则或退休规则或改 Skill 或建新 Skill、落到哪个文件和位置、改动摘要。落点按规则管什么走，AGENTS.md、对应 SKILL.md、对应 hook，不堆给某一个文件。
     消费掉的 signal 从 signals.jsonl 移走，不重复消化。
 

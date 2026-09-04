@@ -4,13 +4,13 @@ description: 当 DEV-PLAN.md 就绪、用户说要开始写代码或继续开发
 ---
 
 [任务]
-    初始化模式：无代码 + 有 DEV-PLAN.md → 搭建项目骨架，装依赖，配好环境，完成 Phase 1。
+    初始化模式：无代码 + 有 DEV-PLAN.md → 在 Harness 根仓库内搭建项目骨架，装依赖，配好环境，完成 Phase 1。
     持续开发模式：有代码 + 有 DEV-PLAN.md → 按 Phase 逐步开发，每个 Phase 走 per-Task review→fix 循环和四步走验证。
     规划与执行方式见 AGENTS.md [规划与执行]。
 
 [依赖检测]
     Skill 启动第一步执行。
-    必需：Product-Spec.md、DEV-PLAN.md、DEV-PLAN 技术栈表里列的系统工具和运行时。缺了提示先补。
+    必需：Product-Spec.md、DEV-PLAN.md、DEV-PLAN 技术栈表里列的系统工具和运行时。缺了提示先补。启动时确认当前 Git 根就是包含 AGENTS.md、.agents、.codex 的 Harness 根；不是就停下修正目录，禁止在产品子目录另建仓库。
     可选，缺了标降级模式继续：Design-Brief.md、设计工具 MCP、gh CLI、playwright。
     必需依赖缺失你自己判断装法直接装；要用户权限或认证才提示用户。
     进已有项目或脚手架先读它自带的 agent 约定文件，比如 AGENTS.md、CLAUDE.md，按项目规矩来，不用自己的默认覆盖。
@@ -40,7 +40,7 @@ description: 当 DEV-PLAN.md 就绪、用户说要开始写代码或继续开发
 [开发规则清单]
     [代码规范]
         - 单文件不超过 300 行，超了按职责拆分
-        - TypeScript strict，不用 any，用 unknown + 类型守卫
+        - 跟随 DEV-PLAN 的语言和框架规范；TypeScript 项目启用 strict，不用 any，用 unknown + 类型守卫
         - 命名：组件 PascalCase，函数变量 camelCase，文件 kebab-case，常量 UPPER_SNAKE_CASE
         - 每个文件单一职责，副作用隔离到 hooks 或 API 层
         - 跟随已有代码库的风格，不强推个人偏好，不做无关重构
@@ -68,8 +68,8 @@ description: 当 DEV-PLAN.md 就绪、用户说要开始写代码或继续开发
     [Git 工作流]
         - 原子提交：每完成一个独立功能就 commit，一个 commit 一个逻辑变更
         - commit message 用 feat、fix、refactor、chore 前缀
-        - 提交门槛：编译通过才能 commit，不过编译不提交
-        - push 由 hook 处理，保护分支不自动推
+        - 提交门槛：DEV-PLAN 声明的提交前检查全部通过，code-reviewer 两阶段通过，并记录当前变更指纹后才能 commit；Git commit-msg Hook 做最终强制校验，PreToolUse 只负责提前反馈
+        - push、创建远程仓库和 PR 只有用户明确要求才执行，Hook 不自动 push
 
 [设计参照]
     有设计工具 MCP 连接时，每个 Task 前读取涉及页面和组件的精确数值：宽高、间距、字号、字重、颜色、圆角、阴影。每个 Task 都重新读，不凭记忆。编码后读代码实际值逐项对照，有偏差先修再提交。设计稿与 Design-Brief 冲突时以设计稿为准。
@@ -83,14 +83,14 @@ description: 当 DEV-PLAN.md 就绪、用户说要开始写代码或继续开发
         派发 code-reviewer 两阶段审查
         Stage 1 失败补实现，重新派 code-reviewer
         Stage 2 失败：质量和重构问题自己按修改纪律修，确属缺陷或安全漏洞才调 bug-fixer，重新派 code-reviewer
-        两阶段都过 → echo clean > .codex/.needs-review → commit → 下一个 Task
+        两阶段都过 → python -X utf8 .codex/hooks/harness_runtime.py mark-reviewed 记录当前变更指纹 → commit → 下一个 Task
     用户强调某环节是追加要求，不替换基础流程，review 闭环照常走。
 
 [Phase 完成度判断]
     所有 Task 完成后过四步走，全通过才算 Phase 完成：
         一、Code Review：对照 DEV-PLAN 交付清单逐项确认，检查有无超范围改动
         二、测试完整性：计划的功能都实现无半成品，且测试真覆盖到交互层和故障路径，不止纯函数和顺畅路径。每条「绿」要能证明行为真的对——核对用例前提与生产一致（量纲、单位、输入合法性、断言方向），用假前提或不可达输入把缺陷盖成预期的等于没测。功能声明的错误态、空态、边界要有用例真的走到，不只在实现里留分支
-        三、编译验证：tsc --noEmit 零错误
+        三、编译验证：执行 DEV-PLAN 针对当前技术栈声明的 typecheck、compile 或 build 命令，零错误
         四、功能测试：启动 dev server 无错，新功能可用，现有功能未破坏；有 Playwright 测核心流程，无则 curl 查 API 返回再提醒用户看 UI
     每步附当场跑的证据。中间有任何改动，四步重新来。
     通过后向用户汇报附证据，用户确认后 Phase 完成。修验证中发现的问题用 fix: 提交。
@@ -101,8 +101,11 @@ description: 当 DEV-PLAN.md 就绪、用户说要开始写代码或继续开发
 [初始化模式]
     无代码时搭骨架：
     - 项目代码放在以项目名命名的子文件夹，不平铺根目录，规划文档留根目录
-    - 按 DEV-PLAN 技术栈表配置，TypeScript strict，装依赖，配环境变量
-    - git init，.gitignore 排除规划文档、环境变量、构建产物，建 private 远程仓库，首次 commit
+    - 按 DEV-PLAN 技术栈表配置语言规范和运行时，装依赖，配环境变量
+    - 项目代码放在 Harness 根的产品子目录，与 AGENTS.md、.agents、.codex 共用根 Git；产品子目录严禁 git init，bootstrap 和审查门禁发现嵌套 .git 时必须拒绝
+    - 根目录不是 Git 仓库时先运行 python -X utf8 scripts/bootstrap_harness.py；.gitignore 排除规划文档、环境变量、构建产物和 Harness 本地状态
+    - 根据技术栈生成 .codex/project-checks.json，使用 argv 数组声明提交前的快速确定性检查；首次 commit 仍须 review 通过
+    - 创建远程仓库或 push 前必须取得用户明确授权
     - 完成后进入 Phase 1 的 Phase 执行流程
 
 [初始化]

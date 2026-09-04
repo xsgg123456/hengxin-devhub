@@ -3,9 +3,9 @@
 
 [流程]
     一、采集
-        你表达不满或纠正，detect-feedback-signal hook 即时抓一行进 .codex/evolution/signals.jsonl。措辞隐晦 hook 没抓到的，主 Agent 识别后自己补记一条。这一步瞬时、无感。
+        你明确表达对 Agent 的不满或纠正时，detect-feedback-signal hook 去除常见密钥后抓一行进本地 .codex/evolution/runtime/signals.jsonl。普通“删除文件、改成功能”命令不算纠正。runtime/ 整目录被 Git 忽略，不上传远端。措辞隐晦 hook 没抓到的，主 Agent 识别后自己补记一条。
     二、消化加询问
-        Codex hook 不支持异步后台，进化消化是同步的。每次 session 启动，主 Agent 第一件事：signals.jsonl 有货就显式 spawn evolution-runner 扫它、加扫 git 历史，逐条消化成改动建议写进 proposals.md，消费掉的 signal 从 signals.jsonl 移走。消化轻量、尽快还给用户。runner 返回后主 Agent 当场把建议逐条摆给你，问同不同意。
+        进化消化必须在当前 session 内同步完成，以便立即把建议逐条交给用户拍板，不使用异步 Hook。每次 session 启动，主 Agent 第一件事：signals.jsonl 有货就显式 spawn evolution-runner 扫它、加扫 git 历史，逐条消化成改动建议写进 proposals.md，消费掉的 signal 从 signals.jsonl 移走。消化轻量、尽快还给用户。runner 返回后主 Agent 当场把建议逐条摆给你，问同不同意。
     三、按你的回应落地
         同意：主 Agent 立刻把规则改进对应文档，AGENTS.md、对应 SKILL.md、对应 hook，按它管什么走。
         全盘否定：这条 signal 和 proposal 一起删，什么都不改。
@@ -25,5 +25,5 @@
     最后手段。模式反复出现、现有 Skill 全覆盖不了、用例子或规则或调现有 Skill 都接不住，三条都满足才提议建新 Skill，确认后主 Agent 调 skill-builder。
 
 [文件]
-    signals.jsonl   待处理的纠正信号，消费即移走
-    proposals.md    待你拍板的改动建议，同意即改、否定即删
+    runtime/signals.jsonl   待处理的纠正信号，消费即移走
+    runtime/proposals.md    待你拍板的改动建议，同意即改、否定即删

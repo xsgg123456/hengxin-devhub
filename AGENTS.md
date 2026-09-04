@@ -44,7 +44,7 @@
     ├── Product-Spec.md / Product-Spec-CHANGELOG.md   # 需求文档 + 变更记录
     ├── Design-Brief.md                                # 设计规范，可选
     ├── DEV-PLAN.md                                     # 分阶段开发计划
-    ├── <project-name>/                                 # 项目代码，以项目名命名的子文件夹
+    ├── <project-name>/                                 # 项目代码，以项目名命名的子文件夹，与 Harness 共用根仓库
     ├── AGENTS.md                                       # 主控，本文件
     ├── .agents/
     │   └── skills/                                     # 各阶段能力模块（SKILL.md + references/ + assets/）
@@ -58,10 +58,12 @@
 [总体规则]
     - 无论用户如何打断或提新问题，完成当前回答后始终引导进入下一步
     - 始终使用中文交流
-    - Git 提交信息强制使用中文；允许 Conventional Commits 类型前缀，但摘要必须包含中文，纯英文提交不得通过
+    - Git 提交信息强制使用中文；允许 Conventional Commits 类型前缀，但摘要必须包含汉字，纯英文提交不得通过
+    - 单仓库根：Harness 文件和产品代码必须共用一个 Git 根，禁止在产品子目录再次 git init。Git 只在 Harness 根初始化，Codex 也始终从该根目录启动
+    - 外部写入显式授权：commit 属于本地开发流程；push、创建远程仓库、部署和发布只有用户明确要求才执行，Hook 不自动触发
     - 联网优先：涉及外部库、API、框架版本时先搜索确认再动手
-    - 自进化：用户纠正即抓成信号入队到 .codex/evolution/signals.jsonl，hook 靠关键词只抓措辞明显的，主 Agent 识别到 hook 没抓到的修正自己补记一条
-    - Codex hook 不支持异步后台。session 启动主 Agent 第一件事：signals 有货就同步 spawn evolution-runner 消化成建议、消化轻量尽快还给用户，当场逐条问用户，同意即改对应文档、全盘否定即删 signal 和 proposal。主 Agent 照常处理用户的修正本身
+    - 自进化：用户纠正即抓成信号入队到 .codex/evolution/runtime/signals.jsonl，hook 靠关键词只抓措辞明显的，主 Agent 识别到 hook 没抓到的修正自己补记一条
+    - 自进化需要在当前 session 内立即返回并询问用户，禁止把它设为异步后台。session 启动主 Agent 第一件事：signals 有货就同步 spawn evolution-runner 消化成建议、消化轻量尽快还给用户，当场逐条问用户，同意即改对应文档、全盘否定即删 signal 和 proposal。主 Agent 照常处理用户的修正本身
     - 设计优先级从高到低：设计稿、Design-Brief.md、Product-Spec.md。有设计稿时 UI 一切以设计稿为准。无设计稿也无 Brief 时，继承项目既有页面和组件的先例，不自由发挥
     - 迭代即同步：任何变更先更对应源文档再动代码，文档是单一真相源。上游文档变了，主 Agent 主动查下游文档和代码受不受影响、要不要一起更，只提醒不自动改，不只改一个留其余脱节
     - 进化沉淀通用规则落到对应文档：编排进 AGENTS.md、技能进对应 SKILL.md、门禁进对应 hook；项目专属归用户记忆，不混
@@ -109,7 +111,7 @@
     初始化时检测项目进度，路由到对应环节：
     - 无 Product-Spec.md → 全新项目 → 引导描述想法或用 product-spec-builder
     - 有 Spec，无 DEV-PLAN，无代码 → 输出交付指南
-    - 有 Spec 和 DEV-PLAN，无代码 → 引导 dev-builder
+    - 有 Spec 和 DEV-PLAN，无代码 → 引导 dev-builder，在 Harness 根仓库内创建产品子目录
     - 有 Spec 和代码，无 DEV-PLAN → 建议 dev-planner 补计划
     - 有 Spec、DEV-PLAN、代码都齐 → 开发中 → 可继续开发、审查、修复或发布
 

@@ -8,10 +8,10 @@ developer_instructions = """
 
 [任务]
     用 evolution-engine skill：
-    1. drain .codex/evolution/signals.jsonl 的纠正信号
+    1. drain .codex/evolution/runtime/signals.jsonl 的纠正信号
     2. 扫 git 历史，找反复出现的修复模式
     3. 双向判断：该加的规则、该退的规则
-    4. 产出改动建议写进 .codex/evolution/proposals.md，每条写明落到哪个文件
+    4. 产出改动建议写进 .codex/evolution/runtime/proposals.md，每条写明落到哪个文件
     5. 消费掉的 signal 从 signals.jsonl 移走
     无信号无模式就什么都不写。
 

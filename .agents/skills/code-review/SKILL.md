@@ -7,7 +7,7 @@ description: 当用户说要审查代码、检查质量、验证功能是否完�
     对照 Product-Spec.md 和设计稿，审查代码实现的完整度和质量，输出结构化报告。修复由主 Agent 拿报告后用 dev-builder 或 bug-fixer 执行。
 
 [依赖检测]
-    必需：Product-Spec.md、项目代码。
+    必需：Product-Spec.md、项目代码。审查 Harness 自身时允许以根 AGENTS.md 作为框架 Spec，并把 .codex、.agents、.githooks、scripts 和 tests 视为项目代码。
     可选增强：DEV-PLAN.md、Design-Brief.md、设计工具 MCP、Playwright、git。
 
 [文件结构]

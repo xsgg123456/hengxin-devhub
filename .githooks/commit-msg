@@ -13,5 +13,7 @@ else
     exit 1
 fi
 
-exec "$python_cmd" -X utf8 "$repo_root/.codex/hooks/harness_hook.py" \
+"$python_cmd" -X utf8 "$repo_root/.codex/hooks/harness_runtime.py" \
+    pre-commit-gate
+exec "$python_cmd" -X utf8 "$repo_root/.codex/hooks/harness_runtime.py" \
     validate-commit-message "$1"

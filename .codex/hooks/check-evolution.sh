@@ -1,2 +1,2 @@
 #!/bin/sh
-exec python3 -X utf8 "$(dirname "$0")/harness_hook.py" check-evolution
+exec python3 -X utf8 "$(dirname "$0")/harness_runtime.py" check-evolution

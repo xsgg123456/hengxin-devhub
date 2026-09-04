@@ -7,7 +7,7 @@ description: 当用户说要打包、部署、发布、上线，或项目开发�
     根据项目类型执行构建、打包、测试、发布。确保发布产物能安装、能运行、无隐私泄露、无安全漏洞。
 
 [依赖检测]
-    基础：项目代码、git、构建工具、package.json。
+    基础：项目代码、git，以及 DEV-PLAN 技术栈声明的构建工具和版本文件。Node 项目使用 package.json，其他技术栈使用各自清单。
     渠道：按用户选的发布渠道检测所需 CLI 和认证状态。只打包不发布则不检测部署工具。
     缺失工具你自己判断装法直接装，要登录认证才提示用户。
 
@@ -23,14 +23,14 @@ description: 当用户说要打包、部署、发布、上线，或项目开发�
     卡住先诊断不臆测：进程 CPU 0% 而运行时长仍在涨 = 死锁，不是慢也不是网络，别干等。打包工具对依赖布局敏感（如 electron-builder 遍历 pnpm 符号链接依赖树会死锁），且配置不等于实际状态（.npmrc 声明 hoisted ≠ node_modules 实际扁平，开发期增量 install 会让二者脱节），打包前验证实际布局再打。
 
 [发布检查清单]
-    版本：package.json version 已更新，CHANGELOG 已更新，工作区干净。
+    版本：技术栈对应的版本文件已更新，CHANGELOG 已更新，工作区干净。
     构建：构建命令零错误，产物大小合理，异常偏大排查是否打了不该打的。
     隐私审计，绝对底线，对构建产物目录执行：
     - grep -rn "/Users/" 查开发者路径
     - find 查 .db、.env、credentials、.pem、.key、用户数据目录
     - grep 查 sk-ant-、sk-proj-、ANTHROPIC_API_KEY、OPENAI_API_KEY、明文密码
     发现任何一项立刻停，修完重新构建。
-    依赖：npm audit 无 critical，构建无 MODULE_NOT_FOUND。
+    依赖：执行当前技术栈的依赖漏洞扫描，无 critical；构建无缺失依赖。
     Git：author 不暴露个人信息，.gitignore 覆盖所有数据文件。
 
 [发布策略]

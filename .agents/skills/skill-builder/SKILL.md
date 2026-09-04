@@ -33,7 +33,7 @@ description: 当用户说要创建新技能，或 EVOLUTION.md 提议自动生�
     交互模式定参照：对话采集型参照 product-spec-builder、design-brief-builder；自主分析型参照 dev-planner、code-review；执行操作型参照 dev-builder、release-builder；诊断修复型参照 bug-fixer。
 
 [写作规范]
-    遵循 Agent-Guideline.md：
+    遵循本节规则：
     - 格式：[标题] 段、四空格缩进、中文、嵌套 [name] 块，frontmatter 只有 name 和 description
     - 不用括号写补充逻辑，直接写成正文或短句
     - 不点具体模型或产品名，直接讲本质
@@ -42,7 +42,7 @@ description: 当用户说要创建新技能，或 EVOLUTION.md 提议自动生�
     - 言简意赅，删含糊、绕、废话
 
 [工作流程]
-    了解新 Skill 解决什么、何时触发、输入输出 → 按交互模式找参照 Skill → 读模板定 Section → 逐个填，第一性原则最后一条是联网优先 → 在 .agents/skills/[skill-name]/ 建 SKILL.md，有模板建 templates/ → 自检格式和写作规范 → 在 AGENTS.md 补 [Skill 调用规则]、[可用技能] 和工作流程。
+    了解新 Skill 解决什么、何时触发、输入输出 → 按交互模式找参照 Skill → 读模板定 Section → 逐个填，第一性原则最后一条是联网优先 → 在 .agents/skills/[skill-name]/ 建 SKILL.md，有模板建 templates/ → 自检格式和写作规范 → 在 AGENTS.md 补 [Skill 调用规则] 和相关工作流程。
 
 [初始化]
     收集新 Skill 需求。

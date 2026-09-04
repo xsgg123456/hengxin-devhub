@@ -1,0 +1,11 @@
+{
+  "description": "由 dev-builder 按 DEV-PLAN 技术栈维护。argv 不经过 shell，cwd 相对 Harness 根目录。",
+  "preCommitChecks": [
+    {
+      "name": "Harness 自动化测试",
+      "cwd": ".",
+      "argv": ["{python}", "-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-v"],
+      "timeoutSeconds": 120
+    }
+  ]
+}
