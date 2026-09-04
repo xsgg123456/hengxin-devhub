@@ -24,6 +24,7 @@ REQUIRED_PATHS = (
     ".codex/hooks.json",
     ".codex/hooks/harness_runtime.py",
     ".codex/hooks/commit_gate.py",
+    ".codex/hooks/reuse_gate.py",
     ".codex/hooks/review_gate.py",
     ".codex/hooks/security_utils.py",
     ".githooks/commit-msg",

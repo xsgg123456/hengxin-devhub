@@ -9,6 +9,7 @@ import subprocess
 import sys
 
 from review_gate import current_review_status
+from reuse_gate import enforce_reuse_baseline
 
 
 def resolve_argv(argv: list[str], workdir: Path) -> list[str]:
@@ -33,6 +34,9 @@ def run_pre_commit_checks(root: Path) -> tuple[bool, str]:
         return True, ""
     try:
         config = json.loads(config_path.read_text(encoding="utf-8-sig"))
+        reuse_passed, reuse_detail = enforce_reuse_baseline(root, config.get("reuseBaseline"))
+        if not reuse_passed:
+            return False, reuse_detail
         checks = config.get("preCommitChecks", [])
         if not isinstance(checks, list):
             raise ValueError("preCommitChecks 必须是数组")

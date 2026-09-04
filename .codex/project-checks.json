@@ -1,5 +1,20 @@
 {
-  "description": "由 dev-builder 按 DEV-PLAN 技术栈维护。argv 不经过 shell，cwd 相对 Harness 根目录。",
+  "description": "由 dev-builder 按 DEV-PLAN 技术栈维护。argv 不经过 shell，cwd 相对 Harness 根目录；reuseBaseline 约束指定母版的客观文件边界。",
+  "reuseBaseline": {
+    "allowedFrontendRoots": ["it-project-console/web"],
+    "protectedPaths": [
+      "it-project-console/web/package.json",
+      "it-project-console/web/src/main.ts",
+      "it-project-console/web/src/views/index/index.vue",
+      "it-project-console/web/src/views/index/style.scss",
+      "it-project-console/web/src/components/core/layouts/art-header-bar/index.vue",
+      "it-project-console/web/src/components/core/layouts/art-menus/art-sidebar-menu/index.vue",
+      "it-project-console/web/src/router/index.ts",
+      "it-project-console/web/src/config/setting.ts"
+    ],
+    "parallelEntryPatterns": ["**/vite.config.*", "**/src/App.vue", "**/src/App.tsx"],
+    "frontendPackages": ["vue", "react", "svelte", "@angular/core", "vite", "next", "nuxt"]
+  },
   "preCommitChecks": [
     {
       "name": "Harness 自动化测试",
