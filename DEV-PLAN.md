@@ -8,24 +8,26 @@
 
 | 项目 | 状态 |
 |---|---|
-| Product Spec | 已完成，11 项需求、27 条验收标准 |
+| Product Spec | 已完成，12 项需求、31 条验收标准 |
 | Design Brief | 已完成，Art Design Pro 为视觉与前端基线 |
-| 设计交付方式 | 已确认：不单独画 Pencil、不做一次性 HTML；真实 Vue 前端就是高保真可点击原型 |
+| 设计交付方式 | 已确认：不单独画 Pencil、不做一次性 HTML；真实 Vue 前端就是领导可操作的评审版 |
 | 前端技术 | 已确认：复用 Art Design Pro 现有代码和技术栈 |
 | 后端技术架构 | 已确认：Node.js + TypeScript + Fastify + Prisma + PostgreSQL 16 + MinIO |
 | 产品代码 | 未开始 |
 | 当前可执行阶段 | Phase 1 |
+| 后端开工门禁 | Phase 4 通过且领导明确确认流程、信息结构和核心交互后，才允许进入 Phase 5 |
 
 产品采用 pnpm workspace：前端放在 `it-project-console/web/`，后端放在 `it-project-console/api/`。前端参考母版是 `D:/Work_Project/art-design-pro`，基准提交为 `f3aaf58eec1a0e988f162352c33862327a484f95`。复制时不带入 `.git`、`node_modules`、`.playwright-cli`、构建缓存和母版工作区未提交内容；保留上游 MIT License。原母版只读，产品子目录不得再次 `git init`。
 
 ### 0.1 功能依赖图
 
 ```text
-Phase 1 模板落库与风险工作台
-   ├─> Phase 2 工程师进度与项目详情 ─┐
-   └─> Phase 3 业务提交与单级立项 ───┴─> Phase 4 负载、甘特与前端原型验收
-                                                │
-                                                ▼
+Phase 1 真实原型底座与演示身份
+   └─> Phase 2 跨角色最小业务闭环
+          └─> Phase 3 管理决策与生命周期补齐
+                 └─> Phase 4 领导评审版打磨与确认
+                                │
+                                ▼（领导明确通过）
 Phase 5 Fastify/PostgreSQL/MinIO 基础 ─> Phase 6 需求立项闭环
                                                 │
                                                 ▼
@@ -37,7 +39,7 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 
 ---
 
-## Phase 1: Art Design Pro 落库与风险工作台
+## Phase 1: 真实原型底座与演示身份
 
 **状态**：待开始
 
@@ -45,8 +47,9 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 
 - 复制并运行 Art Design Pro，保留布局、路由、权限、请求封装、Pinia、表格、表单、抽屉和图标能力。
 - 删除或禁用主题设置、深色模式、布局切换、多语言、工作标签、多余 Dashboard、聊天和示例入口。
-- 建立 mock 与未来 API 可切换的数据访问边界，后端落地时不重写页面。
-- 实现管理人员默认首页“项目总览 / 风险工作台”：五个指标、今日需关注、项目表格、筛选和风险文字标签。
+- 建立原型/生产运行模式和统一 service/repository 边界，页面只能通过接口访问数据，后端落地时不重写页面。
+- 建立覆盖业务人员、项目主负责人、项目协作人员和管理人员的四个固定演示账号；在顶部当前用户区域实现仅原型模式可见的身份切换、“演示模式”标识和一键重置。
+- 建立单一共享 Mock 数据库、固定初始场景和浏览器本地持久化；切换身份和刷新页面不得丢失已成功的业务操作。
 - 实现设备门禁：手机、平板或业务区宽度小于 1024px 时只显示“请在电脑端使用”，门禁判定前不请求业务数据。
 
 **关键文件**：
@@ -58,115 +61,131 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 - `it-project-console/THIRD_PARTY_LICENSES/Art-Design-Pro-LICENSE` — 上游授权和来源提交。
 - `it-project-console/web/src/router/routes/asyncRoutes.ts` — 精简后的角色路由。
 - `it-project-console/web/src/config/setting.ts` — 固定浅色和单一布局。
-- `it-project-console/web/src/views/project-overview/index.vue` — 风险优先管理首页。
-- `it-project-console/web/src/views/project-overview/modules/risk-project-table.vue` — 风险项目表格。
-- `it-project-console/web/src/components/project/risk-tag.vue` — 文字加颜色的风险标签。
-- `it-project-console/web/src/services/project-service.ts` — 页面数据接口边界。
-- `it-project-console/web/src/mocks/project-data.ts` — 可重复演示的数据。
+- `it-project-console/web/src/config/runtime.ts` — 原型模式与生产模式的单向配置边界。
+- `it-project-console/web/src/mocks/auth-context.ts` — 四个固定演示账号和三类角色上下文。
+- `it-project-console/web/src/mocks/seed.ts` — 可重复恢复的领导评审初始场景。
+- `it-project-console/web/src/repositories/prototype-repository.ts` — 共享 Mock 数据、持久化、事务式更新和重置入口。
+- `it-project-console/web/src/stores/modules/prototype.ts` — 当前演示身份、数据版本和异常场景状态。
+- `it-project-console/web/src/components/system/prototype-user-menu.vue` — 身份切换、演示标识和重置入口。
 - `it-project-console/web/src/components/system/unsupported-device.vue` — 不支持设备提示。
 
 **验收标准**：
 
-- `pnpm dev` 可启动，视觉与 Art Design Pro 一致，母版仓库未被修改。
-- 管理人员首屏先看到五个指标和约 8–12 行风险项目，不出现装饰性大图表。
-- 能按项目名称、需求部门、主负责人、当前环节和风险类型筛选。
+- `pnpm dev` 可启动，应用框架视觉与 Art Design Pro 一致，母版仓库未被修改。
+- 四个演示账号可切换；每次切换后当前用户、默认首页、导航和路由权限同步变化，刷新后保留当前身份。
+- 所有页面数据调用都经过统一 repository；修改数据后切换身份或刷新仍保留，一键重置可恢复完全一致的初始快照。
+- 生产模式无法显示身份切换、演示标识和重置入口，也无法回退到 Mock 数据源。
 - 1024、1280、1440px 工作区可用；手机、平板和过窄窗口不加载业务数据。
 - 类型检查、单元测试和生产构建通过。
 
 ---
 
-## Phase 2: 工程师进度与项目详情原型
+## Phase 2: 跨角色最小业务闭环
 
 **状态**：待开始，依赖 Phase 1
 
 **交付内容**：
 
-- 实现“我的项目”，分开展示主责与协作项目，并提供风险、阶段、最近更新和快速更新入口。
-- 实现项目详情：基本信息、固定七阶段、日期、风险、公开进度和计划调整历史。
-- 实现主负责人更新抽屉：简单状态、当前阶段、阶段预计完成日、当前预计上线日、进展和阻塞说明。
-- 日期变更时强制填写原因；协作人只能提交个人进展或阻塞，不能修改整体阶段和关键日期。
-- 完成验收交付后支持标记完成并自动归档；用 mock 演示管理人员纠正阶段/状态、调整计划、取消、手动归档、重新打开，以及仅无进度历史项目可删除。
-
-**关键文件**：
-
-- `it-project-console/web/src/views/my-projects/index.vue` — 工程师项目入口。
-- `it-project-console/web/src/views/project-detail/index.vue` — 项目详情。
-- `it-project-console/web/src/components/project/stage-progress.vue` — 固定七阶段进度条。
-- `it-project-console/web/src/components/project/progress-update-drawer.vue` — 进度更新抽屉。
-- `it-project-console/web/src/components/project/schedule-history.vue` — 日期调整历史。
-- `it-project-console/web/src/domain/project.ts` — 阶段、状态和成员类型。
-- `it-project-console/web/src/services/progress-service.ts` — 进度数据接口边界。
-
-**验收标准**：
-
-- 主负责人可在 1 分钟内更新一次进度，不出现百分比字段。
-- 七阶段严格为需求受理、立项评审、方案设计、开发编码、联调测试、上线部署、验收交付。
-- 协作人界面没有整体阶段和关键日期编辑权限。
-- 日期变化未填原因不能保存，保存后旧值、新值、原因、操作人和时间可查看。
-- 加载、空、错误、无权限、提交中、成功和失败状态可演示。
-
----
-
-## Phase 3: 业务提交与单级立项原型
-
-**状态**：待开始，依赖 Phase 1
-
-**交付内容**：
-
-- 实现业务人员“我的需求”，展示本部门申请的待审批、已退回、已立项和已撤回状态。
-- 实现轻量提交表单：项目名称、自动带入部门和提交人、一句话需求、期望上线日、PRD、HTML 原型文件或链接。
-- 实现待审批或已退回需求的编辑、撤回与删除入口，并保护已立项材料。
-- 实现管理人员单级审批抽屉：查看材料、通过立项、唯一主负责人、可选协作人员、优先级和计划；退回只要求原因。
-- 立项通过后直接进入方案设计，不增加上线审批、验收工单或多级审批。
+- 实现业务人员“我的需求”和提交表单；完成校验后创建待审批需求，并以“模拟上传”展示 PRD 与 HTML 原型的附件元数据。
+- 实现管理人员“需求审批”和审批抽屉；通过立项后从同一需求生成唯一正式项目、主负责人、协作人员及前两环节历史。
+- 实现 IT 工程师“我的项目”、项目详情、固定七阶段和进度更新抽屉；主负责人可更新阶段、状态和日期，协作人员只能提交个人进展或阻塞。
+- 实现管理人员“项目总览 / 风险工作台”的核心版本；工程师更新后，同一项目的指标、风险文字、当前阶段和最近更新时间立即变化。
+- 贯通“业务提交 → 管理立项 → 主负责人更新 → 管理查看结果”的共享 Mock 数据链路，不允许用静态假成功代替关联数据变化。
 
 **关键文件**：
 
 - `it-project-console/web/src/views/my-demands/index.vue` — 业务需求列表。
 - `it-project-console/web/src/views/demand-form/index.vue` — 提交和编辑需求。
 - `it-project-console/web/src/views/demand-approval/index.vue` — 待审批列表。
-- `it-project-console/web/src/components/demand/attachment-field.vue` — PRD 和 HTML 原型输入。
-- `it-project-console/web/src/components/demand/approval-drawer.vue` — 立项与退回。
+- `it-project-console/web/src/components/demand/attachment-field.vue` — 明确标识为模拟上传的 PRD 和 HTML 原型输入。
+- `it-project-console/web/src/components/demand/approval-drawer.vue` — 立项与退回操作。
+- `it-project-console/web/src/views/my-projects/index.vue` — 工程师项目入口。
+- `it-project-console/web/src/views/project-detail/index.vue` — 项目详情。
+- `it-project-console/web/src/views/project-overview/index.vue` — 风险优先管理首页。
+- `it-project-console/web/src/views/project-overview/modules/risk-project-table.vue` — 风险项目表格。
+- `it-project-console/web/src/components/project/stage-progress.vue` — 固定七阶段进度条。
+- `it-project-console/web/src/components/project/progress-update-drawer.vue` — 进度更新抽屉。
+- `it-project-console/web/src/components/project/risk-tag.vue` — 文字加颜色的风险标签。
 - `it-project-console/web/src/domain/demand.ts` — 需求状态与附件类型。
+- `it-project-console/web/src/domain/project.ts` — 阶段、状态和成员类型。
 - `it-project-console/web/src/services/demand-service.ts` — 需求数据接口边界。
+- `it-project-console/web/src/services/project-service.ts` — 项目与管理总览数据接口边界。
+- `it-project-console/web/src/services/progress-service.ts` — 进度数据接口边界。
 
 **验收标准**：
 
-- 缺少 PRD 或 HTML 原型不能提交，并定位缺失字段。
-- 退回必须填写原因；立项必须且只能有一名主负责人，可有多名协作人。
-- 业务只看本部门；管理看全部；工程师导航不出现提交和审批页面。
-- 页面没有 AI、聊天、工单、子任务、工时或小改动入口。
-- 表单可用键盘操作，图标按钮有 Tooltip 和可访问名称。
+- 从重置后的初始场景开始，可连续走通“业务提交 → 管理立项 → 主负责人更新 → 管理查看结果”，且全程操作同一需求和项目记录。
+- 立项生成的项目立即出现在所选主负责人和协作人员的“我的项目”；主负责人更新后，管理总览显示新的阶段、状态、日期和风险。
+- 主负责人可在 1 分钟内更新一次进度；七阶段名称和顺序固定，不出现百分比字段。
+- 业务只看本部门，工程师只看本人主责或协作项目，管理人员看全部；直接访问无权限路由或执行越权操作都不能修改共享数据。
+- 完成闭环后刷新页面仍保留结果；一键重置后需求、项目、进度、风险和当前身份恢复固定初始状态。
+- 类型检查、单元测试、跨角色 E2E 和生产构建通过。
 
 ---
 
-## Phase 4: 负载、月度甘特与前端原型验收
+## Phase 3: 管理决策与生命周期补齐
 
-**状态**：待开始，依赖 Phase 2、Phase 3
+**状态**：待开始，依赖 Phase 2
 
 **交付内容**：
 
-- 实现人员负载：主责数、协作数、同期项目、阶段和风险，不做排名、得分或绩效。
-- 用 DOM/CSS Grid 实现只读月度甘特：一项目一行、整体时间条、今日线、风险颜色和延期文字。
-- 实现管理人员名单页的 mock 交互。
-- 完成三类角色导航、页面互通和通用状态，形成可直接评审的真实前端原型。
-- 用 Playwright 固化三条核心演示路径和 1024/1280/1440px 截图基线。
+- 完成风险工作台：五个指标、今日需关注、项目表格、负责人/部门/阶段/状态/风险筛选，以及延期、停更、阻塞、临期和计划变化的确定性计算。
+- 完成项目详情的日期调整历史、进度历史和管理纠正；支持需求退回/重提/撤回/删除，以及项目完成、取消、归档、重新打开和符合条件的误建删除。
+- 实现人员负载：分开统计主责、协作、同期项目、阶段和风险，不做排名、得分或绩效评价。
+- 用 DOM/CSS Grid 实现只读月度甘特：一项目一行、整体时间条、原计划标记、今日线、风险颜色和延期文字。
+- 实现管理人员名单页的 Mock 交互和最后一名管理员保护，并让所有管理页面继续使用 Phase 2 的共享数据。
 
 **关键文件**：
 
+- `it-project-console/web/src/components/project/schedule-history.vue` — 日期调整历史。
+- `it-project-console/web/src/services/risk-service.ts` — 前端评审版确定性风险计算。
 - `it-project-console/web/src/views/workload/index.vue` — 人员负载。
 - `it-project-console/web/src/views/monthly-gantt/index.vue` — 月度甘特页面。
 - `it-project-console/web/src/components/project/monthly-gantt.vue` — CSS Grid 只读时间轴。
 - `it-project-console/web/src/views/manager-grants/index.vue` — 管理人员名单。
-- `it-project-console/web/src/mocks/auth-context.ts` — 三类演示身份。
-- `it-project-console/web/playwright.config.ts` — E2E 与桌面视口配置。
+- `it-project-console/web/src/services/management-service.ts` — 负载、甘特和管理人员数据接口边界。
 
 **验收标准**：
 
-- 负载分开统计主责和协作，多人项目只有一人计入主责，页面不存在排名。
-- 甘特展示与所选月份相交的项目；延期同时有颜色和“延期 N 天”，不支持拖拽、依赖和阶段分段。
-- 三类角色分别完成“提交需求”“更新进度”“查看风险并进入详情”的端到端演示。
-- Design Brief 的 11 个 SCREEN、13 个 CMP 和全部通用状态逐项通过。
-- E2E、截图回归、类型检查和生产构建通过后，才确认前端原型定稿。
+- 管理人员首屏先看到五个指标和约 8–12 行风险项目，可在 30 秒内按负责人、部门、阶段、状态或风险定位目标项目。
+- 日期变化未填原因不能保存；保存后旧值、新值、原因、操作人和时间可查看，管理纠正与项目生命周期操作同步反映到所有相关页面。
+- 负载分开统计主责和协作，多人项目只有一人计入主责；甘特展示与所选月份相交的项目，延期同时有颜色和“延期 N 天”。
+- 项目完成、取消、归档、重新打开和删除规则与 Product Spec 一致，刷新与角色切换后状态不回滚。
+- 页面没有 AI、聊天、工单、子任务、工时、绩效排名、甘特拖拽、依赖和阶段分段。
+- 类型检查、单元测试、关键管理路径 E2E 和生产构建通过。
+
+---
+
+## Phase 4: 领导评审版打磨与确认
+
+**状态**：待开始，依赖 Phase 3
+
+**交付内容**：
+
+- 补齐三类角色的导航、页面互通以及加载、空数据、网络错误、保存失败、无权限、提交中、成功和数据损坏恢复状态。
+- 建立可控演示场景，在不改代码的情况下切换正常、空数据、加载、保存失败和无权限结果；失败场景不得破坏最近一次成功数据。
+- 清理全部死按钮、静态假成功、孤立页面和模板残留；所有可见核心业务操作必须产生可追踪的数据变化或明确说明模拟边界。
+- 用 Playwright 固化跨角色完整闭环、权限隔离、刷新持久化、一键重置、异常恢复和 1024/1280/1440px 截图基线。
+- 编写领导评审路线与结果清单；领导未明确确认流程、信息结构和核心交互时，Phase 5 保持锁定并回到上游文档和前端迭代。
+
+**关键文件**：
+
+- `it-project-console/web/src/mocks/scenarios.ts` — 正常、空数据、失败和无权限演示场景。
+- `it-project-console/web/src/components/system/prototype-scenario-menu.vue` — 仅原型模式可见的受控场景入口。
+- `it-project-console/web/src/components/system/error-recovery.vue` — 演示数据损坏提示与重置恢复。
+- `it-project-console/web/playwright.config.ts` — E2E 与桌面视口配置。
+- `it-project-console/web/e2e/leadership-review.spec.ts` — 跨角色完整闭环和评审路径。
+- `it-project-console/web/e2e/prototype-boundary.spec.ts` — 权限、持久化、重置和生产禁用验证。
+- `it-project-console/docs/LEADERSHIP-REVIEW.md` — 可重复执行的领导评审路线和结论清单。
+
+**验收标准**：
+
+- 从一键重置开始，可在同一浏览器连续完成“提交需求 → 审批立项 → 更新进度 → 查看风险、负载与甘特”，中途刷新或切换身份不丢数据。
+- 四个演示账号的导航、默认首页、数据范围和操作权限正确；直接访问无权限路由或越权操作不会改变数据。
+- 核心页面的加载、空、错误、无权限、提交中、成功和恢复状态均可稳定重现，所有可见核心按钮均有可观察结果。
+- Design Brief 的 11 个 SCREEN、15 个 CMP 和全部通用状态逐项通过。
+- E2E、截图回归、类型检查和生产构建通过；生产构建不包含演示身份、场景控制、重置入口或 Mock 回退。
+- 领导按照 `LEADERSHIP-REVIEW.md` 实际走完主链路，并明确记录“通过”后，才确认前端评审版定稿并解锁 Phase 5。
 
 ---
 
@@ -205,13 +224,13 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 
 ## Phase 5: Fastify、PostgreSQL 与 MinIO 基础
 
-**状态**：待开始，依赖 Phase 4
+**状态**：待开始且锁定；依赖 Phase 4 通过及领导明确确认前端评审版
 
 **交付内容**：
 
 - 建立 Fastify API、统一响应/错误、Zod 校验、OpenAPI、日志、安全插件和健康检查。
 - 建立独立 PostgreSQL 16、MinIO、自动建桶及独立数据卷，提供可重复启动的 Docker Compose。
-- 建立 Prisma 基础模型、migration、种子数据、服务端 RBAC 和仅开发环境可用的三类演示身份；同时建立可在业务事务内写入的通知 outbox。
+- 建立 Prisma 基础模型、migration、种子数据、服务端 RBAC 和仅开发环境可用的四个演示账号（业务、主责、协作、管理）；同时建立可在业务事务内写入的通知 outbox。
 - 移植并收窄旧项目 S3/MinIO 代码，实现预签名上传、确认、鉴权下载和孤儿对象清理。
 - 建立 Vitest + Fastify `inject()` 单测和使用独立 PostgreSQL schema/MinIO Bucket 的集成测试入口。
 
@@ -495,16 +514,17 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 | 需求 | 前端原型 | 后端实现与最终验证 |
 |---|---:|---:|
 | REQ-001 钉钉身份与角色权限 | Phase 1、4 | Phase 5、9、10 |
-| REQ-002 业务需求提交 | Phase 3 | Phase 6、10 |
-| REQ-003 单级立项与人员分派 | Phase 3 | Phase 6、10 |
+| REQ-002 业务需求提交 | Phase 2、4 | Phase 6、10 |
+| REQ-003 单级立项与人员分派 | Phase 2、4 | Phase 6、10 |
 | REQ-004 七环节进度管理 | Phase 2 | Phase 7、10 |
-| REQ-005 滚动计划与风险规则 | Phase 1、2 | Phase 7、10 |
+| REQ-005 滚动计划与风险规则 | Phase 2、3 | Phase 7、10 |
 | REQ-006 钉钉消息提醒 | 通知入口原型 | Phase 7、9、10 |
-| REQ-007 风险优先项目总览 | Phase 1 | Phase 8、10 |
-| REQ-008 人员负载视图 | Phase 4 | Phase 8、10 |
-| REQ-009 月度整体项目甘特图 | Phase 4 | Phase 8、10 |
-| REQ-010 项目详情与历史 | Phase 2 | Phase 7、10 |
-| REQ-011 删除、取消与归档 | Phase 2、3 | Phase 6、7、10 |
+| REQ-007 风险优先项目总览 | Phase 2、3、4 | Phase 8、10 |
+| REQ-008 人员负载视图 | Phase 3、4 | Phase 8、10 |
+| REQ-009 月度整体项目甘特图 | Phase 3、4 | Phase 8、10 |
+| REQ-010 项目详情与历史 | Phase 2、3、4 | Phase 7、10 |
+| REQ-011 删除、取消与归档 | Phase 3、4 | Phase 6、7、10 |
+| REQ-012 领导可评审的真实前端原型模式 | Phase 1、2、3、4 | 生产环境禁用，Phase 10 复核无残留 |
 
 ---
 
@@ -513,6 +533,9 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 - 单一真相源优先级：真实前端原型 > `Design-Brief.md` > `Product-Spec.md`。
 - 每个 Phase 开始前拆成 1–3 个可独立验收 Task。
 - 每个 Phase 执行 Code Review、测试完整性、编译验证和功能测试；全部通过才能 commit。
+- 前端前四个 Phase 按“底座 → 纵向闭环 → 管理决策 → 领导确认”顺序执行，不按角色各自铺一套孤立页面。
+- 所有可见核心业务操作必须修改共享状态并刷新关联页面；仅弹 Toast、死按钮和静态假成功不计入完成。
+- Phase 4 未通过或领导未明确确认时，禁止开始 Phase 5；反馈先同步 Product Spec、Design Brief 和 DEV-PLAN，再迭代前端。
 - Git 提交可用 `feat`、`fix`、`refactor`、`chore` 前缀，但摘要必须有中文。
 - 不在产品子目录 `git init`，不修改 Art Design Pro 母版仓库。
 - 前端优先复用已有实现，只新增风险表格、七阶段、进度抽屉、只读甘特等业务组件。
