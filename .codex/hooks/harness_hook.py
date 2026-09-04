@@ -22,6 +22,8 @@ FEEDBACK_PATTERN = re.compile(
     r"应该是|应该写"
 )
 
+CJK_PATTERN = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
+
 IGNORED_SUFFIXES = {
     ".md",
     ".txt",
@@ -331,6 +333,37 @@ def stop_gate(event: dict[str, Any]) -> int:
     return 0
 
 
+def validate_commit_message(message_path: str) -> int:
+    if message_path == "-":
+        content = sys.stdin.buffer.read().decode("utf-8-sig", errors="replace")
+    else:
+        path = Path(message_path)
+        if not path.is_file():
+            print(f"❌ 找不到 Git 提交信息文件：{path}", file=sys.stderr)
+            return 1
+        content = path.read_text(encoding="utf-8-sig", errors="replace")
+
+    subject = next(
+        (
+            line.strip()
+            for line in content.splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ),
+        "",
+    )
+    if not subject:
+        print("❌ Git 提交标题不能为空。", file=sys.stderr)
+        return 1
+    if not CJK_PATTERN.search(subject):
+        print(
+            "❌ Git 提交标题必须包含中文。允许 feat:、fix: 等类型前缀，"
+            "例如：feat: 增加用户登录功能",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
 COMMANDS = {
     "detect-feedback-signal": detect_feedback_signal,
     "check-evolution": check_evolution,
@@ -342,8 +375,14 @@ COMMANDS = {
 
 
 def main() -> int:
+    if len(sys.argv) == 3 and sys.argv[1] == "validate-commit-message":
+        return validate_commit_message(sys.argv[2])
     if len(sys.argv) != 2 or sys.argv[1] not in COMMANDS:
-        print("usage: harness_hook.py <hook-name>", file=sys.stderr)
+        print(
+            "usage: harness_hook.py <hook-name> | "
+            "validate-commit-message <message-file>",
+            file=sys.stderr,
+        )
         return 2
     event = read_event()
     try:

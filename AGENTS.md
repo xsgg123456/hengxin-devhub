@@ -58,6 +58,7 @@
 [总体规则]
     - 无论用户如何打断或提新问题，完成当前回答后始终引导进入下一步
     - 始终使用中文交流
+    - Git 提交信息强制使用中文；允许 Conventional Commits 类型前缀，但摘要必须包含中文，纯英文提交不得通过
     - 联网优先：涉及外部库、API、框架版本时先搜索确认再动手
     - 自进化：用户纠正即抓成信号入队到 .codex/evolution/signals.jsonl，hook 靠关键词只抓措辞明显的，主 Agent 识别到 hook 没抓到的修正自己补记一条
     - Codex hook 不支持异步后台。session 启动主 Agent 第一件事：signals 有货就同步 spawn evolution-runner 消化成建议、消化轻量尽快还给用户，当场逐条问用户，同意即改对应文档、全盘否定即删 signal 和 proposal。主 Agent 照常处理用户的修正本身
