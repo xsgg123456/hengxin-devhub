@@ -5,7 +5,7 @@
         ><h2 class="text-xl font-medium text-g-900">我的项目</h2
         ><p class="mt-1.5 text-sm text-g-500">同时展示主责与协作项目，项目职责清晰可见</p></div
       >
-      <ElTag type="primary" effect="light" round>{{ prototypeStore.currentUser.title }}</ElTag>
+      <ElTag type="primary" effect="light" round>{{ prototypeStore.currentUser.roleLabel }}</ElTag>
     </div>
     <ElRow :gutter="20">
       <ElCol v-for="metric in metrics" :key="metric.label" :span="6">
@@ -32,7 +32,7 @@
             ></template
           ></ElTableColumn
         >
-        <ElTableColumn label="我的角色" min-width="108"
+        <ElTableColumn label="项目关系" min-width="108"
           ><template #default="{ row }"
             ><ElTag :type="isPrimary(row) ? 'primary' : 'info'" effect="light" round>{{
               isPrimary(row) ? '主责' : '协作'

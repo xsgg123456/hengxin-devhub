@@ -6,30 +6,28 @@ export const DEMO_USERS = [
     name: '陈立峰',
     department: '信息技术部',
     role: 'manager',
-    title: 'IT 负责人'
+    roleLabel: '管理人员'
   },
   {
     id: 'user-business-li',
     name: '李思敏',
     department: '市场运营部',
     role: 'business',
-    title: '业务需求负责人'
+    roleLabel: '业务人员'
   },
   {
     id: 'user-engineer-wang',
     name: '王浩然',
     department: '信息技术部',
     role: 'engineer',
-    persona: 'primary',
-    title: '项目主负责人'
+    roleLabel: 'IT工程师'
   },
   {
     id: 'user-engineer-zhao',
     name: '赵清越',
     department: '信息技术部',
     role: 'engineer',
-    persona: 'collaborator',
-    title: '项目协作人员'
+    roleLabel: 'IT工程师'
   }
 ] as const satisfies readonly DemoUser[]
 

@@ -54,7 +54,12 @@ export class PrototypeRepository {
     try {
       const parsed: unknown = JSON.parse(rawSnapshot)
       if (!isPrototypeSnapshot(parsed)) throw new PrototypeDataError()
-      return structuredClone(parsed)
+      const normalized = structuredClone(parsed)
+      if (JSON.stringify(normalized.database.users) !== JSON.stringify(DEMO_USERS)) {
+        normalized.database.users = structuredClone([...DEMO_USERS])
+        this.write(normalized)
+      }
+      return normalized
     } catch (error) {
       if (error instanceof PrototypeDataError) throw error
       throw new PrototypeDataError()

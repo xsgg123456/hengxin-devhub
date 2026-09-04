@@ -15,7 +15,7 @@
         <span class="prototype-avatar" aria-hidden="true">{{ initials }}</span>
         <span class="prototype-user-copy">
           <strong>{{ prototypeStore.currentUser.name }}</strong>
-          <small>{{ prototypeStore.currentUser.title }}</small>
+          <small>{{ prototypeStore.currentUser.roleLabel }}</small>
         </span>
         <ArtSvgIcon icon="ri:arrow-down-s-line" />
       </button>
@@ -24,7 +24,7 @@
     <div class="prototype-identity-menu">
       <div class="identity-menu-heading">
         <strong>切换演示身份</strong>
-        <span>四个角色共享同一份业务数据</span>
+        <span>四个演示账号 · 三类系统角色</span>
       </div>
       <button
         v-for="user in demoUsers"
@@ -38,7 +38,7 @@
         <span class="identity-mini-avatar">{{ user.name.slice(-2) }}</span>
         <span
           ><strong>{{ user.name }}</strong
-          ><small>{{ user.title }} · {{ user.department }}</small></span
+          ><small>{{ user.roleLabel }} · {{ user.department }}</small></span
         >
         <ArtSvgIcon v-if="user.id === prototypeStore.currentUser.id" icon="ri:check-line" />
       </button>

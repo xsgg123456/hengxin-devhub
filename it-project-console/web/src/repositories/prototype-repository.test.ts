@@ -37,6 +37,48 @@ describe('PrototypeRepository', () => {
     expect(new PrototypeRepository(storage).load().activeUserId).toBe('user-engineer-wang')
   })
 
+  it('加载旧快照时把工程师身份标签迁移为系统角色并保留项目关系', () => {
+    const storage = new MemoryStorage()
+    const repository = new PrototypeRepository(storage)
+    const snapshot = repository.load()
+    const legacySnapshot = structuredClone(snapshot) as unknown as {
+      revision: number
+      database: {
+        users: Array<Record<string, unknown>>
+        demands: Array<Record<string, unknown>>
+      }
+    }
+    legacySnapshot.revision = 7
+    legacySnapshot.database.demands[0].status = 'returned'
+    legacySnapshot.database.users[2] = {
+      id: 'user-engineer-wang',
+      name: '王浩然',
+      department: '信息技术部',
+      role: 'engineer',
+      persona: 'primary',
+      title: '项目主负责人'
+    }
+    storage.setItem(PROTOTYPE_STORAGE_KEY, JSON.stringify(legacySnapshot))
+
+    const migrated = repository.load()
+    expect(migrated.database.users[2]).toEqual({
+      id: 'user-engineer-wang',
+      name: '王浩然',
+      department: '信息技术部',
+      role: 'engineer',
+      roleLabel: 'IT工程师'
+    })
+    expect(migrated.database.users[3]).toEqual({
+      id: 'user-engineer-zhao',
+      name: '赵清越',
+      department: '信息技术部',
+      role: 'engineer',
+      roleLabel: 'IT工程师'
+    })
+    expect(migrated.revision).toBe(7)
+    expect(migrated.database.demands[0].status).toBe('returned')
+  })
+
   it('重置会恢复确定性业务快照并保留当前身份', () => {
     const storage = new MemoryStorage()
     const repository = new PrototypeRepository(storage)

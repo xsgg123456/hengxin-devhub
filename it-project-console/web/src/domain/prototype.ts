@@ -1,5 +1,4 @@
 export type SystemRole = 'business' | 'engineer' | 'manager'
-export type EngineerPersona = 'primary' | 'collaborator'
 export type PrototypeScenario = 'normal' | 'empty' | 'loading' | 'save-error' | 'forbidden'
 export type DemandStatus = 'pending' | 'returned' | 'established' | 'withdrawn'
 export type ProjectStatus = 'active' | 'completed' | 'cancelled'
@@ -22,8 +21,7 @@ export interface DemoUser {
   name: string
   department: string
   role: SystemRole
-  persona?: EngineerPersona
-  title: string
+  roleLabel: '业务人员' | 'IT工程师' | '管理人员'
 }
 
 export interface DemoDemand {
