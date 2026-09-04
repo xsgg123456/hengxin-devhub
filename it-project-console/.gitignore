@@ -1,0 +1,8 @@
+node_modules/
+.playwright-cli/
+output/
+test-results/
+playwright-report/
+web/dist/
+web/node_modules/
+api/node_modules/

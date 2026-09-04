@@ -6,6 +6,24 @@
       "cwd": ".",
       "argv": ["{python}", "-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-v"],
       "timeoutSeconds": 120
+    },
+    {
+      "name": "前端类型检查",
+      "cwd": "it-project-console",
+      "argv": ["pnpm", "typecheck"],
+      "timeoutSeconds": 180
+    },
+    {
+      "name": "前端单元测试",
+      "cwd": "it-project-console",
+      "argv": ["pnpm", "test"],
+      "timeoutSeconds": 180
+    },
+    {
+      "name": "前端生产构建",
+      "cwd": "it-project-console",
+      "argv": ["pnpm", "build"],
+      "timeoutSeconds": 240
     }
   ]
 }

@@ -1,0 +1,22 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
+.cursorrules
+.husky/
+.vscode/
+.env
+.env.*
+!.env.example
+!.env.prototype
+!.env.production
+
+# Auto-generated files
+src/types/import/auto-imports.d.ts
+src/types/import/components.d.ts
+.auto-import.json
+output/
+test-results/
+playwright-report/
+.playwright-cli/

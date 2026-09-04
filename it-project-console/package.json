@@ -1,0 +1,17 @@
+{
+  "name": "it-project-console",
+  "private": true,
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": "24.18.1",
+    "pnpm": "11.24.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @it-project-console/web dev",
+    "typecheck": "pnpm --filter @it-project-console/web typecheck",
+    "test": "pnpm --filter @it-project-console/web test",
+    "test:e2e": "pnpm --filter @it-project-console/web test:e2e",
+    "build": "pnpm --filter @it-project-console/web build",
+    "check": "pnpm typecheck && pnpm test && pnpm build"
+  }
+}

@@ -13,8 +13,8 @@
 | 设计交付方式 | 已确认：不单独画 Pencil、不做一次性 HTML；真实 Vue 前端就是领导可操作的评审版 |
 | 前端技术 | 已确认：复用 Art Design Pro 现有代码和技术栈 |
 | 后端技术架构 | 已确认：Node.js + TypeScript + Fastify + Prisma + PostgreSQL 16 + MinIO |
-| 产品代码 | 未开始 |
-| 当前可执行阶段 | Phase 1 |
+| 产品代码 | Phase 1 已实现、验证并通过代码审查，等待用户视觉确认 |
+| 当前可执行阶段 | Phase 1 视觉验收；确认后进入 Phase 2 |
 | 后端开工门禁 | Phase 4 通过且领导明确确认流程、信息结构和核心交互后，才允许进入 Phase 5 |
 
 产品采用 pnpm workspace：前端放在 `it-project-console/web/`，后端放在 `it-project-console/api/`。前端参考母版是 `D:/Work_Project/art-design-pro`，基准提交为 `f3aaf58eec1a0e988f162352c33862327a484f95`。复制时不带入 `.git`、`node_modules`、`.playwright-cli`、构建缓存和母版工作区未提交内容；保留上游 MIT License。原母版只读，产品子目录不得再次 `git init`。
@@ -41,7 +41,7 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 
 ## Phase 1: 真实原型底座与演示身份
 
-**状态**：待开始
+**状态**：已实现、验证并通过代码审查（2026-09-04），待用户视觉确认
 
 **交付内容**：
 
@@ -65,8 +65,8 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 - `it-project-console/web/src/mocks/auth-context.ts` — 四个固定演示账号和三类角色上下文。
 - `it-project-console/web/src/mocks/seed.ts` — 可重复恢复的领导评审初始场景。
 - `it-project-console/web/src/repositories/prototype-repository.ts` — 共享 Mock 数据、持久化、事务式更新和重置入口。
-- `it-project-console/web/src/stores/modules/prototype.ts` — 当前演示身份、数据版本和异常场景状态。
-- `it-project-console/web/src/components/system/prototype-user-menu.vue` — 身份切换、演示标识和重置入口。
+- `it-project-console/web/src/store/modules/prototype.ts` — 当前演示身份、数据版本和异常场景状态。
+- `it-project-console/web/src/components/core/layouts/art-header-bar/widget/ArtUserMenu.vue` — 在母版原生用户区内接入身份切换、演示标识和重置入口。
 - `it-project-console/web/src/components/system/unsupported-device.vue` — 不支持设备提示。
 
 **验收标准**：
