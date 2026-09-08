@@ -7,11 +7,15 @@
     "pnpm": "11.24.0"
   },
   "scripts": {
-    "dev": "pnpm --filter @it-project-console/web dev",
-    "typecheck": "pnpm --filter @it-project-console/web typecheck",
-    "test": "pnpm --filter @it-project-console/web test",
+    "dev": "pnpm -r --parallel dev",
+    "dev:web": "pnpm --filter @it-project-console/web dev",
+    "dev:api": "pnpm --filter @it-project-console/api dev",
+    "setup:local": "node scripts/setup-local.mjs",
+    "audit:api": "node scripts/audit-api.mjs",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
     "test:e2e": "pnpm --filter @it-project-console/web test:e2e",
-    "build": "pnpm --filter @it-project-console/web build",
+    "build": "pnpm -r build",
     "check": "pnpm typecheck && pnpm test && pnpm build"
   }
 }

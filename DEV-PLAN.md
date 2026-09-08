@@ -13,8 +13,8 @@
 | 设计交付方式 | 已定版：design/role-prototypes-v2 三角色 HTML；工程师以 engineer.html 为准，开发在现有 Vue 母版原位实现 |
 | 前端技术 | 已确认：复用 Art Design Pro 现有代码和技术栈 |
 | 后端技术架构 | 已确认：Node.js + TypeScript + Fastify + Prisma + PostgreSQL 16 + MinIO |
-| 产品代码 | Phase 3 图表、职责待办、甘特与生命周期已实现并通过技术验收 |
-| 当前可执行阶段 | Phase 4 技术验证已通过，待领导实际评审确认；Phase 5 保持锁定 |
+| 产品代码 | Phase 1–4 前端评审通过；Phase 5 后端基础实现并通过技术验证 |
+| 当前可执行阶段 | Phase 5 已实现，下一步 Phase 6 真实需求提交与立项闭环 |
 | 后端开工门禁 | Phase 4 通过且领导明确确认流程、信息结构和核心交互后，才允许进入 Phase 5 |
 
 产品采用 pnpm workspace：前端放在 `it-project-console/web/`，后端放在 `it-project-console/api/`。前端参考母版是 `D:/Work_Project/art-design-pro`，基准提交为 `f3aaf58eec1a0e988f162352c33862327a484f95`。复制时不带入 `.git`、`node_modules`、`.playwright-cli`、构建缓存和母版工作区未提交内容；保留上游 MIT License。原母版只读，产品子目录不得再次 `git init`。
@@ -188,7 +188,7 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 
 ## Phase 4: 领导评审版打磨与确认
 
-**状态**：技术验证已通过（2026-09-08），领导评审结论待实际确认。证据见 `it-project-console/docs/PHASE-4-VERIFICATION.md`，操作路线见 `it-project-console/docs/LEADERSHIP-REVIEW.md`。
+**状态**：已通过（2026-09-08）。技术验证后用户明确确认前端并要求开始后端。证据见 `it-project-console/docs/PHASE-4-VERIFICATION.md`，确认记录见 `it-project-console/docs/LEADERSHIP-REVIEW.md`。
 
 **本轮执行与验收**：
 
@@ -260,7 +260,15 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 
 ## Phase 5: Fastify、PostgreSQL 与 MinIO 基础
 
-**状态**：待开始且锁定；依赖 Phase 4 通过及领导明确确认前端评审版
+**状态**：已实现并通过技术验证（2026-09-08），证据见 `it-project-console/docs/PHASE-5-VERIFICATION.md`。用户确认“这一步没什么问题了 开始开发后端吧”后启动。
+
+**本轮步骤与完成标准**：
+
+1. 建立 API workspace、配置校验、统一错误、OpenAPI 与健康检查；严格类型和 inject 正常/错误测试通过。
+2. 建立独立 PostgreSQL/MinIO Compose、Prisma 模型与可重复 migration/开发 seed；不使用旧系统数据库或存储卷，真实隔离集成测试可运行。
+3. 实现数据库会话、RBAC 和开发账号登录；未登录401、越权403、生产禁开发登录，无密码或会话泄漏。
+4. 从旧项目原文件移植 S3 适配，完成申请/直传确认/下载/孤儿清理；用真实独立 Bucket 验证合法与拒绝路径。
+5. 独立审查、后端全量检查与前端回归通过后本地提交；不执行发布或推送。
 
 **交付内容**：
 
@@ -281,7 +289,7 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 - `it-project-console/api/prisma.config.ts` — Prisma 7 数据源和 migration 配置。
 - `it-project-console/api/src/modules/storage/s3-storage.ts` — 从旧系统收窄后的 MinIO/S3 适配器。
 - `it-project-console/api/src/modules/attachments/attachment-service.ts` — 附件状态、预签名、确认和清理。
-- `it-project-console/compose.yaml` — 独立 PostgreSQL、MinIO、minio-init、API 和 Web 编排。
+- `it-project-console/compose.yaml` — 本阶段独立 PostgreSQL、MinIO、minio-init 编排；API/Web 由 `pnpm dev` 同时启动，生产容器编排按 Phase 10 实施。
 
 **验收标准**：
 
@@ -491,6 +499,10 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 | 浏览器 E2E | Playwright | 1.62.1 | 三角色主流程和桌面截图回归 |
 
 技术版本依据（保留原计划锁定记录，本次不调整依赖；后端实施前须重新联网核实）：Fastify 和依赖版本来自原选型时的 npm registry；Prisma 7.10 仍受官方完整支持并支持 PostgreSQL 16；PostgreSQL 16 官方支持到 2028-11；MinIO 使用当前本机已安装镜像的 digest 保证开发环境可复现，上线前更新或审计。
+
+Phase 5 实施核验（2026-09-08）：保留已锁定稳定版本（npm 的 Prisma latest 已指向 8.0 RC，不跟随）。审计发现 Prisma 间接依赖 deepmerge-ts/mysql2 有已知高危公告，分别局部固定为 8.0.0 / 3.23.1，并重验 migration、生成、构建和集成测试。现有前端 Vite/xlsx 告警单独列入 Phase 10 发布前整改，不能将 API 审计通过写成全仓无漏洞。
+
+Vitest 间接引用的 Vite 也有开发服务器漏洞，测试工具链单独固定到 7.3.6（含 esbuild 补丁），并回归前后端测试；页面母版的直接 Vite 构建依赖暂不变更。
 
 官方依据：
 

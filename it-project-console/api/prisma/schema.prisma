@@ -1,0 +1,246 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  MANAGER
+  ENGINEER
+  BUSINESS
+
+  @@map("role")
+}
+
+enum DemandStatus {
+  DRAFT
+  PENDING
+  RETURNED
+  REJECTED
+  APPROVED
+  WITHDRAWN
+
+  @@map("demand_status")
+}
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+
+  @@map("project_status")
+}
+
+enum MemberType {
+  COLLABORATOR
+
+  @@map("member_type")
+}
+
+enum AttachmentKind {
+  PRD
+  PROTOTYPE
+
+  @@map("attachment_kind")
+}
+
+enum AttachmentStatus {
+  PENDING
+  READY
+  FAILED
+
+  @@map("attachment_status")
+}
+
+enum OutboxStatus {
+  PENDING
+  SENT
+  FAILED
+
+  @@map("outbox_status")
+}
+
+model Department {
+  id         String   @id @default(cuid())
+  name       String
+  dingDeptId String?  @unique @map("ding_dept_id")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  users      User[]
+
+  @@map("departments")
+}
+
+model User {
+  id               String               @id @default(cuid())
+  name             String
+  department       String
+  departmentId     String?              @map("department_id")
+  departmentRecord Department?          @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  dingUserId       String?              @unique @map("ding_user_id")
+  role             Role                 @default(BUSINESS)
+  active           Boolean              @default(true)
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  sessions         Session[]
+  demands          Demand[]
+  ownedProjects    Project[]
+  memberships      ProjectMember[]
+  attachments      Attachment[]
+  notifications    NotificationOutbox[]
+  managerGrant     ManagerGrant?        @relation("GrantRecipient")
+  grantsIssued     ManagerGrant[]       @relation("GrantIssuer")
+  auditLogs        AuditLog[]
+
+  @@index([departmentId])
+  @@map("users")
+}
+
+model ManagerGrant {
+  id          String   @id @default(cuid())
+  userId      String   @unique @map("user_id")
+  user        User     @relation("GrantRecipient", fields: [userId], references: [id], onDelete: Restrict)
+  grantedById String?  @map("granted_by_id")
+  grantedBy   User?    @relation("GrantIssuer", fields: [grantedById], references: [id], onDelete: Restrict)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("manager_grants")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Demand {
+  id            String               @id @default(cuid())
+  name          String
+  status        DemandStatus         @default(DRAFT)
+  ownerId       String               @map("owner_id")
+  owner         User                 @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  attachments   Attachment[]
+  project       Project?
+  notifications NotificationOutbox[]
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([ownerId, status])
+  @@map("demands")
+}
+
+model Project {
+  id             String               @id @default(cuid())
+  name           String
+  status         ProjectStatus        @default(ACTIVE)
+  archived       Boolean              @default(false)
+  demandId       String?              @unique @map("demand_id")
+  demand         Demand?              @relation(fields: [demandId], references: [id], onDelete: Restrict)
+  primaryOwnerId String               @map("primary_owner_id")
+  primaryOwner   User                 @relation(fields: [primaryOwnerId], references: [id], onDelete: Restrict)
+  members        ProjectMember[]
+  notifications  NotificationOutbox[]
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([primaryOwnerId])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String     @id @default(cuid())
+  projectId String     @map("project_id")
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String     @map("user_id")
+  user      User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  type      MemberType @default(COLLABORATOR)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_members")
+}
+
+model Attachment {
+  id               String           @id @default(cuid())
+  demandId         String           @map("demand_id")
+  demand           Demand           @relation(fields: [demandId], references: [id], onDelete: Restrict)
+  uploaderId       String           @map("uploader_id")
+  uploader         User             @relation(fields: [uploaderId], references: [id], onDelete: Restrict)
+  kind             AttachmentKind
+  name             String
+  mime             String
+  size             Int
+  objectKey        String           @unique @map("object_key")
+  stagingCleanedAt DateTime?        @map("staging_cleaned_at") @db.Timestamptz(3)
+  status           AttachmentStatus @default(PENDING)
+  expiresAt        DateTime         @map("expires_at") @db.Timestamptz(3)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([demandId, status])
+  @@index([status, expiresAt])
+  @@map("attachments")
+}
+
+model NotificationOutbox {
+  id             String       @id @default(cuid())
+  recipientId    String       @map("recipient_id")
+  recipient      User         @relation(fields: [recipientId], references: [id], onDelete: Restrict)
+  eventType      String       @map("event_type")
+  demandId       String?      @map("demand_id")
+  demand         Demand?      @relation(fields: [demandId], references: [id], onDelete: Restrict)
+  projectId      String?      @map("project_id")
+  project        Project?     @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  idempotencyKey String       @unique @map("idempotency_key")
+  payload        Json
+  availableAt    DateTime     @default(now()) @map("available_at") @db.Timestamptz(3)
+  status         OutboxStatus @default(PENDING)
+  attempts       Int          @default(0)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([status, availableAt])
+  @@map("notification_outbox")
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("system_settings")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?  @map("actor_id")
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  payload    Json
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([entityType, entityId, createdAt])
+  @@map("audit_logs")
+}

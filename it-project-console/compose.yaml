@@ -1,0 +1,44 @@
+name: it-project-console
+services:
+  postgres:
+    image: postgres@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
+    environment:
+      POSTGRES_DB: it_project_console
+      POSTGRES_USER: it_project_console
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run pnpm setup:local}
+    ports: ["127.0.0.1:55432:5432"]
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U it_project_console -d it_project_console"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  minio:
+    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?run pnpm setup:local}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?run pnpm setup:local}
+    ports: ["127.0.0.1:59000:9000", "127.0.0.1:59001:9001"]
+    volumes: ["minio-data:/data"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  minio-init:
+    image: minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    depends_on:
+      minio: { condition: service_healthy }
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?run pnpm setup:local}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?run pnpm setup:local}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mc alias set local http://minio:9000 "$$S3_ACCESS_KEY" "$$S3_SECRET_KEY" >/dev/null &&
+        mc mb --ignore-existing local/it-project-console &&
+        mc anonymous set none local/it-project-console
+volumes:
+  postgres-data:
+  minio-data:

@@ -1,7 +1,14 @@
 packages:
   - web
   - api
+overrides:
+  'vitest>vite': 7.3.6
+  '@vitest/mocker>vite': 7.3.6
+  '@prisma/config>deepmerge-ts': 8.0.0
+  'prisma>mysql2': 3.23.1
 allowBuilds:
+  '@prisma/engines': true
+  prisma: true
   '@parcel/watcher': true
   core-js: true
   es5-ext: true
