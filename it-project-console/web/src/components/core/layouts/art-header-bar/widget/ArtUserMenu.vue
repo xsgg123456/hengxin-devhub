@@ -10,8 +10,8 @@
     popper-class="user-menu-popover prototype-identity-popover"
   >
     <template #reference>
-      <button class="prototype-user-control" type="button" aria-label="切换演示身份">
-        <span class="prototype-mode-label">演示模式</span>
+      <button class="prototype-user-control" type="button" :aria-label="menuLabel">
+        <span v-if="modeLabel" class="prototype-mode-label">{{ modeLabel }}</span>
         <span class="prototype-avatar" aria-hidden="true">{{ initials }}</span>
         <span class="prototype-user-copy">
           <strong>{{ prototypeStore.currentUser.name }}</strong>
@@ -21,104 +21,41 @@
       </button>
     </template>
 
-    <div class="prototype-identity-menu">
-      <div class="identity-menu-heading">
-        <strong>切换演示身份</strong>
-        <span>四个演示账号 · 三类系统角色</span>
-      </div>
-      <button
-        v-for="user in demoUsers"
-        :key="user.id"
-        type="button"
-        class="identity-menu-item"
-        :class="{ 'is-current': user.id === prototypeStore.currentUser.id }"
-        :disabled="prototypeStore.saving || user.id === prototypeStore.currentUser.id"
-        @click="switchIdentity(user.id)"
-      >
-        <span class="identity-mini-avatar">{{ user.name.slice(-2) }}</span>
-        <span
-          ><strong>{{ user.name }}</strong
-          ><small>{{ user.roleLabel }} · {{ user.department }}</small></span
-        >
-        <ArtSvgIcon v-if="user.id === prototypeStore.currentUser.id" icon="ri:check-line" />
-      </button>
-      <PrototypeScenarioMenu />
-      <ElAlert v-if="menuError" :title="menuError" type="error" :closable="false" />
-      <button
-        class="prototype-reset-action"
-        type="button"
-        :disabled="prototypeStore.saving"
-        @click="resetPrototype"
-      >
-        <ArtSvgIcon icon="ri:restart-line" />
-        <span>重置演示数据</span>
-      </button>
-    </div>
+    <ModeControls v-if="ModeControls" @close="userMenuPopover?.hide()" />
+    <ElButton
+      v-else
+      :disabled="
+        prototypeStore.saving || prototypeStore.uploading || prototypeStore.hasUnsavedChanges
+      "
+      @click="logout"
+      >退出登录</ElButton
+    >
   </ElPopover>
 </template>
 
 <script setup lang="ts">
-  import { computed, ref } from 'vue'
-  import { ElMessage, ElMessageBox } from 'element-plus'
-  import { useRouter } from 'vue-router'
-  import { DEMO_USERS } from '@/mocks/auth-context'
-  import { getHomePath } from '@/router/access'
-  import { syncPrototypeShell } from '@/prototype/sync-shell'
+  import { computed, ref, defineAsyncComponent } from 'vue'
   import { usePrototypeStore } from '@/store/modules/prototype'
-  import PrototypeScenarioMenu from '@/components/system/prototype-scenario-menu.vue'
-
-  defineOptions({ name: 'ArtUserMenu' })
-
-  const router = useRouter()
+  import { apiRequest } from '@/services/api-client'
   const prototypeStore = usePrototypeStore()
   const userMenuPopover = ref<{ hide: () => void }>()
-  const menuError = ref('')
-  const demoUsers = computed(() => prototypeStore.database?.users ?? DEMO_USERS)
   const initials = computed(() => prototypeStore.currentUser.name.slice(-2))
-
-  async function switchIdentity(userId: string): Promise<void> {
-    if (prototypeStore.saving) return
-    menuError.value = ''
-    if (prototypeStore.hasUnsavedChanges) {
-      try {
-        await ElMessageBox.confirm('当前表单尚未保存，切换身份后会丢失修改。', '切换演示身份？', {
-          confirmButtonText: '放弃并切换',
-          cancelButtonText: '继续编辑',
-          type: 'warning'
-        })
-      } catch {
-        return
-      }
-    }
-    try {
-      prototypeStore.switchUser(userId)
-      prototypeStore.clearDirty()
-    } catch (error) {
-      menuError.value = error instanceof Error ? error.message : '身份切换失败'
-      return
-    }
-    syncPrototypeShell(prototypeStore.currentUser.role)
-    userMenuPopover.value?.hide()
-    await router.push(getHomePath(prototypeStore.currentUser.role))
-  }
-
-  async function resetPrototype(): Promise<void> {
-    if (prototypeStore.saving) return
-    menuError.value = ''
-    try {
-      await ElMessageBox.confirm('这会清除当前演示进度，并恢复固定初始场景。', '重置演示数据', {
-        confirmButtonText: '确认重置',
-        cancelButtonText: '保留当前数据',
-        type: 'warning'
-      })
-      prototypeStore.reset()
-      syncPrototypeShell(prototypeStore.currentUser.role)
-      userMenuPopover.value?.hide()
-      await router.push(getHomePath(prototypeStore.currentUser.role))
-      ElMessage.success('演示数据已重置')
-    } catch (error) {
-      if (error instanceof Error) menuError.value = error.message
-    }
+  const menuLabel = import.meta.env.MODE === 'prototype' ? '切换演示身份' : '当前用户'
+  const modeLabel =
+    import.meta.env.MODE === 'prototype'
+      ? '演示模式'
+      : import.meta.env.MODE === 'live'
+        ? '本地联调'
+        : ''
+  const ModeControls =
+    import.meta.env.MODE === 'prototype'
+      ? defineAsyncComponent(() => import('@/components/system/prototype-user-controls.vue'))
+      : import.meta.env.MODE === 'live'
+        ? defineAsyncComponent(() => import('@/components/system/live-user-controls.vue'))
+        : null
+  async function logout() {
+    await apiRequest('/auth/logout', { method: 'POST' })
+    window.location.reload()
   }
 </script>
 

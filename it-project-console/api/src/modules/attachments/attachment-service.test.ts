@@ -26,6 +26,7 @@ function setup() {
   }
   const db = {
     $queryRaw: vi.fn().mockResolvedValue([]),
+    objectDeletion: { findMany: vi.fn().mockResolvedValue([]) },
     demand: { findUnique: vi.fn().mockResolvedValue(demand) },
     attachment: {
       findUnique: vi.fn().mockResolvedValue(attachment),

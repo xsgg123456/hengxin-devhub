@@ -14,7 +14,7 @@
     />
     <ProjectFields ref="fields" v-model="form" :disabled="busy" />
     <ElAlert v-if="error" :title="error" type="error" :closable="false" show-icon role="alert" />
-    <PrototypeSaveRecovery v-if="error" />
+    <PrototypeSaveRecovery v-if="error && runtimeConfig.isPrototype" />
     <template #footer
       ><ElButton :disabled="busy" @click="beforeClose(() => emit('update:modelValue', false))"
         >取消</ElButton
@@ -23,12 +23,14 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
+  import { runtimeConfig } from '@/config/runtime'
   import PrototypeSaveRecovery from '@/components/system/prototype-save-recovery.vue'
   import { computed, ref, watch } from 'vue'
   import { ElMessage } from 'element-plus'
   import { createProject, type ProjectInput } from '@/services/workflow-service'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { useUnsavedForm } from '@/hooks/business/use-unsaved-form'
+  import { createLiveProject, liveOperationKey } from '@/services/live-demand-service'
   import ProjectFields from './project-fields.vue'
   const props = defineProps<{ modelValue: boolean }>()
   const emit = defineEmits<{ 'update:modelValue': [value: boolean]; created: [id: string] }>()
@@ -44,6 +46,7 @@
     expectedDeliveryDate: '',
     stageExpectedDate: ''
   })
+  let operationKey = liveOperationKey()
   const form = ref<ProjectInput>(emptyForm())
   const initial = ref('')
   const busy = ref(false)
@@ -55,6 +58,7 @@
     () => props.modelValue,
     (open) => {
       if (open) {
+        operationKey = liveOperationKey()
         form.value = emptyForm()
         initial.value = JSON.stringify(form.value)
         error.value = ''
@@ -68,9 +72,13 @@
     try {
       let id = ''
       const input = JSON.parse(JSON.stringify(form.value)) as ProjectInput
-      await store.runCommand((draft) => {
-        id = createProject(draft, input).id
-      })
+      if (!runtimeConfig.isPrototype) {
+        input.requestId = operationKey({ ...input, requestId: undefined })
+        id = (await store.runLiveCommand(() => createLiveProject(input))).id
+      } else
+        await store.runCommand((draft) => {
+          id = createProject(draft, input).id
+        })
       initial.value = JSON.stringify(form.value)
       emit('update:modelValue', false)
       emit('created', id)

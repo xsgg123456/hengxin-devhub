@@ -1,6 +1,6 @@
 # 后端本地开发
 
-Phase 5 提供 Fastify 基础、PostgreSQL 会话与权限、附件上传和存储。前端仍为独立演示库；真实需求/立项和页面联调从 Phase 6 开始，钉钉登录在 Phase 9 接入。
+Phase 6 已接入真实需求、单级审批、立项和附件。前端继承 Art Design Pro 页面与交互，提供独立原型和真实联调模式；钉钉登录在 Phase 9 接入。
 
 ## 启动
 
@@ -13,11 +13,14 @@ docker compose up -d postgres minio minio-init
 pnpm --filter @it-project-console/api db:migrate
 pnpm --filter @it-project-console/api db:seed
 pnpm dev
+# 另一个终端启动真实前端
+pnpm dev:live
 ```
 
 `setup:local` 仅首次生成根 `.env` 与 `api/.env`，使用随机凭据，不覆盖现有配置。两者均被 Git 忽略。已有配置缺项时参照 `.env.example` 补齐，不重新初始化数据库。
 
-- 前端：http://127.0.0.1:4317/ 。
+- 原型前端：http://127.0.0.1:4317/ ，使用原有浏览器演示库。
+- 真实前端：http://127.0.0.1:4318/ ，选择本地联调账号后读写独立 PostgreSQL/MinIO。已有 `api/.env` 的 `WEB_ORIGIN` 须改为 `http://127.0.0.1:4318` 并重启 API。
 - API：http://127.0.0.1:4322/ ，文档在 `/docs`，存活 `/health/live`，数据库和存储就绪 `/health/ready`。
 - PostgreSQL：回环端口 55432、独立数据库 `it_project_console`。
 - MinIO：回环端口 59000、Console 59001、私有 Bucket `it-project-console`。凭据读取本机 `.env`。
@@ -39,13 +42,20 @@ pnpm dev
 3. `POST /api/attachments/:id/confirm`。服务端检查真实对象大小/MIME、条件复制到客户端不可写的最终对象并再次检查；重复确认幂等。尚未真实上传、大小不符、过期或越权都会拒绝。
 4. `GET /api/attachments/:id/download` 返回5分钟下载链接。必须先登录，下载强制 attachment/octet-stream，HTML不会在应用同源页面执行。
 
-需求额度分配、确认和清理共享数据库行锁。上传链接只能写临时对象，重放不会覆盖已确认文件。后台每分钟清理到期超过一分钟的未确认上传；已确认附件只清临时对象。清理失败记录脱敏数量并下周期重试。
+需求额度分配、确认和清理共享数据库行锁。上传链接只能写临时对象，重放不会覆盖已确认文件。后台每分钟清理到期超过一分钟的未确认上传；已保存引用的附件只清临时对象。未保存到需求的已确认文件可由 `DELETE /api/attachments/:id` 丢弃，客户端移除/替换时调用；关闭页面遗漏的未引用 READY 文件满24小时后回收。删除需求或替换已保存材料时，事务写入持久对象删除队列；临时对象等签名过期额外一分钟再删，最终对象下一个清理周期删除。清理失败记录脱敏数量并下周期重试。
+
+## 需求与立项
+
+`GET /api/workspace` 返回当前会话可读的真实用户、需求、项目及阶段历史，兼容既有页面 DTO。需求使用 POST 创建、PATCH 修改、POST `/:id/withdraw` 撤回和 DELETE 删除。管理人员通过 POST `/api/demands/:id/review` 评估；POST `/api/projects` 直接立项。
+
+每个写命令携带 `requestId`，修改还携带 `version`。相同请求重试返回已提交结果；同请求号不同内容或过期版本返回409。通知只写入 outbox，Phase 9 前不会发送钉钉消息。真实模式暂不开放进度更新、项目生命周期操作和管理员授权；原型保留这些既有演示交互。
 
 ## 验证与隔离
 
 ```powershell
 pnpm check
 pnpm --filter @it-project-console/api test:integration
+pnpm --filter @it-project-console/api test:browser
 pnpm --filter @it-project-console/api exec prisma validate
 pnpm audit:api
 pnpm --filter @it-project-console/web test:e2e --workers=2

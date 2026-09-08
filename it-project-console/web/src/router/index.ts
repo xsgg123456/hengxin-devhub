@@ -1,7 +1,6 @@
 import type { App } from 'vue'
 import { createRouter, createWebHashHistory } from 'vue-router'
 import type { SystemRole } from '@/domain/prototype'
-import { runtimeConfig } from '@/config/runtime'
 import { usePrototypeStore } from '@/store/modules/prototype'
 import { isSupportedDevice } from '@/utils/device'
 import { canAccessRole, getHomePath } from './access'
@@ -33,11 +32,12 @@ export const router = createRouter({
 })
 
 router.beforeEach(async (to, from) => {
-  if (!runtimeConfig.isPrototype || !isSupportedDevice()) return true
+  if (!isSupportedDevice()) return true
   const prototypeStore = usePrototypeStore()
   prototypeStore.initialize()
+  if (to.fullPath !== from.fullPath && prototypeStore.uploading) return false
   if (to.fullPath !== from.fullPath && prototypeStore.hasUnsavedChanges) {
-    if (prototypeStore.saving) return false
+    if (prototypeStore.saving || prototypeStore.uploading) return false
     try {
       await ElMessageBox.confirm('当前表单尚未保存，离开后会丢失修改。', '离开当前页面？', {
         confirmButtonText: '放弃并离开',

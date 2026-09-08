@@ -16,6 +16,7 @@
     "test": "pnpm -r test",
     "test:e2e": "pnpm --filter @it-project-console/web test:e2e",
     "build": "pnpm -r build",
-    "check": "pnpm typecheck && pnpm test && pnpm build"
+    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "dev:live": "pnpm --filter @it-project-console/web dev:live"
   }
 }

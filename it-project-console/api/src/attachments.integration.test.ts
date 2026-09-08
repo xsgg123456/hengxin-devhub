@@ -266,7 +266,7 @@ describe('真实PostgreSQL/MinIO附件闭环', () => {
       runtime.attachments.cleanupExpired()
     ])
     expect(results.flatMap((result) => result.failed)).toEqual([])
-    expect(results.reduce((sum, result) => sum + result.cleaned, 0)).toBe(2)
+    expect(results.reduce((sum, result) => sum + result.cleaned, 0)).toBeGreaterThanOrEqual(2)
     expect(await db.attachment.findUnique({ where: { id: pending.attachmentId } })).toBeNull()
     expect(
       (

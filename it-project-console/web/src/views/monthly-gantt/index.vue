@@ -60,13 +60,13 @@
         />
         <ElAlert
           v-else-if="store.corrupted || !store.database"
-          title="项目数据读取失败，请通过顶部演示工具重置数据后重试"
+          title="项目数据读取失败，请刷新后重试"
           type="error"
           :closable="false"
         />
         <ElAlert
           v-else-if="store.snapshot?.scenario === 'forbidden'"
-          title="当前场景无查看权限，请切换演示场景"
+          title="当前无查看权限，请返回首页"
           type="warning"
           :closable="false"
         />
@@ -90,11 +90,16 @@
         @update:model-value="closeDetail"
         @edit="openUpdate"
       />
-      <ProgressUpdateDrawer v-model="updateOpen" :project="updateProject" />
+      <ProgressUpdateDrawer
+        v-if="runtimeConfig.isPrototype"
+        v-model="updateOpen"
+        :project="updateProject"
+      />
     </div>
   </BusinessPageState>
 </template>
 <script setup lang="ts">
+  import { runtimeConfig } from '@/config/runtime'
   import BusinessPageState from '@/components/system/business-page-state.vue'
   import { computed, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
@@ -152,6 +157,7 @@
     void router.replace({ query })
   }
   function openUpdate(id: string): void {
+    if (!runtimeConfig.isPrototype) return
     updateId.value = id
     updateOpen.value = true
   }

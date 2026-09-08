@@ -10,6 +10,8 @@
   </ElDropdown>
 </template>
 <script setup lang="ts">
+  import { runtimeConfig } from '@/config/runtime'
+  import { actionLiveDemand } from '@/services/live-demand-service'
   import { computed } from 'vue'
   import { ElMessage, ElMessageBox } from 'element-plus'
   import type { DemoDemand } from '@/domain/prototype'
@@ -17,6 +19,7 @@
   import { actionDemand } from '@/services/lifecycle-service'
   const props = defineProps<{ demand: DemoDemand }>()
   const store = usePrototypeStore()
+  const operationIds = { withdraw: crypto.randomUUID(), delete: crypto.randomUUID() }
   const own = computed(() => props.demand.submitterId === store.currentUser.id)
   const deletable = computed(() => ['draft', 'pending', 'returned'].includes(props.demand.status))
   const withdrawable = computed(() => ['pending', 'returned'].includes(props.demand.status))
@@ -38,9 +41,15 @@
       return
     }
     try {
-      await store.runCommand((draft) => {
-        actionDemand(draft, { demandId: props.demand.id, action })
-      })
+      if (!runtimeConfig.isPrototype) {
+        await store.runLiveCommand(() =>
+          actionLiveDemand(props.demand.id, props.demand.version, action, operationIds[action])
+        )
+        operationIds[action] = crypto.randomUUID()
+      } else
+        await store.runCommand((draft) => {
+          actionDemand(draft, { demandId: props.demand.id, action })
+        })
       ElMessage.success(action === 'delete' ? '需求已删除' : '需求已撤回')
     } catch (cause) {
       ElMessage.error(cause instanceof Error ? cause.message : '操作失败，请重试')

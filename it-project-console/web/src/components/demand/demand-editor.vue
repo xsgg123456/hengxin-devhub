@@ -14,8 +14,8 @@
       class="mb-5"
     />
     <ElAlert v-if="failure" :title="failure" type="error" :closable="false" class="mb-5" />
-    <PrototypeSaveRecovery v-if="failure" />
-    <ElForm ref="formRef" :model="form" label-position="top" :disabled="saving" scroll-to-error>
+    <PrototypeSaveRecovery v-if="failure && runtimeConfig.isPrototype" />
+    <ElForm ref="formRef" :model="form" label-position="top" :disabled="busy" scroll-to-error>
       <ElFormItem label="项目名称" prop="name" :error="errors.name" required>
         <ElInput v-model="form.name" maxlength="100" show-word-limit />
       </ElFormItem>
@@ -57,21 +57,33 @@
         />
       </ElFormItem>
       <ElFormItem label="PRD 文档（正式提交必填）" prop="prd" :error="errors.prd">
-        <MaterialField v-model="form.prd" type="prd" :disabled="saving" />
+        <MaterialField
+          v-model="form.prd"
+          type="prd"
+          :disabled="busy"
+          :ensure-demand="ensureDraft"
+          @busy="uploading.prd = $event"
+        />
       </ElFormItem>
       <ElFormItem label="HTML 原型（正式提交必填）" prop="prototype" :error="errors.prototype">
-        <MaterialField v-model="form.prototype" type="prototype" :disabled="saving" />
+        <MaterialField
+          v-model="form.prototype"
+          type="prototype"
+          :disabled="busy"
+          :ensure-demand="ensureDraft"
+          @busy="uploading.prototype = $event"
+        />
       </ElFormItem>
     </ElForm>
     <template #footer>
       <div class="flex justify-end gap-2 flex-wrap">
-        <ElButton :disabled="saving" @click="close">取消</ElButton>
-        <ElButton :disabled="saving" :loading="saving && !submitting" @click="save(false)"
-          >保存草稿</ElButton
-        >
+        <ElButton :disabled="busy" @click="close">取消</ElButton>
+        <ElButton :disabled="busy" :loading="saving && !submitting" @click="save(false)">{{
+          !runtimeConfig.isPrototype && demand?.status === 'pending' ? '保存修改' : '保存草稿'
+        }}</ElButton>
         <ElButton
           type="primary"
-          :disabled="saving"
+          :disabled="busy"
           :loading="saving && submitting"
           @click="save(true)"
           >{{ demand ? '重新提交' : '提交评估' }}</ElButton
@@ -81,6 +93,7 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
+  import { runtimeConfig } from '@/config/runtime'
   import PrototypeSaveRecovery from '@/components/system/prototype-save-recovery.vue'
   import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
   import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
@@ -88,6 +101,12 @@
   import { saveDemand, validateAttachment } from '@/services/workflow-service'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { currentDate } from '@/utils/project-display'
+  import { ApiError } from '@/services/api-client'
+  import {
+    saveLiveDemand,
+    liveOperationKey,
+    type LiveDemandInput
+  } from '@/services/live-demand-service'
   import MaterialField from './material-field.vue'
   const props = defineProps<{ demand?: DemoDemand }>()
   const emit = defineEmits<{ close: []; saved: [] }>()
@@ -106,6 +125,13 @@
   const dirty = computed(() => JSON.stringify(form) !== baseline)
   const errors = reactive<Record<string, string>>({})
   const saving = ref(false)
+  const uploading = reactive({ prd: false, prototype: false })
+  const busy = computed(() => saving.value || uploading.prd || uploading.prototype)
+  const liveId = ref(props.demand?.id)
+  const liveVersion = ref(props.demand?.version)
+  const operationKey = liveOperationKey()
+  let draftInput: LiveDemandInput | undefined
+  let draftPromise: Promise<string> | undefined
   const submitting = ref(false)
   const failure = ref('')
   const requestId = props.demand?.requestId || crypto.randomUUID()
@@ -116,8 +142,25 @@
     const label = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
     return label < currentDate()
   }
+  async function ensureDraft(): Promise<string> {
+    if (liveId.value) return liveId.value
+    if (!draftPromise) {
+      draftInput ??= { ...form, prd: null, prototype: null }
+      draftPromise = store
+        .runLiveCommand(() => saveLiveDemand(draftInput!, requestId, false))
+        .then((result) => {
+          liveId.value = result.id
+          liveVersion.value = result.version
+          return result.id
+        })
+        .finally(() => {
+          draftPromise = undefined
+        })
+    }
+    return draftPromise
+  }
   async function close() {
-    if (saving.value) return
+    if (busy.value) return
     if (dirty.value) {
       try {
         await ElMessageBox.confirm('未保存的需求内容将丢失，确认放弃？', '放弃修改', {
@@ -132,7 +175,7 @@
     emit('close')
   }
   async function save(submit: boolean) {
-    if (saving.value) return
+    if (busy.value) return
     Object.keys(errors).forEach((key) => delete errors[key])
     if (submit && !form.name.trim()) errors.name = '请填写项目名称'
     if (submit && !form.description.trim()) errors.description = '请说明要解决的问题'
@@ -142,7 +185,8 @@
       try {
         validateAttachment(form[type], type, submit)
       } catch (cause) {
-        errors[type] = cause instanceof Error ? cause.message : '材料校验失败'
+        const message = cause instanceof Error ? cause.message : '材料校验失败'
+        errors[type] = runtimeConfig.isPrototype ? message : message.replace('模拟上传', '上传')
       }
     }
     if ((form.prd?.size || 0) + (form.prototype?.size || 0) > 50 * 1024 * 1024)
@@ -157,20 +201,51 @@
     failure.value = ''
     try {
       let demandId = ''
-      await store.runCommand((snapshot) => {
-        demandId = saveDemand(snapshot, {
+      if (!runtimeConfig.isPrototype) {
+        await ensureDraft()
+        const requestKey = operationKey({
           ...form,
-          prd: form.prd ? { ...form.prd } : null,
-          prototype: form.prototype ? { ...form.prototype } : null,
-          id: props.demand?.id,
-          requestId,
-          submit
-        }).id
-      })
+          submit,
+          id: liveId.value,
+          version: liveVersion.value
+        })
+        const result = await store.runLiveCommand(() =>
+          saveLiveDemand(form, requestKey, submit, liveId.value, liveVersion.value)
+        )
+        demandId = result.id
+        liveId.value = result.id
+        liveVersion.value = result.version
+      } else
+        await store.runCommand((snapshot) => {
+          demandId = saveDemand(snapshot, {
+            ...form,
+            prd: form.prd ? { ...form.prd } : null,
+            prototype: form.prototype ? { ...form.prototype } : null,
+            id: props.demand?.id,
+            requestId,
+            submit
+          }).id
+        })
       store.setDirty('demand-form', false)
-      ElMessage.success(submit ? `${demandId} 已提交，等待管理人员评估` : `${demandId} 草稿已保存`)
+      ElMessage.success(
+        submit
+          ? `${demandId} 已提交，等待管理人员评估`
+          : !runtimeConfig.isPrototype && props.demand?.status === 'pending'
+            ? `${demandId} 修改已保存，仍待评估`
+            : `${demandId} 草稿已保存`
+      )
       emit('saved')
     } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 409) {
+        try {
+          await store.refreshLive()
+          liveVersion.value =
+            store.database?.demands.find((demand) => demand.id === liveId.value)?.version ??
+            liveVersion.value
+        } catch {
+          /* 当前输入保留，稍后可重试。 */
+        }
+      }
       failure.value = cause instanceof Error ? cause.message : '保存失败，请重试；输入已保留'
     } finally {
       saving.value = false

@@ -20,7 +20,8 @@
     "fix": "eslint --fix",
     "lint:prettier": "prettier --write \"**/*.{js,cjs,ts,json,tsx,css,less,scss,vue,html,md}\"",
     "lint:stylelint": "stylelint  \"**/*.{css,scss,vue}\" --fix",
-    "lint:lint-staged": "lint-staged"
+    "lint:lint-staged": "lint-staged",
+    "dev:live": "vite --mode live --host 127.0.0.1 --port 4318 --strictPort"
   },
   "config": {
     "commitizen": {

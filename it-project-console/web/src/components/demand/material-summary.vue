@@ -12,15 +12,39 @@
         >{{ item.material.url }}</ElLink
       >
       <p v-else-if="item.material?.kind === 'file'" class="break-all"
-        >{{ item.material.name }} <ElTag type="info" size="small">模拟文件 · 未上传</ElTag></p
+        >{{ item.material.name }}
+        <ElTag v-if="runtimeConfig.isPrototype" type="info" size="small">模拟文件 · 未上传</ElTag>
+        <ElButton
+          v-else-if="item.material.attachmentId"
+          link
+          type="primary"
+          :loading="downloading === item.material.attachmentId"
+          @click="download(item.material.attachmentId)"
+          >下载文件</ElButton
+        ></p
       >
       <span v-else class="text-g-500">未提供有效材料</span>
     </div>
   </div>
 </template>
 <script setup lang="ts">
-  import { computed } from 'vue'
+  import { computed, ref } from 'vue'
+  import { ElMessage } from 'element-plus'
+  import { runtimeConfig } from '@/config/runtime'
+  import { downloadLiveMaterial } from '@/services/live-material-service'
   import type { DemoDemand } from '@/domain/prototype'
+  const downloading = ref('')
+  async function download(id: string) {
+    if (downloading.value) return
+    downloading.value = id
+    try {
+      await downloadLiveMaterial(id)
+    } catch (cause) {
+      ElMessage.error(cause instanceof Error ? cause.message : '下载失败，请重试')
+    } finally {
+      downloading.value = ''
+    }
+  }
   const props = defineProps<{ demand: DemoDemand }>()
   const materials = computed(() => [
     { label: 'PRD 文档', material: props.demand.prd },

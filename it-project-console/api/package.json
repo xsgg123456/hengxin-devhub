@@ -12,7 +12,8 @@
     "test": "vitest run --exclude '**/*.integration.test.ts'",
     "test:integration": "tsx --env-file-if-exists=.env scripts/integration.ts",
     "db:migrate": "prisma migrate deploy",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "test:browser": "tsx --env-file-if-exists=.env scripts/browser-integration.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1126.0",

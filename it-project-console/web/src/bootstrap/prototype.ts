@@ -8,8 +8,10 @@ import { usePrototypeStore } from '@/store/modules/prototype'
 import { syncPrototypeShell } from '@/prototype/sync-shell'
 import { setupGlobDirectives } from '@/directives'
 import { setupErrorHandle } from '@/utils/sys/error-handle'
+import { installPrototypeDriver } from '@/mocks/store-adapter'
 
 export function bootstrapPrototype(): void {
+  installPrototypeDriver()
   const app = createApp(App)
   initStore(app)
 

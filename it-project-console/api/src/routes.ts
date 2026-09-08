@@ -1,3 +1,7 @@
+import { registerWorkspaceRoutes } from './modules/workspace/workspace-routes.js'
+import { registerDemandRoutes } from './modules/demands/demand-routes.js'
+import { registerApprovalRoutes } from './modules/approvals/approval-routes.js'
+import { registerProjectRoutes } from './modules/projects/project-routes.js'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
@@ -14,7 +18,15 @@ export async function registerRoutes(
 ) {
   const api = app.withTypeProvider<ZodTypeProvider>()
   const auth = authService(db, env)
+  registerWorkspaceRoutes(app, db, auth.authenticate)
+  registerDemandRoutes(app, db, auth.authenticate)
+  registerApprovalRoutes(app, db, auth.authenticate)
+  registerProjectRoutes(app, db, auth.authenticate)
   if (env.NODE_ENV !== 'production' && env.DEV_LOGIN) {
+    api.get('/api/auth/dev-accounts', async () => ({ data: await db.user.findMany({
+      where: { active: true, id: { in: ['user-manager-chen', 'user-business-li', 'user-engineer-wang', 'user-engineer-zhao'] } },
+      select: { id: true, name: true, department: true, role: true }
+    }) }))
     api.post(
       '/api/auth/dev-login',
       {
@@ -77,6 +89,7 @@ export async function registerRoutes(
       data: await attachments.confirmUpload(request.actor!, request.params.id)
     })
   )
+  api.delete('/api/attachments/:id', { preHandler: auth.authenticate, schema: { params } }, async request => ({ data: await attachments.discard(request.actor!, request.params.id) }))
   api.get(
     '/api/attachments/:id/download',
     { preHandler: auth.authenticate, schema: { tags: ['附件'], params } },

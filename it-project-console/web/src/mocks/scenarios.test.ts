@@ -1,3 +1,4 @@
+import { installPrototypeDriver } from '@/mocks/store-adapter'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { usePrototypeStore } from '@/store/modules/prototype'
@@ -16,6 +17,7 @@ beforeEach(() => {
     }
   })
   setActivePinia(createPinia())
+    installPrototypeDriver()
 })
 afterEach(() => {
   vi.useRealTimers()
@@ -95,6 +97,7 @@ describe('受控演示场景', () => {
     const before = JSON.stringify(store.snapshot?.database)
     store.setScenario(value)
     setActivePinia(createPinia())
+    installPrototypeDriver()
     const reloaded = usePrototypeStore()
     reloaded.initialize()
     expect(reloaded.snapshot?.scenario).toBe(value)

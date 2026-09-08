@@ -49,7 +49,8 @@
       </ElDescriptions>
       <StageProgress :stage="project.stage" :status="project.simpleStatus" />
       <StageHistory :project-id="project.id" />
-      <LifecycleActions :project="project" />
+      <LifecycleActions v-if="runtimeConfig.isPrototype" :project="project" />
+      <p v-else class="mt-4 text-sm text-g-500">进度维护、取消与归档尚未开放。</p>
       <LifecycleHistory :project-id="project.id" />
       <h4 class="mt-6 mb-4 font-medium">更新记录</h4>
       <ElEmpty v-if="!updates.length" description="暂无进度记录，等待首次更新" :image-size="50" />
@@ -79,18 +80,8 @@
       <p v-if="!demand" class="text-sm text-g-600">直接创建项目，无关联需求材料</p>
       <template v-else
         ><p class="mb-3 whitespace-pre-wrap">{{ demand.description }}</p
-        ><div v-for="item in materials" :key="item.label" class="material"
-          ><span>{{ item.label }}</span
-          ><a
-            v-if="safeLink(item.value)"
-            :href="item.value!.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            >{{ item.value!.url }}</a
-          ><span v-else>{{
-            item.value ? `${item.value.name}（模拟上传，仅保存文件信息）` : '未提供'
-          }}</span></div
-        ></template
+        ><MaterialSummary :demand="demand"
+      /></template>
       >
     </template>
     <template #footer
@@ -102,14 +93,16 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
+  import { runtimeConfig } from '@/config/runtime'
   import { computed } from 'vue'
-  import type { DemoAttachment, DemoProject } from '@/domain/prototype'
+  import type { DemoProject } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { computeProjectRisks } from '@/services/risk-service'
   import { displayTime, statusLabel } from '@/utils/project-display'
   import StageProgress from './stage-progress.vue'
   import StageHistory from './stage-history.vue'
   import RiskTag from './risk-tag.vue'
+  import MaterialSummary from '@/components/demand/material-summary.vue'
   import LifecycleActions from './lifecycle-actions.vue'
   import LifecycleHistory from './lifecycle-history.vue'
   const props = defineProps<{ modelValue: boolean; project: DemoProject | null }>()
@@ -120,10 +113,6 @@
   const demand = computed(() =>
     store.database?.demands.find((d) => d.id === props.project?.demandId)
   )
-  const materials = computed(() => [
-    { label: 'PRD 文档', value: demand.value?.prd },
-    { label: 'HTML 原型', value: demand.value?.prototype }
-  ])
   const updates = computed(
     () =>
       store.database?.progressUpdates
@@ -150,17 +139,11 @@
   )
   const canUpdate = computed(
     () =>
+      runtimeConfig.isPrototype &&
       props.project?.status === 'active' &&
       !props.project.archived &&
       (isOverall.value || props.project.collaboratorIds.includes(store.currentUser.id))
   )
-  function safeLink(value: DemoAttachment | null | undefined): boolean {
-    try {
-      return value?.kind === 'link' && new URL(value.url ?? '').protocol === 'https:'
-    } catch {
-      return false
-    }
-  }
 </script>
 <style scoped>
   .history-row {
@@ -171,17 +154,6 @@
   }
   .history-row small {
     color: var(--art-gray-600);
-  }
-  .material {
-    display: grid;
-    grid-template-columns: 90px 1fr;
-    gap: 12px;
-    margin-bottom: 12px;
-    font-size: 13px;
-    overflow-wrap: anywhere;
-  }
-  .material a {
-    color: var(--el-color-primary);
   }
   :deep(.el-descriptions__content) {
     overflow-wrap: anywhere;

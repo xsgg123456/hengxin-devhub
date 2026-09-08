@@ -1,3 +1,5 @@
+import { queueAttachmentDeletion } from '../demands/demand-materials.js'
+import { cleanupDeletedObjects } from './object-cleanup.js'
 import { randomUUID } from 'node:crypto'
 import type { Prisma, PrismaClient } from '../../generated/prisma/client.js'
 import { AppError } from '../../lib/errors.js'
@@ -121,6 +123,20 @@ export class AttachmentService {
     )
   }
 
+  async discard(actor: AttachmentActor, id: string) {
+    assertActive(actor)
+    const existing = await this.prisma.attachment.findUnique({ where: { id } })
+    if (!existing) return { discarded: true }
+    await this.prisma.$transaction(async tx => {
+      const demand = await lockedDemand(tx, existing.demandId)
+      assertWritable(actor, demand)
+      if ([demand.prdAttachmentId, demand.prototypeAttachmentId].includes(id))
+        throw new AppError(409, 'ATTACHMENT_IN_USE', '附件已保存到需求，请通过编辑需求移除')
+      await queueAttachmentDeletion(tx, [id])
+    })
+    return { discarded: true }
+  }
+
   async download(actor: AttachmentActor, id: string) {
     assertActive(actor)
     const attachment = await this.prisma.attachment.findUnique({
@@ -140,6 +156,19 @@ export class AttachmentService {
   async cleanupExpired(now = new Date()) {
     // Wait an extra minute after signature expiry before removing replayable staging keys.
     const cutoff = new Date(now.getTime() - 60_000)
+    // READY files abandoned before saving retain a full day for form recovery.
+    const abandoned = await this.prisma.$queryRaw<Array<{ id: string; demandId: string }>>`
+      SELECT a.id, a.demand_id AS "demandId" FROM attachments a JOIN demands d ON d.id = a.demand_id
+      WHERE a.status = 'READY' AND a.created_at < ${new Date(now.getTime() - 86400000)}
+        AND a.id IS DISTINCT FROM d.prd_attachment_id AND a.id IS DISTINCT FROM d.prototype_attachment_id
+      ORDER BY a.created_at LIMIT 100`
+    for (const file of abandoned) {
+      await this.prisma.$transaction(async tx => {
+        const demand = await lockedDemand(tx, file.demandId)
+        if (![demand.prdAttachmentId, demand.prototypeAttachmentId].includes(file.id))
+          await queueAttachmentDeletion(tx, [file.id])
+      })
+    }
     const candidates = await this.prisma.attachment.findMany({
       where: { expiresAt: { lt: cutoff }, stagingCleanedAt: null },
       orderBy: { expiresAt: 'asc' },
@@ -176,6 +205,7 @@ export class AttachmentService {
         failed.push(candidate.id)
       }
     }
-    return { cleaned, failed }
+    const deleted = await cleanupDeletedObjects(this.prisma, this.storage, now)
+    return { cleaned: cleaned + deleted.cleaned, failed: [...failed, ...deleted.failed] }
   }
 }

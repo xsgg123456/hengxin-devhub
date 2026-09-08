@@ -14,7 +14,7 @@
 | 前端技术 | 已确认：复用 Art Design Pro 现有代码和技术栈 |
 | 后端技术架构 | 已确认：Node.js + TypeScript + Fastify + Prisma + PostgreSQL 16 + MinIO |
 | 产品代码 | Phase 1–4 前端评审通过；Phase 5 后端基础实现并通过技术验证 |
-| 当前可执行阶段 | Phase 5 已实现，下一步 Phase 6 真实需求提交与立项闭环 |
+| 当前可执行阶段 | 用户要求继续，进入 Phase 6 真实需求提交与立项闭环 |
 | 后端开工门禁 | Phase 4 通过且领导明确确认流程、信息结构和核心交互后，才允许进入 Phase 5 |
 
 产品采用 pnpm workspace：前端放在 `it-project-console/web/`，后端放在 `it-project-console/api/`。前端参考母版是 `D:/Work_Project/art-design-pro`，基准提交为 `f3aaf58eec1a0e988f162352c33862327a484f95`。复制时不带入 `.git`、`node_modules`、`.playwright-cli`、构建缓存和母版工作区未提交内容；保留上游 MIT License。原母版只读，产品子目录不得再次 `git init`。
@@ -303,12 +303,19 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 
 ## Phase 6: 需求提交与单级立项闭环
 
-**状态**：待开始，依赖 Phase 5
+**状态**：已实现并通过技术验证（2026-09-08），证据见 `it-project-console/docs/PHASE-6-VERIFICATION.md`。待用户体验确认，下一阶段为 Phase 7。
+
+**本轮步骤与验收**：
+
+1. 扩展原 Prisma 模型与迁移，实现本人草稿/提交/修改/撤回/删除及管理评估/直接建项目；以行锁、版本与幂等记录保证并发安全，通知outbox同事务写入。
+2. 在原需求表、需求编辑/评估抽屉、材料控件和项目创建抽屉接入真实API；保留显式prototype演示构建，新增仅开发的live联调入口，production仅使用真实会话/API且无Mock回退。
+3. 原Art壳与共享详情继续复用；尚属Phase7的进度/生命周期写入在真实模式标明未开放，不把原型写入当服务端成功。
+4. 真实PostgreSQL/MinIO集成与隔离浏览器完成文件/链接提交→评估→方案设计→刷新；验证越权、并发、回滚和生产边界，独立审查及全量检查后本地提交。
 
 **交付内容**：
 
 - 实现全员只读需求查询、本人草稿与提交、修改、撤回、退回补充后重提和受约束删除；PRD/HTML 各支持文件或 HTTPS 链接，缺任一材料服务端拒绝正式提交。
-- 实现 PRD 与 HTML 原型的 MinIO 文件或 HTTPS 链接保存，删除未引用附件时同步清理对象。
+- 实现 PRD 与 HTML 原型的 MinIO 文件或 HTTPS 链接保存，删除未引用附件时事务记录持久清理任务，存储对象按清理周期回收并失败重试；未保存的READY材料支持主动丢弃与24小时孤儿回收。
 - 实现管理人员立项、退回补充、不予立项（后两项必填原因），以及标记来源的直接建项目；立项事务一次创建项目、七阶段初始记录、唯一主负责人和协作关系。
 - 退回时在同一事务写入业务提交人的通知 outbox；立项时写入提交人、主负责人和全部协作人员的通知 outbox，业务事务成功后由 Phase 9 投递。
 - 将“我的需求、提交需求、需求审批”从 mock 切换为真实 API，保留显式原型模式用于 UI 演示。
@@ -322,7 +329,8 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 - `it-project-console/api/src/modules/approvals/approval-service.ts` — 单级立项事务。
 - `it-project-console/api/src/modules/projects/project-routes.ts`、`project-service.ts` — Phase 6 建立管理人员直接创建端点与事务，记录来源和可空 demandId；Phase 7 在原文件扩展更新及管理动作。
 - `it-project-console/api/src/modules/notifications/lifecycle-event-service.ts` — 退回、立项和完成事件的幂等记录。
-- `it-project-console/web/src/services/demand-service.ts` — 需求真实 API 与 mock 适配。
+- `it-project-console/web/src/services/live-demand-service.ts` — 需求/审批/直接立项真实 API 适配；既有 demand-service 保留原型语义。
+- `it-project-console/api/src/modules/workspace/workspace-routes.ts` — 会话鉴权后的页面数据投影。
 
 **验收标准**：
 

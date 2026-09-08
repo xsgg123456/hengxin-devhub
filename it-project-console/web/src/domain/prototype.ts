@@ -30,6 +30,7 @@ export interface DemoUser {
   roleLabel: '业务人员' | 'IT工程师' | '管理人员'
 }
 export interface DemoAttachment {
+  attachmentId?: string
   kind: 'file' | 'link'
   name: string
   url?: string
@@ -38,6 +39,7 @@ export interface DemoAttachment {
   status: 'ready' | 'failed' | 'uploading'
 }
 export interface DemoDemand {
+  version?: number
   id: string
   requestId: string
   name: string
@@ -54,6 +56,7 @@ export interface DemoDemand {
   submittedAt: string
 }
 export interface DemoProject {
+  version?: number
   id: string
   requestId: string
   demandId: string | null

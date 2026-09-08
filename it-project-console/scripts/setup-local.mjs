@@ -25,7 +25,7 @@ writeFileSync(
     "NODE_ENV=development",
     "DEV_LOGIN=true",
     "PORT=4322",
-    "WEB_ORIGIN=http://127.0.0.1:4317",
+    "WEB_ORIGIN=http://127.0.0.1:4318",
     `DATABASE_URL=postgresql://it_project_console:${password}@127.0.0.1:55432/it_project_console`,
     "S3_ENDPOINT=http://127.0.0.1:59000",
     "S3_PUBLIC_ENDPOINT=http://127.0.0.1:59000",

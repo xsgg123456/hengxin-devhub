@@ -9,7 +9,7 @@
       <p class="mt-3 mb-6 text-sm leading-7 text-g-500"
         >{{
           prototypeStore.currentUser.roleLabel
-        }}仅能查看与职责相关的数据。你可以切换演示身份，或返回当前角色首页。</p
+        }}当前角色无权进入该页面，请返回角色首页。</p
       >
       <ElButton type="primary" @click="goHome">返回我的首页</ElButton>
     </div>

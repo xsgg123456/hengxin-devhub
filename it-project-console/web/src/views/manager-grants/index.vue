@@ -1,6 +1,12 @@
 <template>
   <BusinessPageState>
-    <div>
+    <ElAlert
+      v-if="!runtimeConfig.isPrototype"
+      title="管理人员名单维护尚未开放，请联系系统管理员。"
+      type="info"
+      :closable="false"
+    />
+    <div v-else>
       <div class="flex-cb mb-5"
         ><div
           ><h2 class="text-xl font-medium">管理人员名单</h2
@@ -65,6 +71,7 @@
   </BusinessPageState>
 </template>
 <script setup lang="ts">
+  import { runtimeConfig } from '@/config/runtime'
   import BusinessPageState from '@/components/system/business-page-state.vue'
   import { computed, ref, watch } from 'vue'
   import { ElMessage, ElMessageBox } from 'element-plus'
@@ -92,6 +99,7 @@
     selectedId.value = ''
   })
   async function add() {
+    if (!runtimeConfig.isPrototype) return
     if (!selectedId.value) {
       addError.value = '请选择组织成员'
       return
@@ -107,6 +115,7 @@
     }
   }
   async function remove(userId: string) {
+    if (!runtimeConfig.isPrototype) return
     error.value = ''
     try {
       await ElMessageBox.confirm(

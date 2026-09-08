@@ -16,7 +16,7 @@ export default ({ mode }: { mode: string }) => {
   const version = env.VITE_VERSION || '0.1.0'
   const port = Number(env.VITE_PORT || 3006)
   const baseUrl = env.VITE_BASE_URL || '/'
-  const apiProxyUrl = env.VITE_API_PROXY_URL
+  const apiProxyUrl = env.VITE_API_PROXY_URL || (mode === 'live' ? 'http://127.0.0.1:4322' : undefined)
 
   return defineConfig({
     define: {

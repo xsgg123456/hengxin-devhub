@@ -50,7 +50,7 @@ export function assertActive(actor: AttachmentActor): void {
 export function assertWritable(actor: AttachmentActor, demand: Demand): void {
   assertActive(actor)
   if (demand.ownerId !== actor.id) throw new AppError(403, 'FORBIDDEN', '仅提交人可维护需求材料')
-  if (!['DRAFT', 'PENDING', 'RETURNED'].includes(demand.status)) {
+  if (!['DRAFT', 'PENDING', 'RETURNED', 'WITHDRAWN'].includes(demand.status)) {
     throw new AppError(409, 'DEMAND_NOT_EDITABLE', '当前需求状态不可修改材料')
   }
 }

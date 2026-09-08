@@ -13,7 +13,7 @@
             ><ElRadioButton value="mine">我负责 / 参与</ElRadioButton
             ><ElRadioButton value="all">全部项目</ElRadioButton></ElRadioGroup
           ><ElButton
-            v-if="store.currentUser.role === 'manager'"
+            v-if="runtimeConfig.isPrototype && store.currentUser.role === 'manager'"
             @click="router.push('/manager-grants')"
             >管理人员名单</ElButton
           ><ElButton
@@ -149,12 +149,17 @@
         @update:model-value="closeDetail"
         @edit="openUpdate"
       />
-      <ProgressUpdateDrawer v-model="updateOpen" :project="updateProject" />
+      <ProgressUpdateDrawer
+        v-if="runtimeConfig.isPrototype"
+        v-model="updateOpen"
+        :project="updateProject"
+      />
       <ProjectCreateDrawer v-model="createOpen" @created="openDetail" />
     </div>
   </BusinessPageState>
 </template>
 <script setup lang="ts">
+  import { runtimeConfig } from '@/config/runtime'
   import BusinessPageState from '@/components/system/business-page-state.vue'
   import { computed, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
@@ -216,6 +221,7 @@
     }
   }
   function openUpdate(id: string): void {
+    if (!runtimeConfig.isPrototype) return
     updateId.value = id
     updateOpen.value = true
   }

@@ -105,6 +105,10 @@ test.describe('生产静态产物边界', () => {
     await readFile(resolve(dist, 'index.html')) // pnpm build must precede E2E.
     server = createServer(async (request, response) => {
       const path = decodeURIComponent(new URL(request.url ?? '/', 'http://127.0.0.1').pathname)
+      if (path === '/api/workspace') {
+        response.writeHead(401, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: '请登录' } }))
+        return
+      }
       const target = resolve(dist, '.' + (path === '/' ? '/index.html' : path))
       if (!target.startsWith(dist + '/') && !target.startsWith(dist + '\\')) {
         response.writeHead(403).end()
@@ -172,7 +176,7 @@ test.describe('生产静态产物边界', () => {
           demo
         )
         expect(errors).toEqual([])
-        expect(api).toEqual([])
+        expect(api).toEqual([origin + '/api/workspace'])
       } finally {
         await context.close()
       }

@@ -7,7 +7,7 @@
     append-to-body
   >
     <ElAlert v-if="failure" :title="failure" type="error" :closable="false" class="mb-5" />
-    <PrototypeSaveRecovery v-if="failure" />
+    <PrototypeSaveRecovery v-if="failure && runtimeConfig.isPrototype" />
     <p class="mb-2 text-g-500"
       >{{ demand.department }} · 期望上线 {{ demand.expectedLaunchDate }}</p
     >
@@ -46,6 +46,7 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
+  import { runtimeConfig } from '@/config/runtime'
   import PrototypeSaveRecovery from '@/components/system/prototype-save-recovery.vue'
   import { computed, onBeforeUnmount, ref, watch } from 'vue'
   import { ElMessage, ElMessageBox } from 'element-plus'
@@ -53,10 +54,13 @@
   import { reviewDemand, type ProjectInput } from '@/services/workflow-service'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import ProjectFields from '@/components/project/project-fields.vue'
+  import { ApiError } from '@/services/api-client'
+  import { reviewLiveDemand, liveOperationKey } from '@/services/live-demand-service'
   import MaterialSummary from './material-summary.vue'
   const props = defineProps<{ demand: DemoDemand }>()
   const emit = defineEmits<{ close: []; saved: [] }>()
   const store = usePrototypeStore()
+  const operationKey = liveOperationKey()
   const decision = ref<'establish' | 'return' | 'reject'>('establish')
   const reason = ref('')
   const reasonError = ref('')
@@ -108,14 +112,35 @@
     saving.value = true
     failure.value = ''
     try {
-      await store.runCommand((snapshot) => {
-        reviewDemand(snapshot, {
-          demandId: props.demand.id,
-          decision: decision.value,
-          reason: reason.value,
-          project: project.value
+      if (!runtimeConfig.isPrototype) {
+        const input = {
+          ...project.value,
+          requestId: operationKey({
+            ...project.value,
+            requestId: undefined,
+            decision: decision.value,
+            reason: reason.value,
+            version: props.demand.version
+          })
+        }
+        await store.runLiveCommand(() =>
+          reviewLiveDemand(
+            props.demand.id,
+            props.demand.version,
+            decision.value,
+            reason.value,
+            input
+          )
+        )
+      } else
+        await store.runCommand((snapshot) => {
+          reviewDemand(snapshot, {
+            demandId: props.demand.id,
+            decision: decision.value,
+            reason: reason.value,
+            project: project.value
+          })
         })
-      })
       store.setDirty('demand-review', false)
       ElMessage.success(
         decision.value === 'establish'
@@ -126,6 +151,13 @@
       )
       emit('saved')
     } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 409) {
+        try {
+          await store.refreshLive()
+        } catch {
+          /* 保留原错误及当前输入。 */
+        }
+      }
       failure.value = cause instanceof Error ? cause.message : '保存失败，输入已保留，请重试'
     } finally {
       saving.value = false
