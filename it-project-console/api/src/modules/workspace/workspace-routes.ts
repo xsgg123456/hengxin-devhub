@@ -9,17 +9,21 @@ export function registerWorkspaceRoutes(
   app.get('/api/workspace', { preHandler: authenticate }, async (request) => {
     const database = await db.$transaction(
       async (tx) => {
-        const [users, demands, projects] = await Promise.all([
-          tx.user.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
-          tx.demand.findMany({
-            include: { attachments: true },
-            orderBy: [{ submittedAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }]
-          }),
-          tx.project.findMany({
-            include: { members: true, stageHistories: true },
-            orderBy: { createdAt: 'desc' }
-          })
-        ])
+        const [users, demands, projects, progressUpdates, scheduleChanges, lifecycleEvents] =
+          await Promise.all([
+            tx.user.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+            tx.demand.findMany({
+              include: { attachments: true },
+              orderBy: [{ submittedAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }]
+            }),
+            tx.project.findMany({
+              include: { members: true, stageHistories: { orderBy: { createdAt: 'asc' } } },
+              orderBy: { createdAt: 'desc' }
+            }),
+            tx.progressUpdate.findMany({ orderBy: { createdAt: 'desc' } }),
+            tx.scheduleChange.findMany({ orderBy: { createdAt: 'desc' } }),
+            tx.lifecycleEvent.findMany({ orderBy: { createdAt: 'desc' } })
+          ])
         return {
           schemaVersion: 2,
           users: users.map((user) => ({
@@ -87,8 +91,9 @@ export function registerWorkspaceRoutes(
             expectedDeliveryDate: date(project.currentDeliveryDate),
             status: project.status.toLowerCase(),
             archived: project.archived,
-            risks: [],
-            blocker: '',
+            risks: project.risks,
+            riskVersion: project.riskVersion,
+            blocker: project.blocker,
             createdAt: project.createdAt.toISOString(),
             updatedAt: project.updatedAt.toISOString(),
             lastOverallUpdatedAt: project.lastOverallUpdatedAt.toISOString()
@@ -100,12 +105,23 @@ export function registerWorkspaceRoutes(
                 projectId: project.id,
                 stage: item.stage,
                 startedAt: item.enteredAt!.toISOString(),
-                completedAt: item.completedAt?.toISOString() ?? null
+                completedAt: item.completedAt?.toISOString() ?? null,
+                interruptedAt: item.interruptedAt?.toISOString()
               }))
           ),
-          progressUpdates: [],
-          scheduleChanges: [],
-          lifecycleEvents: []
+          progressUpdates: progressUpdates.map((row) => ({
+            ...row,
+            overallProgress: row.overallProgress ?? undefined,
+            createdAt: row.createdAt.toISOString()
+          })),
+          scheduleChanges: scheduleChanges.map((row) => ({
+            ...row,
+            createdAt: row.createdAt.toISOString()
+          })),
+          lifecycleEvents: lifecycleEvents.map((row) => ({
+            ...row,
+            createdAt: row.createdAt.toISOString()
+          }))
         }
       },
       { isolationLevel: 'RepeatableRead' }

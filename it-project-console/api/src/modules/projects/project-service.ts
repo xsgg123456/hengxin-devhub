@@ -1,3 +1,4 @@
+import { refreshProjectRisks } from '../risks/risk-scan-job.js'
 import type { Prisma, PrismaClient } from '../../generated/prisma/client.js'
 import type { Actor } from '../../plugins/auth.js'
 import { AppError } from '../../lib/errors.js'
@@ -11,7 +12,7 @@ export async function createProject(tx: Prisma.TransactionClient, input: Project
   const users = await tx.user.count({ where: { id: { in: ids }, department: '信息技术部', active: true } })
   if (users !== ids.length) throw new AppError(400, 'INVALID_MEMBERS', '主负责人与协作人员必须是有效 IT 用户')
   const now = new Date()
-  return tx.project.create({ data: {
+  const project = await tx.project.create({ data: {
     requestId: input.requestId, name: input.name, department: input.department,
     demandId, source: demandId ? 'demand' : 'direct', priority: input.priority,
     primaryOwnerId: input.primaryOwnerId, stage: '方案设计', simpleStatus: 'not-started',
@@ -27,6 +28,8 @@ export async function createProject(tx: Prisma.TransactionClient, input: Project
       expectedDate: index === 2 && input.stageExpectedDate ? new Date(input.stageExpectedDate) : null
     })) }
   } })
+  await refreshProjectRisks(tx, project.id, now)
+  return project
 }
 export class ProjectService {
   constructor(private readonly db: PrismaClient) {}

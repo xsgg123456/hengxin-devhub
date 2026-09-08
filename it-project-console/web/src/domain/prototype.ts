@@ -56,6 +56,7 @@ export interface DemoDemand {
   submittedAt: string
 }
 export interface DemoProject {
+  riskVersion?: number
   version?: number
   id: string
   requestId: string

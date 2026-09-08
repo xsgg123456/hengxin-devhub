@@ -41,7 +41,8 @@ export function buildGanttRows(
     if (!filters.includeArchived && (project.archived || project.status === 'cancelled')) return []
     if (filters.department && project.department !== filters.department) return []
     if (filters.ownerId && project.primaryOwnerId !== filters.ownerId) return []
-    const risks = computeProjectRisks(project, changes, now)
+    const risks =
+      project.riskVersion !== undefined ? project.risks : computeProjectRisks(project, changes, now)
     if (filters.risk === 'any' && !risks.length) return []
     if (filters.risk === 'delayed' && !risks.some((risk) => risk.includes('延期'))) return []
     if (filters.risk === 'stale' && !risks.some((risk) => risk.includes('未更新'))) return []

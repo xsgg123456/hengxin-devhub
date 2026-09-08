@@ -69,14 +69,11 @@
         ? isOverall
           ? '可更新整体进度与计划'
           : '仅填写个人进展，不改变整体进度'
-        : runtimeConfig.isPrototype
-          ? '当前项目仅可查看'
-          : '进度维护尚未开放，当前可查看项目'
+        : '当前项目仅可查看'
     }}</p>
   </article>
 </template>
 <script setup lang="ts">
-  import { runtimeConfig } from '@/config/runtime'
   import { computed } from 'vue'
   import type { DemoProject } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'
@@ -105,13 +102,14 @@
   )
   const canUpdate = computed(
     () =>
-      runtimeConfig.isPrototype &&
       props.project.status === 'active' &&
       !props.project.archived &&
       (isOverall.value || relationship.value === '协作')
   )
   const risks = computed(() =>
-    computeProjectRisks(props.project, store.database?.scheduleChanges ?? [])
+    props.project.riskVersion !== undefined
+      ? props.project.risks
+      : computeProjectRisks(props.project, store.database?.scheduleChanges ?? [])
   )
   const severe = computed(() => risks.value.some((risk) => /延期|未更新/.test(risk)))
 </script>

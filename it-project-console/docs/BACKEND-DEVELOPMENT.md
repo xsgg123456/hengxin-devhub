@@ -1,6 +1,6 @@
 # 后端本地开发
 
-Phase 6 已接入真实需求、单级审批、立项和附件。前端继承 Art Design Pro 页面与交互，提供独立原型和真实联调模式；钉钉登录在 Phase 9 接入。
+Phase 7 已接入真实需求、单级审批、立项、附件、进度、项目生命周期和风险。前端继承 Art Design Pro 页面与交互，提供独立原型和真实联调模式；钉钉登录在 Phase 9 接入。
 
 ## 启动
 
@@ -48,7 +48,19 @@ pnpm dev:live
 
 `GET /api/workspace` 返回当前会话可读的真实用户、需求、项目及阶段历史，兼容既有页面 DTO。需求使用 POST 创建、PATCH 修改、POST `/:id/withdraw` 撤回和 DELETE 删除。管理人员通过 POST `/api/demands/:id/review` 评估；POST `/api/projects` 直接立项。
 
-每个写命令携带 `requestId`，修改还携带 `version`。相同请求重试返回已提交结果；同请求号不同内容或过期版本返回409。通知只写入 outbox，Phase 9 前不会发送钉钉消息。真实模式暂不开放进度更新、项目生命周期操作和管理员授权；原型保留这些既有演示交互。
+每个写命令携带 `requestId`，修改还携带 `version`。相同请求重试返回已提交结果；同请求号不同内容或过期版本返回409。通知只写入 outbox，Phase 9 前不会发送钉钉消息。真实模式可更新进度、纠正、完成归档和管理重开；管理员授权仍待后续身份管理阶段。原型保留原有演示交互。
+
+## 进度、历史与风险
+
+`POST /api/projects/:id/progress` 接收 `requestId/version/kind/summary/status`；整体更新另外接收百分比及日期字段。协作人员只允许个人进展和阻塞，服务端拒绝整体字段。日期变化必须填写原因与说明，写入不可覆盖的旧值/新值记录。阶段标记完成后填写下一阶段日期并按固定顺序推进；100% 不自动关闭。
+
+`POST /api/projects/:id/correct` 为管理纠正；`POST /api/projects/:id/action` 支持 complete/cancel/archive/reopen/delete。完成仅允许主负责人在验收交付完成后显式执行，并自动归档。有进度记录不能物理删除；删除无进度的需求项目会恢复关联需求为待评估。重开/纠正保留旧阶段记录并创建新 episode。
+
+风险由服务端统一生成 `Project.risks/riskVersion` 和版本历史 `RiskSnapshot`，页面、待办和甘特读取同一快照。每次项目变更同事务重算，另由 node-cron 启动扫描并默认每分钟运行一次。`RISK_SCAN_CRON` 可改变扫描周期，时区固定 Asia/Shanghai；单实例 noOverlap、按数据库schema区分的 advisory lock 防止重复扫描。关闭服务等待在途风险事务。
+
+工作日与停更阈值从 `SystemSetting` 的 `risk-policy` JSON 读取，默认 `{ "staleWorkdays": 3, "weekdays": [1,2,3,4,5] }`。工作日采用周一至周五，暂未接公司节假日日历。工程师仅收到自己主责项目的临期、延期、停更、阻塞事件；管理人员接收风险集合变化事件，业务人员不接风险事件。空风险不写通知，风险解除仍保留快照历史，再次出现会分配新版本。Phase 9 前仅写 outbox，不实际投递消息。
+
+Prisma模型按职责拆在 `prisma/schema.prisma` 与 `prisma/progress.prisma`，配置指定同一个prisma目录；迁移目录仍是 `prisma/migrations`，没有新建数据库或第二套客户端。[Prisma多文件配置](https://docs.prisma.io/docs/orm/reference/prisma-config-reference)、[node-cron调度文档](https://nodecron.com/scheduling-options)用于本期实现核对。
 
 ## 验证与隔离
 

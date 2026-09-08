@@ -136,148 +136,31 @@
 </template>
 <script setup lang="ts">
   import PrototypeSaveRecovery from '@/components/system/prototype-save-recovery.vue'
-  import { computed, ref, watch } from 'vue'
-  import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-  import {
-    PROJECT_STAGES,
-    SCHEDULE_REASONS,
-    type DemoProject,
-    type ProjectStage
-  } from '@/domain/prototype'
-  import { updateProgress, type ProgressInput } from '@/services/workflow-service'
-  import { correctProject } from '@/services/management-service'
-  import { usePrototypeStore } from '@/store/modules/prototype'
-  import { useUnsavedForm } from '@/hooks/business/use-unsaved-form'
+  import type { DemoProject } from '@/domain/prototype'
+  import { SCHEDULE_REASONS } from '@/domain/prototype'
   import { statusLabel } from '@/utils/project-display'
+  import { useProgressForm } from '@/hooks/business/use-progress-form'
   const props = defineProps<{
     modelValue: boolean
     project: DemoProject | null
     correction?: boolean
   }>()
   const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
-  const store = usePrototypeStore()
-  const overall = computed(
-    () =>
-      store.currentUser.role === 'manager' || store.currentUser.id === props.project?.primaryOwnerId
-  )
-  const form = ref<ProgressInput>({ projectId: '', kind: 'overall', summary: '' })
-  const correctionStage = ref<ProjectStage>('方案设计')
-  const correctionStages = computed(() =>
-    PROJECT_STAGES.filter(
-      (s) =>
-        s === props.project?.stage ||
-        store.database?.stageHistories.some(
-          (h) => h.projectId === props.project?.id && h.stage === s
-        )
-    )
-  )
-  const initial = ref('')
-  const blocked = ref(false)
-  const busy = ref(false)
-  const error = ref('')
-  const formRef = ref<FormInstance>()
-  const formSnapshot = () =>
-    JSON.stringify({
-      form: form.value,
-      blocked: blocked.value,
-      correctionStage: correctionStage.value
-    })
-  const dirty = computed(() => props.modelValue && formSnapshot() !== initial.value)
-  const { beforeClose } = useUnsavedForm('project-progress', dirty, busy)
-  const nextStage = computed(() =>
-    !props.correction && overall.value && form.value.status === 'completed' && props.project
-      ? PROJECT_STAGES[PROJECT_STAGES.indexOf(props.project.stage) + 1]
-      : undefined
-  )
-  const datesChanged = computed(
-    () =>
-      overall.value &&
-      props.project &&
-      (['stageExpectedDate', 'expectedLaunchDate', 'expectedDeliveryDate'] as const).some(
-        (field) => props.project![field] !== form.value[field]
-      )
-  )
-  const required = { required: true, message: '请填写此项', trigger: 'change' }
-  const rules = computed<FormRules>(() => ({
-    summary: [required, { whitespace: true, message: '请填写进展说明', trigger: 'blur' }],
-    ...(overall.value
-      ? {
-          overallProgress: [required],
-          status: [required],
-          stageExpectedDate: [required],
-          expectedLaunchDate: [required],
-          expectedDeliveryDate: [required]
-        }
-      : {}),
-    ...(nextStage.value ? { nextStageExpectedDate: [required] } : {}),
-    ...(datesChanged.value ? { changeReason: [required], changeDescription: [required] } : {}),
-    ...(blocked.value || form.value.status === 'blocked' ? { blocker: [required] } : {})
-  }))
-  watch(
-    () => props.modelValue,
-    (open) => {
-      if (!open || !props.project) return
-      const p = props.project
-      correctionStage.value = p.stage
-      blocked.value = false
-      form.value = {
-        projectId: p.id,
-        kind: overall.value ? 'overall' : 'personal',
-        summary: '',
-        blocker: overall.value ? p.blocker : '',
-        ...(overall.value
-          ? {
-              overallProgress: p.overallProgress,
-              status: p.simpleStatus,
-              stageExpectedDate: p.stageExpectedDate,
-              expectedLaunchDate: p.expectedLaunchDate,
-              expectedDeliveryDate: p.expectedDeliveryDate
-            }
-          : {})
-      }
-      initial.value = formSnapshot()
-      error.value = ''
-    }
-  )
-  async function save(): Promise<void> {
-    if (busy.value || !(await formRef.value?.validate().catch(() => false))) return
-    busy.value = true
-    error.value = ''
-    try {
-      const input: ProgressInput = overall.value
-        ? { ...form.value }
-        : {
-            projectId: form.value.projectId,
-            kind: 'personal',
-            summary: form.value.summary,
-            status: blocked.value ? 'blocked' : 'in-progress',
-            blocker: blocked.value ? form.value.blocker : ''
-          }
-      await store.runCommand((draft) => {
-        if (props.correction)
-          correctProject(draft, {
-            ...input,
-            stage: correctionStage.value,
-            overallProgress: input.overallProgress ?? 0,
-            reason: input.summary
-          })
-        else updateProgress(draft, input)
-      })
-      initial.value = formSnapshot()
-      emit('update:modelValue', false)
-      ElMessage.success(
-        props.correction
-          ? '管理纠正已保存'
-          : overall.value
-            ? '项目整体进度已更新'
-            : '个人进展已保存'
-      )
-    } catch (cause) {
-      error.value = cause instanceof Error ? cause.message : '保存失败，请重试'
-    } finally {
-      busy.value = false
-    }
-  }
+  const {
+    overall,
+    form,
+    correctionStage,
+    correctionStages,
+    blocked,
+    busy,
+    error,
+    formRef,
+    beforeClose,
+    nextStage,
+    datesChanged,
+    rules,
+    save
+  } = useProgressForm(props, emit)
 </script>
 <style scoped>
   .date-fields {

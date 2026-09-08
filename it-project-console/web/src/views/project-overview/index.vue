@@ -149,11 +149,7 @@
         @update:model-value="closeDetail"
         @edit="openUpdate"
       />
-      <ProgressUpdateDrawer
-        v-if="runtimeConfig.isPrototype"
-        v-model="updateOpen"
-        :project="updateProject"
-      />
+      <ProgressUpdateDrawer v-model="updateOpen" :project="updateProject" />
       <ProjectCreateDrawer v-model="createOpen" @created="openDetail" />
     </div>
   </BusinessPageState>
@@ -221,7 +217,6 @@
     }
   }
   function openUpdate(id: string): void {
-    if (!runtimeConfig.isPrototype) return
     updateId.value = id
     updateOpen.value = true
   }

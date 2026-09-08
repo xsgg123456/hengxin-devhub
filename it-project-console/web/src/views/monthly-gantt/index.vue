@@ -90,16 +90,11 @@
         @update:model-value="closeDetail"
         @edit="openUpdate"
       />
-      <ProgressUpdateDrawer
-        v-if="runtimeConfig.isPrototype"
-        v-model="updateOpen"
-        :project="updateProject"
-      />
+      <ProgressUpdateDrawer v-model="updateOpen" :project="updateProject" />
     </div>
   </BusinessPageState>
 </template>
 <script setup lang="ts">
-  import { runtimeConfig } from '@/config/runtime'
   import BusinessPageState from '@/components/system/business-page-state.vue'
   import { computed, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
@@ -157,7 +152,6 @@
     void router.replace({ query })
   }
   function openUpdate(id: string): void {
-    if (!runtimeConfig.isPrototype) return
     updateId.value = id
     updateOpen.value = true
   }

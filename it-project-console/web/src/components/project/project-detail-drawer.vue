@@ -49,8 +49,7 @@
       </ElDescriptions>
       <StageProgress :stage="project.stage" :status="project.simpleStatus" />
       <StageHistory :project-id="project.id" />
-      <LifecycleActions v-if="runtimeConfig.isPrototype" :project="project" />
-      <p v-else class="mt-4 text-sm text-g-500">进度维护、取消与归档尚未开放。</p>
+      <LifecycleActions :project="project" />
       <LifecycleHistory :project-id="project.id" />
       <h4 class="mt-6 mb-4 font-medium">更新记录</h4>
       <ElEmpty v-if="!updates.length" description="暂无进度记录，等待首次更新" :image-size="50" />
@@ -93,7 +92,6 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
-  import { runtimeConfig } from '@/config/runtime'
   import { computed } from 'vue'
   import type { DemoProject } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'
@@ -108,25 +106,32 @@
   const props = defineProps<{ modelValue: boolean; project: DemoProject | null }>()
   defineEmits<{ 'update:modelValue': [value: boolean]; edit: [id: string] }>()
   const store = usePrototypeStore()
+  const project = computed(
+    () => store.visibleProjects.find((p) => p.id === props.project?.id) ?? null
+  )
   const userName = (id: string) =>
     store.database?.users.find((u) => u.id === id)?.name ?? '未知人员'
   const demand = computed(() =>
-    store.database?.demands.find((d) => d.id === props.project?.demandId)
+    store.database?.demands.find((d) => d.id === project.value?.demandId)
   )
   const updates = computed(
     () =>
       store.database?.progressUpdates
-        .filter((u) => u.projectId === props.project?.id)
+        .filter((u) => u.projectId === project.value?.id)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt)) ?? []
   )
   const changes = computed(
     () =>
       store.database?.scheduleChanges
-        .filter((c) => c.projectId === props.project?.id)
+        .filter((c) => c.projectId === project.value?.id)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt)) ?? []
   )
   const risks = computed(() =>
-    props.project ? computeProjectRisks(props.project, store.database?.scheduleChanges ?? []) : []
+    project.value
+      ? project.value.riskVersion !== undefined
+        ? project.value.risks
+        : computeProjectRisks(project.value, store.database?.scheduleChanges ?? [])
+      : []
   )
   const fieldLabels = {
     stageExpectedDate: '阶段预计完成',
@@ -135,14 +140,13 @@
   }
   const isOverall = computed(
     () =>
-      store.currentUser.role === 'manager' || store.currentUser.id === props.project?.primaryOwnerId
+      store.currentUser.role === 'manager' || store.currentUser.id === project.value?.primaryOwnerId
   )
   const canUpdate = computed(
     () =>
-      runtimeConfig.isPrototype &&
-      props.project?.status === 'active' &&
-      !props.project.archived &&
-      (isOverall.value || props.project.collaboratorIds.includes(store.currentUser.id))
+      project.value?.status === 'active' &&
+      !project.value.archived &&
+      (isOverall.value || project.value.collaboratorIds.includes(store.currentUser.id))
   )
 </script>
 <style scoped>

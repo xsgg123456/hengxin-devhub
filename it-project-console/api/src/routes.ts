@@ -1,3 +1,5 @@
+import { registerProgressRoutes } from './modules/progress/progress-routes.js'
+import { refreshProjectRisks } from './modules/risks/risk-scan-job.js'
 import { registerWorkspaceRoutes } from './modules/workspace/workspace-routes.js'
 import { registerDemandRoutes } from './modules/demands/demand-routes.js'
 import { registerApprovalRoutes } from './modules/approvals/approval-routes.js'
@@ -18,6 +20,7 @@ export async function registerRoutes(
 ) {
   const api = app.withTypeProvider<ZodTypeProvider>()
   const auth = authService(db, env)
+  registerProgressRoutes(app, db, auth.authenticate, async (tx, id) => { await refreshProjectRisks(tx, id) })
   registerWorkspaceRoutes(app, db, auth.authenticate)
   registerDemandRoutes(app, db, auth.authenticate)
   registerApprovalRoutes(app, db, auth.authenticate)

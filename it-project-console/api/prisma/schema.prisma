@@ -138,7 +138,7 @@ model Project {
   priority String @default("P1")
   stage String @default("方案设计")
   simpleStatus String @default("not-started") @map("simple_status")
-  overallProgress Int @default(0) @map("overall_progress")
+  overallProgress Float @default(0) @map("overall_progress")
   originalLaunchDate DateTime? @map("original_launch_date") @db.Date
   currentLaunchDate DateTime? @map("current_launch_date") @db.Date
   originalDeliveryDate DateTime? @map("original_delivery_date") @db.Date
@@ -146,6 +146,12 @@ model Project {
   stageExpectedDate DateTime? @map("stage_expected_date") @db.Date
   lastOverallUpdatedAt DateTime @default(now()) @map("last_overall_updated_at") @db.Timestamptz(3)
   version Int @default(1)
+  blocker String @default("")
+  risks Json @default("[]")
+  riskVersion Int @default(0) @map("risk_version")
+  progressUpdates ProgressUpdate[]
+  scheduleChanges ScheduleChange[]
+  riskSnapshots RiskSnapshot[]
   stageHistories StageHistory[]
   id             String               @id @default(cuid())
   name           String
@@ -247,7 +253,8 @@ model StageHistory {
   progress Int @default(0)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-  @@unique([projectId, stage])
+  interruptedAt DateTime? @map("interrupted_at") @db.Timestamptz(3)
+  @@index([projectId, stage])
   @@map("stage_histories")
 }
 model CommandReceipt {

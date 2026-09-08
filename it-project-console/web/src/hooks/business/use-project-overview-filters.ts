@@ -21,7 +21,13 @@ export function useProjectOverviewFilters(personal = false) {
   const departments = computed(() => [...new Set(store.visibleProjects.map((p) => p.department))])
   const projects = computed(() =>
     store.visibleProjects
-      .map((p) => ({ ...p, risks: computeProjectRisks(p, store.database?.scheduleChanges ?? []) }))
+      .map((p) => ({
+        ...p,
+        risks:
+          p.riskVersion !== undefined
+            ? p.risks
+            : computeProjectRisks(p, store.database?.scheduleChanges ?? [])
+      }))
       .filter((p) => {
         if (!includeArchived.value && p.archived) return false
         if (

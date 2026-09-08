@@ -1,3 +1,4 @@
+import { scanProjectRisks } from './modules/risks/risk-scan-job.js'
 import Fastify from 'fastify'
 import cookie from '@fastify/cookie'
 import cors from '@fastify/cors'
@@ -122,5 +123,5 @@ export async function buildApp(
     if (!overrides.db) await db.$disconnect()
     if (!overrides.storage) storage.close()
   })
-  return { app, attachments }
+  return { app, attachments, scanRisks: () => scanProjectRisks(db) }
 }

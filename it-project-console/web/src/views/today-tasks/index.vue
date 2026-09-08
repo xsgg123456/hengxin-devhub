@@ -21,25 +21,13 @@
               task.reason
             }}</p></div
           >
-          <ElButton
-            type="primary"
-            plain
-            :disabled="!runtimeConfig.isPrototype && ['overall', 'personal'].includes(task.action)"
-            @click="act(task)"
-            >{{
-              !runtimeConfig.isPrototype && ['overall', 'personal'].includes(task.action)
-                ? '进度维护尚未开放'
-                : actionLabels[task.action]
-            }}</ElButton
-          >
+          <ElButton type="primary" plain @click="act(task)">{{
+            actionLabels[task.action]
+          }}</ElButton>
         </div>
       </div>
       <ProjectDetailDrawer v-model="detailOpen" :project="selected" @edit="openUpdate" />
-      <ProgressUpdateDrawer
-        v-if="runtimeConfig.isPrototype"
-        v-model="updateOpen"
-        :project="updateProject"
-      />
+      <ProgressUpdateDrawer v-model="updateOpen" :project="updateProject" />
       <DemandReview v-if="review" :demand="review" @close="reviewId = ''" @saved="reviewId = ''" />
       <DemandEditor
         v-if="supplement"
@@ -51,7 +39,6 @@
   </BusinessPageState>
 </template>
 <script setup lang="ts">
-  import { runtimeConfig } from '@/config/runtime'
   import BusinessPageState from '@/components/system/business-page-state.vue'
   import { computed, ref, watch } from 'vue'
   import { usePrototypeStore } from '@/store/modules/prototype'
@@ -90,7 +77,6 @@
     coordinate: '查看并协调'
   }
   function openUpdate(id: string) {
-    if (!runtimeConfig.isPrototype) return
     updateId.value = id
     updateOpen.value = true
   }

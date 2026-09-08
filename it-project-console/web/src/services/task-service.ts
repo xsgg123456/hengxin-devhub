@@ -44,7 +44,8 @@ export function responsibilityTasks(
   if (user.role === 'business') return tasks
   for (const p of db.projects) {
     if (p.status !== 'active' || p.archived) continue
-    const risks = computeProjectRisks(p, db.scheduleChanges, now)
+    const risks =
+      p.riskVersion !== undefined ? p.risks : computeProjectRisks(p, db.scheduleChanges, now)
     const delay = risks.filter((r) => r.includes('延期'))
     const stale = risks.filter((r) => r.includes('未更新'))
     const severity = delay.length
