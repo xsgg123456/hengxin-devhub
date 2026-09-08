@@ -2,6 +2,7 @@ import type { PrototypeSnapshot } from '@/domain/prototype'
 import { DEMO_USERS } from '@/mocks/auth-context'
 import { createInitialPrototypeSnapshot } from '@/mocks/seed'
 import { migratePrototypeSnapshot } from './prototype-migration'
+import { isPrototypeSnapshot } from './prototype-validation'
 
 export interface PrototypeStorage {
   getItem(key: string): string | null
@@ -17,42 +18,18 @@ export class PrototypeDataError extends Error {
   }
 }
 
-function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot {
-  if (!value || typeof value !== 'object') return false
-
-  const candidate = value as Record<string, unknown>
-  const database = candidate.database
-
-  const validScenarios = ['normal', 'empty', 'loading', 'save-error', 'forbidden']
-
-  return (
-    candidate.schemaVersion === 2 &&
-    typeof candidate.revision === 'number' &&
-    Number.isInteger(candidate.revision) &&
-    candidate.revision >= 0 &&
-    typeof candidate.activeUserId === 'string' &&
-    DEMO_USERS.some((user) => user.id === candidate.activeUserId) &&
-    typeof candidate.scenario === 'string' &&
-    validScenarios.includes(candidate.scenario) &&
-    typeof candidate.updatedAt === 'string' &&
-    typeof database === 'object' &&
-    database !== null &&
-    (database as Record<string, unknown>).schemaVersion === 2 &&
-    Array.isArray((database as Record<string, unknown>).users) &&
-    Array.isArray((database as Record<string, unknown>).demands) &&
-    Array.isArray((database as Record<string, unknown>).projects) &&
-    Array.isArray((database as Record<string, unknown>).progressUpdates)
-  )
-}
-
 export class PrototypeRepository {
   constructor(private readonly storage: PrototypeStorage) {}
 
   load(): PrototypeSnapshot {
-    const rawSnapshot = this.storage.getItem(PROTOTYPE_STORAGE_KEY)
-    if (!rawSnapshot) return this.reset()
-
+    let rawSnapshot: string | null
     try {
+      rawSnapshot = this.storage.getItem(PROTOTYPE_STORAGE_KEY)
+    } catch {
+      throw new PrototypeDataError('浏览器存储不可用，请恢复存储权限后重新读取')
+    }
+    try {
+      if (!rawSnapshot) return this.reset()
       const parsed: unknown = JSON.parse(rawSnapshot)
       const normalized = migratePrototypeSnapshot(parsed)
       if (!isPrototypeSnapshot(normalized)) throw new PrototypeDataError()
@@ -89,5 +66,9 @@ export class PrototypeRepository {
 }
 
 export function createBrowserPrototypeRepository(): PrototypeRepository {
-  return new PrototypeRepository(window.localStorage)
+  try {
+    return new PrototypeRepository(window.localStorage)
+  } catch {
+    throw new PrototypeDataError('浏览器存储不可用，请恢复存储权限后重新读取')
+  }
 }

@@ -14,6 +14,7 @@
     />
     <ProjectFields ref="fields" v-model="form" :disabled="busy" />
     <ElAlert v-if="error" :title="error" type="error" :closable="false" show-icon role="alert" />
+    <PrototypeSaveRecovery v-if="error" />
     <template #footer
       ><ElButton :disabled="busy" @click="beforeClose(() => emit('update:modelValue', false))"
         >取消</ElButton
@@ -22,6 +23,7 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
+  import PrototypeSaveRecovery from '@/components/system/prototype-save-recovery.vue'
   import { computed, ref, watch } from 'vue'
   import { ElMessage } from 'element-plus'
   import { createProject, type ProjectInput } from '@/services/workflow-service'

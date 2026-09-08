@@ -118,6 +118,7 @@
         /></ElFormItem>
       </ElForm>
       <ElAlert v-if="error" type="error" :title="error" :closable="false" show-icon role="alert" />
+      <PrototypeSaveRecovery v-if="error" />
     </template>
     <template #footer>
       <p v-if="overall" class="mb-3 text-xs text-g-600"
@@ -134,6 +135,7 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
+  import PrototypeSaveRecovery from '@/components/system/prototype-save-recovery.vue'
   import { computed, ref, watch } from 'vue'
   import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
   import {

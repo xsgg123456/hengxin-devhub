@@ -14,6 +14,7 @@
       class="mb-5"
     />
     <ElAlert v-if="failure" :title="failure" type="error" :closable="false" class="mb-5" />
+    <PrototypeSaveRecovery v-if="failure" />
     <ElForm ref="formRef" :model="form" label-position="top" :disabled="saving" scroll-to-error>
       <ElFormItem label="项目名称" prop="name" :error="errors.name" required>
         <ElInput v-model="form.name" maxlength="100" show-word-limit />
@@ -80,6 +81,7 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
+  import PrototypeSaveRecovery from '@/components/system/prototype-save-recovery.vue'
   import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
   import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
   import type { DemoAttachment, DemoDemand } from '@/domain/prototype'

@@ -23,9 +23,10 @@
   async function act(action: 'withdraw' | 'delete') {
     try {
       await ElMessageBox.confirm(
-        action === 'delete'
-          ? '删除后无法恢复此需求及材料信息。'
-          : '撤回后退出评估，可编辑后重新提交。',
+        `需求「${props.demand.name || props.demand.id}」：` +
+          (action === 'delete'
+            ? '删除后无法恢复此需求及材料信息。'
+            : '撤回后退出评估，可编辑后重新提交。'),
         action === 'delete' ? '删除需求' : '撤回需求',
         {
           confirmButtonText: action === 'delete' ? '确认删除' : '确认撤回',

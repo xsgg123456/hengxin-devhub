@@ -32,7 +32,7 @@
         type="button"
         class="identity-menu-item"
         :class="{ 'is-current': user.id === prototypeStore.currentUser.id }"
-        :disabled="user.id === prototypeStore.currentUser.id"
+        :disabled="prototypeStore.saving || user.id === prototypeStore.currentUser.id"
         @click="switchIdentity(user.id)"
       >
         <span class="identity-mini-avatar">{{ user.name.slice(-2) }}</span>
@@ -42,7 +42,14 @@
         >
         <ArtSvgIcon v-if="user.id === prototypeStore.currentUser.id" icon="ri:check-line" />
       </button>
-      <button class="prototype-reset-action" type="button" @click="resetPrototype">
+      <PrototypeScenarioMenu />
+      <ElAlert v-if="menuError" :title="menuError" type="error" :closable="false" />
+      <button
+        class="prototype-reset-action"
+        type="button"
+        :disabled="prototypeStore.saving"
+        @click="resetPrototype"
+      >
         <ArtSvgIcon icon="ri:restart-line" />
         <span>重置演示数据</span>
       </button>
@@ -58,17 +65,20 @@
   import { getHomePath } from '@/router/access'
   import { syncPrototypeShell } from '@/prototype/sync-shell'
   import { usePrototypeStore } from '@/store/modules/prototype'
+  import PrototypeScenarioMenu from '@/components/system/prototype-scenario-menu.vue'
 
   defineOptions({ name: 'ArtUserMenu' })
 
   const router = useRouter()
   const prototypeStore = usePrototypeStore()
   const userMenuPopover = ref<{ hide: () => void }>()
+  const menuError = ref('')
   const demoUsers = computed(() => prototypeStore.database?.users ?? DEMO_USERS)
   const initials = computed(() => prototypeStore.currentUser.name.slice(-2))
 
   async function switchIdentity(userId: string): Promise<void> {
     if (prototypeStore.saving) return
+    menuError.value = ''
     if (prototypeStore.hasUnsavedChanges) {
       try {
         await ElMessageBox.confirm('当前表单尚未保存，切换身份后会丢失修改。', '切换演示身份？', {
@@ -76,18 +86,25 @@
           cancelButtonText: '继续编辑',
           type: 'warning'
         })
-        prototypeStore.clearDirty()
       } catch {
         return
       }
     }
-    prototypeStore.switchUser(userId)
+    try {
+      prototypeStore.switchUser(userId)
+      prototypeStore.clearDirty()
+    } catch (error) {
+      menuError.value = error instanceof Error ? error.message : '身份切换失败'
+      return
+    }
     syncPrototypeShell(prototypeStore.currentUser.role)
     userMenuPopover.value?.hide()
     await router.push(getHomePath(prototypeStore.currentUser.role))
   }
 
   async function resetPrototype(): Promise<void> {
+    if (prototypeStore.saving) return
+    menuError.value = ''
     try {
       await ElMessageBox.confirm('这会清除当前演示进度，并恢复固定初始场景。', '重置演示数据', {
         confirmButtonText: '确认重置',
@@ -99,8 +116,8 @@
       userMenuPopover.value?.hide()
       await router.push(getHomePath(prototypeStore.currentUser.role))
       ElMessage.success('演示数据已重置')
-    } catch {
-      // 取消操作时保留当前数据。
+    } catch (error) {
+      if (error instanceof Error) menuError.value = error.message
     }
   }
 </script>

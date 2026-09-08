@@ -6,7 +6,7 @@
       <ElIcon class="is-loading" :size="28"><Loading /></ElIcon>
       <span>正在准备演示数据…</span>
     </div>
-    <RouterView v-else />
+    <RouterView v-else :key="prototypeStore.resetVersion" />
   </ElConfigProvider>
 </template>
 

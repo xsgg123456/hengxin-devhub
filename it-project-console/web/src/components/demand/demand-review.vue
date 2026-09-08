@@ -7,6 +7,7 @@
     append-to-body
   >
     <ElAlert v-if="failure" :title="failure" type="error" :closable="false" class="mb-5" />
+    <PrototypeSaveRecovery v-if="failure" />
     <p class="mb-2 text-g-500"
       >{{ demand.department }} · 期望上线 {{ demand.expectedLaunchDate }}</p
     >
@@ -45,6 +46,7 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
+  import PrototypeSaveRecovery from '@/components/system/prototype-save-recovery.vue'
   import { computed, onBeforeUnmount, ref, watch } from 'vue'
   import { ElMessage, ElMessageBox } from 'element-plus'
   import type { DemoDemand } from '@/domain/prototype'

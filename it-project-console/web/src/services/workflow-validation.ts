@@ -4,6 +4,10 @@ export function assertWrite(snapshot: PrototypeSnapshot) {
   if (snapshot.scenario === 'save-error')
     throw new WorkflowError('模拟保存失败，请重试；已保存数据不变')
   if (snapshot.scenario === 'forbidden') throw new WorkflowError('当前场景无操作权限')
+  if (snapshot.scenario === 'network-error')
+    throw new WorkflowError('模拟网络错误，请恢复正常后重试')
+  if (snapshot.scenario === 'empty' || snapshot.scenario === 'loading')
+    throw new WorkflowError('当前场景仅供查看，请恢复正常后再保存')
   const actor = snapshot.database.users.find((user) => user.id === snapshot.activeUserId)
   if (!actor) throw new WorkflowError('当前身份无效')
   return actor

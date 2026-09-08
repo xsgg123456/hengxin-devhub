@@ -14,7 +14,7 @@
 | 前端技术 | 已确认：复用 Art Design Pro 现有代码和技术栈 |
 | 后端技术架构 | 已确认：Node.js + TypeScript + Fastify + Prisma + PostgreSQL 16 + MinIO |
 | 产品代码 | Phase 3 图表、职责待办、甘特与生命周期已实现并通过技术验收 |
-| 当前可执行阶段 | Phase 3 待用户预览确认；下一阶段为 Phase 4 领导评审版打磨 |
+| 当前可执行阶段 | Phase 4 技术验证已通过，待领导实际评审确认；Phase 5 保持锁定 |
 | 后端开工门禁 | Phase 4 通过且领导明确确认流程、信息结构和核心交互后，才允许进入 Phase 5 |
 
 产品采用 pnpm workspace：前端放在 `it-project-console/web/`，后端放在 `it-project-console/api/`。前端参考母版是 `D:/Work_Project/art-design-pro`，基准提交为 `f3aaf58eec1a0e988f162352c33862327a484f95`。复制时不带入 `.git`、`node_modules`、`.playwright-cli`、构建缓存和母版工作区未提交内容；保留上游 MIT License。原母版只读，产品子目录不得再次 `git init`。
@@ -188,7 +188,13 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 
 ## Phase 4: 领导评审版打磨与确认
 
-**状态**：待开始，依赖 Phase 3
+**状态**：技术验证已通过（2026-09-08），领导评审结论待实际确认。证据见 `it-project-console/docs/PHASE-4-VERIFICATION.md`，操作路线见 `it-project-console/docs/LEADERSHIP-REVIEW.md`。
+
+**本轮执行与验收**：
+
+1. 在原用户菜单接入正常、空数据、加载、网络错误、保存失败、无权限场景；场景切换不覆盖成功业务数据，恢复正常后原数据仍在，未保存编辑有保护。
+2. 原位补强读取失败与数据损坏恢复，重置有确认、忙碌和失败反馈；核对三角色页面、组件、字体及边界，不新建应用壳。
+3. 固化从重置开始的领导评审路线和全状态/生产边界 E2E，执行全量检查与独立两阶段审查，技术验收完成后本地提交。领导是否通过单独记录，Phase 5 继续锁定。
 
 **交付内容**：
 
@@ -202,7 +208,7 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 
 - `it-project-console/web/src/mocks/scenarios.ts` — 正常、空数据、失败和无权限演示场景。
 - `it-project-console/web/src/components/system/prototype-scenario-menu.vue` — 仅原型模式可见的受控场景入口。
-- `it-project-console/web/src/components/system/error-recovery.vue` — 演示数据损坏提示与重置恢复。
+- `it-project-console/web/src/components/system/prototype-data-error.vue` — 原位增强演示数据损坏提示与重置恢复，保留现有入口。
 - `it-project-console/web/playwright.config.ts` — E2E 与桌面视口配置。
 - `it-project-console/web/e2e/leadership-review.spec.ts` — 跨角色完整闭环和评审路径。
 - `it-project-console/web/e2e/prototype-boundary.spec.ts` — 权限、持久化、重置和生产禁用验证。

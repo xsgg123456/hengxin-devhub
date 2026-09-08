@@ -1,7 +1,9 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { DemoProject, PrototypeSnapshot } from '@/domain/prototype'
-import { DEMO_USERS, getDemoUser } from '@/mocks/auth-context'
+import type { DemoProject, PrototypeScenario, PrototypeSnapshot } from '@/domain/prototype'
+import { DEMO_USERS } from '@/mocks/auth-context'
+import { projectScenarioDatabase } from '@/mocks/scenarios'
+import { assertWrite } from '@/services/workflow-validation'
 import {
   createBrowserPrototypeRepository,
   PrototypeDataError,
@@ -16,6 +18,7 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
   const dirtyForms = ref<Record<string, boolean>>({})
   const hasUnsavedChanges = computed(() => Object.values(dirtyForms.value).some(Boolean))
   const saving = ref(false)
+  const resetVersion = ref(0)
   let repository: PrototypeRepository | null = null
 
   const currentUser = computed(() => {
@@ -26,7 +29,11 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
   })
 
   const navigationItems = computed(() => getNavigation(currentUser.value.role))
-  const database = computed(() => snapshot.value?.database ?? null)
+  const database = computed(() =>
+    snapshot.value
+      ? projectScenarioDatabase(snapshot.value.database, snapshot.value.scenario)
+      : null
+  )
 
   const visibleProjects = computed<DemoProject[]>(() => {
     const projects = database.value?.projects ?? []
@@ -57,17 +64,38 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
   }
 
   function switchUser(userId: string): void {
-    if (!getDemoUser(userId)) return
+    if (saving.value) throw new Error('正在保存，请稍候')
+    if (!snapshot.value?.database.users.some((user) => user.id === userId)) return
     snapshot.value = getRepository().transact((draft) => {
       draft.activeUserId = userId
     })
   }
 
   function reset(): void {
+    if (saving.value) throw new Error('正在保存，请稍候')
     snapshot.value = getRepository().reset(currentUser.value.id)
+    try {
+      const filters = window.sessionStorage
+      if (filters) {
+        for (let index = filters.length - 1; index >= 0; index--) {
+          const key = filters.key(index)
+          if (key?.startsWith('it-project-console.filters.')) filters.removeItem(key)
+        }
+      }
+    } catch {
+      // 浏览器禁用会话缓存时，业务重置仍已成功；页面重建恢复默认筛选。
+    }
     corrupted.value = false
     ready.value = true
     clearDirty()
+    resetVersion.value++
+  }
+
+  function setScenario(scenario: PrototypeScenario): void {
+    if (saving.value) throw new Error('正在保存，请稍候')
+    snapshot.value = getRepository().transact((draft) => {
+      draft.scenario = scenario
+    })
   }
 
   function setDirty(key: string, dirty: boolean): void {
@@ -82,9 +110,11 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
     if (saving.value) throw new Error('正在保存，请稍候')
     saving.value = true
     try {
-      // Yield one frame so the disabled/loading controls are painted before persistence.
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-      snapshot.value = getRepository().transact(mutator)
+      await new Promise<void>((resolve) => setTimeout(resolve, 600))
+      snapshot.value = getRepository().transact((draft) => {
+        assertWrite(draft)
+        mutator(draft)
+      })
     } catch (error) {
       if (error instanceof PrototypeDataError) corrupted.value = true
       throw error
@@ -105,6 +135,8 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
     initialize,
     switchUser,
     reset,
+    resetVersion,
+    setScenario,
     runCommand,
     saving,
     setDirty,

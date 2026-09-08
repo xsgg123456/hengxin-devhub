@@ -67,9 +67,10 @@
     try {
       if (action === 'cancel' || action === 'delete') {
         const result = await ElMessageBox.prompt(
-          action === 'delete'
-            ? '删除不可恢复；关联需求将回到待评估。请填写误建原因。'
-            : '取消后保留全部历史和材料。请填写原因。',
+          `项目「${props.project.name}」：` +
+            (action === 'delete'
+              ? '删除不可恢复；关联需求将回到待评估。请填写误建原因。'
+              : '取消后保留全部历史和材料。请填写原因。'),
           labels[action],
           {
             inputType: 'textarea',
@@ -83,9 +84,10 @@
         reason = result.value
       } else
         await ElMessageBox.confirm(
-          action === 'reopen'
-            ? '恢复为进行中，保留全部历史。'
-            : '归档后从默认活跃列表移除，可在含归档范围中查看。',
+          `项目「${props.project.name}」：` +
+            (action === 'reopen'
+              ? '恢复为进行中，保留全部历史。'
+              : '归档后从默认活跃列表移除，可在含归档范围中查看。'),
           labels[action],
           {
             confirmButtonText: '确认' + labels[action],

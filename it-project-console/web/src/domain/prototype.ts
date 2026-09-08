@@ -1,5 +1,6 @@
 export type SystemRole = 'business' | 'engineer' | 'manager'
-export type PrototypeScenario = 'normal' | 'empty' | 'loading' | 'save-error' | 'forbidden'
+export type PrototypeScenario =
+  'normal' | 'empty' | 'loading' | 'network-error' | 'save-error' | 'forbidden'
 export type DemandStatus =
   'draft' | 'pending' | 'returned' | 'rejected' | 'established' | 'withdrawn'
 export type ProjectStatus = 'active' | 'completed' | 'cancelled'
