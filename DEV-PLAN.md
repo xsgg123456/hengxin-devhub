@@ -13,8 +13,8 @@
 | 设计交付方式 | 已定版：design/role-prototypes-v2 三角色 HTML；工程师以 engineer.html 为准，开发在现有 Vue 母版原位实现 |
 | 前端技术 | 已确认：复用 Art Design Pro 现有代码和技术栈 |
 | 后端技术架构 | 已确认：Node.js + TypeScript + Fastify + Prisma + PostgreSQL 16 + MinIO |
-| 产品代码 | Phase 1–4 前端评审通过；Phase 5 后端基础实现并通过技术验证 |
-| 当前可执行阶段 | 用户要求继续，进入 Phase 6 真实需求提交与立项闭环 |
+| 产品代码 | Phase 1–4 前端评审通过；Phase 5–8 后端闭环与管理看板已实现并通过技术验证 |
+| 当前可执行阶段 | Phase 8 技术验证通过，下一阶段为 Phase 9 钉钉身份与风险通知 |
 | 后端开工门禁 | Phase 4 通过且领导明确确认流程、信息结构和核心交互后，才允许进入 Phase 5 |
 
 产品采用 pnpm workspace：前端放在 `it-project-console/web/`，后端放在 `it-project-console/api/`。前端参考母版是 `D:/Work_Project/art-design-pro`，基准提交为 `f3aaf58eec1a0e988f162352c33862327a484f95`。复制时不带入 `.git`、`node_modules`、`.playwright-cli`、构建缓存和母版工作区未提交内容；保留上游 MIT License。原母版只读，产品子目录不得再次 `git init`。
@@ -390,7 +390,15 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 
 ## Phase 8: 管理看板与全量联调
 
-**状态**：待开始，依赖 Phase 7
+**状态**：已实现并通过技术验证（2026-09-08），证据见 `it-project-console/docs/PHASE-8-VERIFICATION.md`。下一阶段为 Phase 9，真实联调需要企业应用凭据。
+
+**执行与验收顺序**：
+
+1. 同源查询：实现总览筛选分页、风险关注顺序、人员负载和需求统计、甘特几何查询；以真实数据库验证 AC-017～022 与统计明细一致。
+2. 原位接入：复用 project-overview 的图表与卡片、my-demands 图表表格、monthly-gantt 时间轴和 manager-grants 名单；保留筛选、悬停、详情、危险操作确认，补充局部加载/错误/重试，名单事务保护最后一名管理员并审计。
+3. 全量验证：三角色真实 API 浏览器闭环、1024/1280/1440 桌面布局、生产无 mock、类型与构建、单测和集成及独立审查通过后记录证据并本地提交。
+
+联调容量修正：总览初载需要多个聚合请求，约 10 人同出口共用原 120 次/分钟 IP 限额会误拦正常操作。全局上限提供服务端正整数配置，默认 600 次/分钟；开发登录仍独立限制 10 次/分钟，保留真实 429 与重试提示。
 
 **交付内容**：
 

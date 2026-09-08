@@ -1,4 +1,7 @@
 import { computed, ref, watch } from 'vue'
+import { runtimeConfig } from '@/config/runtime'
+import { useLiveQuery } from './use-live-query'
+import type { DashboardResult } from '@/services/live-dashboard-types'
 import { useRouter } from 'vue-router'
 import { usePrototypeStore } from '@/store/modules/prototype'
 import { computeProjectRisks } from '@/services/risk-service'
@@ -19,7 +22,7 @@ export function useProjectOverviewFilters(personal = false) {
     () => store.database?.users.filter((u) => u.department === '信息技术部') ?? []
   )
   const departments = computed(() => [...new Set(store.visibleProjects.map((p) => p.department))])
-  const projects = computed(() =>
+  const prototypeProjects = computed(() =>
     store.visibleProjects
       .map((p) => ({
         ...p,
@@ -73,7 +76,7 @@ export function useProjectOverviewFilters(personal = false) {
           b.updatedAt.localeCompare(a.updatedAt)
       )
   )
-  const metrics = computed(() => [
+  const prototypeMetrics = computed(() => [
     {
       label: '在手项目',
       key: 'active',
@@ -107,6 +110,46 @@ export function useProjectOverviewFilters(personal = false) {
       ).length
     }
   ])
+  const page = ref(1)
+  const pageSize = 20
+  const query = computed(() => ({
+    scope: scope.value,
+    status: status.value,
+    person: person.value,
+    risk: riskFilter.value,
+    keyword: keyword.value,
+    department: department.value,
+    stage: stage.value,
+    includeArchived: includeArchived.value,
+    from: dates.value?.[0],
+    to: dates.value?.[1]
+  }))
+  watch(query, () => {
+    page.value = 1
+  })
+  const { data, loading, error, retry } = useLiveQuery<DashboardResult>('/dashboard', () => ({
+    ...query.value,
+    page: page.value,
+    pageSize
+  }))
+  const projects = computed(() =>
+    runtimeConfig.isPrototype ? prototypeProjects.value : (data.value?.projects ?? [])
+  )
+  const items = computed(() =>
+    runtimeConfig.isPrototype
+      ? projects.value.slice((page.value - 1) * pageSize, page.value * pageSize)
+      : (data.value?.items ?? [])
+  )
+  const total = computed(() =>
+    runtimeConfig.isPrototype ? projects.value.length : (data.value?.total ?? 0)
+  )
+  const metrics = computed(() =>
+    runtimeConfig.isPrototype ? prototypeMetrics.value : (data.value?.metrics ?? [])
+  )
+  watch(total, (value) => {
+    if (page.value > Math.max(1, Math.ceil(value / pageSize)) && !loading.value)
+      page.value = Math.max(1, Math.ceil(value / pageSize))
+  })
   function clearFilters() {
     status.value = 'all'
     person.value = ''
@@ -182,6 +225,15 @@ export function useProjectOverviewFilters(personal = false) {
     }
   )
   return {
+    distribution: computed(() => data.value?.distribution),
+    query,
+    page,
+    pageSize,
+    items,
+    total,
+    loading,
+    error,
+    retry,
     scope,
     status,
     person,

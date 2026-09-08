@@ -54,10 +54,13 @@
           <ElFormItem label=" "><ElButton @click="clearFilters">清除筛选</ElButton></ElFormItem>
         </ElForm>
         <ElSkeleton
-          v-if="!store.ready || store.snapshot?.scenario === 'loading'"
+          v-if="loading || !store.ready || store.snapshot?.scenario === 'loading'"
           :rows="6"
           animated
         />
+        <ElAlert v-else-if="error" :title="error" type="error" :closable="false"
+          ><ElButton @click="retry">重新加载</ElButton></ElAlert
+        >
         <ElAlert
           v-else-if="store.corrupted || !store.database"
           title="项目数据读取失败，请刷新后重试"
@@ -95,6 +98,9 @@
   </BusinessPageState>
 </template>
 <script setup lang="ts">
+  import { runtimeConfig } from '@/config/runtime'
+  import { useLiveQuery } from '@/hooks/business/use-live-query'
+  import type { GanttRow } from '@/services/gantt-service'
   import BusinessPageState from '@/components/system/business-page-state.vue'
   import { computed, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
@@ -122,7 +128,7 @@
         store.visibleProjects.some((p) => p.primaryOwnerId === user.id)
       ) ?? []
   )
-  const rows = computed(() =>
+  const prototypeRows = computed(() =>
     buildGanttRows(
       store.visibleProjects,
       month.value,
@@ -134,6 +140,16 @@
       },
       store.database?.scheduleChanges
     )
+  )
+  const { data, loading, error, retry } = useLiveQuery<GanttRow[]>('/gantt', () => ({
+    month: month.value,
+    department: department.value,
+    ownerId: ownerId.value,
+    risk: risk.value,
+    includeArchived: includeArchived.value
+  }))
+  const rows = computed(() =>
+    runtimeConfig.isPrototype ? prototypeRows.value : (data.value ?? [])
   )
   const detailOpen = computed(() => typeof route.query.projectId === 'string')
   const selected = computed(

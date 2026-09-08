@@ -7,6 +7,7 @@ const schema = z
     RISK_SCAN_CRON: z.string().default('* * * * *').refine(cron.validate),
     HOST: z.string().default('127.0.0.1'),
     PORT: z.coerce.number().int().min(1).max(65535).default(4322),
+    REQUESTS_PER_MINUTE: z.coerce.number().int().min(1).max(10000).default(600),
     DATABASE_URL: z
       .string()
       .url()

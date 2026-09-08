@@ -12,7 +12,11 @@
         ><ElButton @click="month = currentMonth()">本月</ElButton></div
       >
     </div>
-    <ElEmpty v-if="!rows.length" description="该月当前范围暂无人员项目" />
+    <ElAlert v-if="error" :title="error" type="error" :closable="false"
+      ><ElButton @click="retry">重新加载</ElButton></ElAlert
+    >
+    <ElSkeleton v-if="loading" :rows="4" animated />
+    <ElEmpty v-if="!loading && !error && !rows.length" description="该月当前范围暂无人员项目" />
     <div
       v-show="rows.length"
       ref="chartRef"
@@ -69,16 +73,27 @@
 </template>
 
 <script setup lang="ts">
+  import { runtimeConfig } from '@/config/runtime'
+  import { useLiveQuery, type QueryParams } from '@/hooks/business/use-live-query'
+  import type { WorkloadResult } from '@/services/live-dashboard-types'
   import type { DemoProject, DemoUser } from '@/domain/prototype'
   import { personWorkload, shiftMonth } from '@/services/analytics-service'
   import { shanghaiDay } from '@/services/workflow-validation'
   import { useChartComponent } from '@/hooks/core/useChart'
   import type { EChartsOption } from '@/plugins/echarts'
-  const props = defineProps<{ projects: DemoProject[]; users: DemoUser[] }>()
+  const props = defineProps<{ projects: DemoProject[]; users: DemoUser[]; query?: QueryParams }>()
   const emit = defineEmits<{ detail: [projectId: string] }>()
   const currentMonth = () => shanghaiDay(new Date().toISOString()).slice(0, 7)
   const month = ref(currentMonth())
-  const rows = computed(() => personWorkload(props.projects, props.users, month.value))
+  const { data, loading, error, retry } = useLiveQuery<WorkloadResult>('/workload', () => ({
+    ...props.query,
+    month: month.value
+  }))
+  const rows = computed(() =>
+    runtimeConfig.isPrototype
+      ? personWorkload(props.projects, props.users, month.value)
+      : (data.value ?? [])
+  )
   const riskColumns = [
     { key: 'delayed', label: '延期', type: 'danger' },
     { key: 'blocked', label: '阻塞', type: 'danger' },

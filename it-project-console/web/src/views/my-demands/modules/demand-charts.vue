@@ -74,6 +74,8 @@
 </template>
 <script setup lang="ts">
   import type { ComponentPublicInstance, ComputedRef } from 'vue'
+  import type { DemandStatistics } from '@/services/live-dashboard-types'
+  import { runtimeConfig } from '@/config/runtime'
   import type { DemoDemand, DemoUser } from '@/domain/prototype'
   import {
     CHART_COLORS,
@@ -83,7 +85,11 @@
   import { shanghaiDay } from '@/services/workflow-validation'
   import { useChartComponent } from '@/hooks/core/useChart'
   import type { EChartsOption } from '@/plugins/echarts'
-  const props = defineProps<{ demands: DemoDemand[]; users: DemoUser[] }>()
+  const props = defineProps<{
+    demands: DemoDemand[]
+    users: DemoUser[]
+    statistics?: DemandStatistics
+  }>()
   const emit = defineEmits<{ detail: [demandId: string] }>()
   const selected = ref<DemoDemand[]>([])
   const selectedTitle = ref('')
@@ -95,9 +101,21 @@
     emit('detail', id)
     selected.value = []
   }
-  const submitters = computed(() => demandDistribution(props.demands, props.users, 'submitter'))
-  const departments = computed(() => demandDistribution(props.demands, props.users, 'department'))
-  const trend = computed(() => demandMonthlyTrend(props.demands))
+  const submitters = computed(() =>
+    runtimeConfig.isPrototype
+      ? demandDistribution(props.demands, props.users, 'submitter')
+      : (props.statistics?.submitters ?? [])
+  )
+  const departments = computed(() =>
+    runtimeConfig.isPrototype
+      ? demandDistribution(props.demands, props.users, 'department')
+      : (props.statistics?.departments ?? [])
+  )
+  const trend = computed(() =>
+    runtimeConfig.isPrototype
+      ? demandMonthlyTrend(props.demands)
+      : (props.statistics?.trend ?? { months: [], departments: [] })
+  )
   const panels = computed(() => [
     { title: '需求提出人分布', items: submitters.value },
     { title: '需求部门分布', items: departments.value }

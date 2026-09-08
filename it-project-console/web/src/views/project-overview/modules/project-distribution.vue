@@ -35,14 +35,21 @@
 </template>
 
 <script setup lang="ts">
+  import { runtimeConfig } from '@/config/runtime'
   import type { DemoProject, DemoUser } from '@/domain/prototype'
   import { projectDistribution } from '@/services/analytics-service'
   import { useChartComponent } from '@/hooks/core/useChart'
   import type { EChartsOption } from '@/plugins/echarts'
 
-  const props = defineProps<{ projects: DemoProject[]; users: DemoUser[] }>()
+  const props = defineProps<{
+    projects: DemoProject[]
+    users: DemoUser[]
+    distribution?: ReturnType<typeof projectDistribution>
+  }>()
   const emit = defineEmits<{ select: [projectId: string] }>()
-  const buckets = computed(() => projectDistribution(props.projects))
+  const buckets = computed(() =>
+    runtimeConfig.isPrototype ? projectDistribution(props.projects) : (props.distribution ?? [])
+  )
   const owner = (p: DemoProject) =>
     props.users.find((u) => u.id === p.primaryOwnerId)?.name || '未指派'
   function tooltip(index: number) {

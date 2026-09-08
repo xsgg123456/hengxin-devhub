@@ -53,6 +53,30 @@ afterAll(async () => {
   await db.$disconnect()
 })
 
+it('团队IP限额可配置且真实429保留重试提示，登录保留独立限额', async () => {
+  for (const value of ['0', '-1', '1.5', '10001'])
+    expect(() => parseEnv({ ...process.env, REQUESTS_PER_MINUTE: value })).toThrow('REQUESTS_PER_MINUTE')
+  const limited = (await buildApp({ ...env, REQUESTS_PER_MINUTE: 2 }, { logging: false })).app
+  try {
+    await limited.ready()
+    expect((await limited.inject('/health/live')).statusCode).toBe(200)
+    expect((await limited.inject('/health/live')).statusCode).toBe(200)
+    const denied = await limited.inject('/health/live')
+    expect(denied.statusCode).toBe(429)
+    expect(denied.headers['retry-after']).toBeDefined()
+    expect(denied.json().error).toEqual({ code: 'RATE_LIMITED', message: '请求过于频繁，请稍后重试' })
+  } finally { await limited.close() }
+  const loginLimited = (await buildApp({ ...env, REQUESTS_PER_MINUTE: 600 }, { logging: false })).app
+  try {
+    await loginLimited.ready()
+    for (let index = 0; index < 10; index++) {
+      const response = await loginLimited.inject({ method: 'POST', url: '/api/auth/dev-login', headers: { origin: env.WEB_ORIGIN }, payload: { userId: 'unknown' } })
+      expect(response.statusCode).toBe(400)
+    }
+    expect((await loginLimited.inject({ method: 'POST', url: '/api/auth/dev-login', headers: { origin: env.WEB_ORIGIN }, payload: { userId: manager } })).statusCode).toBe(429)
+  } finally { await loginLimited.close() }
+})
+
 describe('database-backed authentication and immediate permission changes', () => {
   it('rejects absent, malformed and unknown sessions', async () => {
     for (const cookie of ['', `${sessionCookie}=invalid`, `${sessionCookie}=${'a'.repeat(64)}`]) {

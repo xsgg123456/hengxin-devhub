@@ -62,7 +62,7 @@ export async function buildApp(
   await app.register(cookie)
   await app.register(cors, { origin: env.WEB_ORIGIN, credentials: true })
   await app.register(helmet)
-  await app.register(rateLimit, { max: 120, timeWindow: '1 minute' })
+  await app.register(rateLimit, { max: env.REQUESTS_PER_MINUTE, timeWindow: '1 minute' })
   app.addHook('onRequest', async (request) => {
     if (
       ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) &&
@@ -86,6 +86,8 @@ export async function buildApp(
         ? error.statusCode
         : 500
     const clientError = status >= 400 && status < 500
+    if (status === 429)
+      return reply.code(429).send({ error: { code: 'RATE_LIMITED', message: '请求过于频繁，请稍后重试' }, requestId: request.id })
     if (!clientError)
       request.log.error({ requestId: request.id, code: 'INTERNAL_ERROR' }, '请求处理失败')
     return reply.code(clientError ? status : 500).send({

@@ -13,7 +13,7 @@
             ><ElRadioButton value="mine">我负责 / 参与</ElRadioButton
             ><ElRadioButton value="all">全部项目</ElRadioButton></ElRadioGroup
           ><ElButton
-            v-if="runtimeConfig.isPrototype && store.currentUser.role === 'manager'"
+            v-if="store.currentUser.role === 'manager'"
             @click="router.push('/manager-grants')"
             >管理人员名单</ElButton
           ><ElButton
@@ -27,7 +27,7 @@
       <div class="art-card p-5 mb-5">
         <div class="art-card-header mb-4"
           ><div class="title"><h4>项目总览</h4></div
-          ><span class="text-xs text-g-500">共 {{ projects.length }} 个项目</span></div
+          ><span class="text-xs text-g-500">共 {{ total }} 个项目</span></div
         >
         <ElForm inline label-position="top" class="filters">
           <ElFormItem label="搜索项目"
@@ -107,6 +107,10 @@
           <ElFormItem label=" "><ElButton @click="clearFilters">清除筛选</ElButton></ElFormItem>
         </ElForm>
       </div>
+      <ElAlert v-if="error" :title="error" type="error" :closable="false" class="mb-5"
+        ><ElButton @click="retry">重新加载</ElButton></ElAlert
+      >
+      <ElSkeleton v-if="loading" :rows="5" animated class="mb-5" />
       <div class="metrics mb-5"
         ><button
           v-for="metric in metrics"
@@ -119,9 +123,12 @@
       >
       <div class="overview-charts mb-5"
         ><ProjectDistribution
+          v-if="!loading && !error"
+          :distribution="distribution"
           :projects="projects"
           :users="store.database?.users ?? []"
           @select="openDetail" /><PersonWorkload
+          :query="query"
           :projects="projects"
           :users="store.database?.users ?? []"
           @detail="openDetail"
@@ -131,17 +138,25 @@
           ><div class="title"><h4>项目明细</h4></div
           ><span class="text-xs text-g-500">整体进度、日期与风险使用同一份数据</span></div
         >
-        <ElEmpty v-if="!projects.length" description="当前没有符合条件的项目"
+        <ElEmpty v-if="!loading && !error && !projects.length" description="当前没有符合条件的项目"
           ><ElButton @click="clearFilters">清除筛选</ElButton></ElEmpty
         >
         <div v-else class="project-grid"
           ><ProjectCard
-            v-for="project in projects"
+            v-for="project in items"
             :key="project.id"
             :project="project"
             @detail="openDetail"
             @update="openUpdate"
         /></div>
+        <ElPagination
+          v-if="total > pageSize"
+          v-model:current-page="page"
+          :page-size="pageSize"
+          :total="total"
+          layout="prev, pager, next, total"
+          class="mt-5"
+        />
       </div>
       <ProjectDetailDrawer
         :model-value="detailOpen"
@@ -155,7 +170,6 @@
   </BusinessPageState>
 </template>
 <script setup lang="ts">
-  import { runtimeConfig } from '@/config/runtime'
   import BusinessPageState from '@/components/system/business-page-state.vue'
   import { computed, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
@@ -173,6 +187,15 @@
   const route = useRoute()
   const router = useRouter()
   const {
+    distribution,
+    query,
+    page,
+    pageSize,
+    items,
+    total,
+    loading,
+    error,
+    retry,
     scope,
     status,
     person,

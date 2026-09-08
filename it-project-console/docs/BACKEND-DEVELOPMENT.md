@@ -62,6 +62,18 @@ pnpm dev:live
 
 Prisma模型按职责拆在 `prisma/schema.prisma` 与 `prisma/progress.prisma`，配置指定同一个prisma目录；迁移目录仍是 `prisma/migrations`，没有新建数据库或第二套客户端。[Prisma多文件配置](https://docs.prisma.io/docs/orm/reference/prisma-config-reference)、[node-cron调度文档](https://nodecron.com/scheduling-options)用于本期实现核对。
 
+## Phase 8 管理查询与名单
+
+`REQUESTS_PER_MINUTE` 默认 600，允许 1～10000 的整数，作用于每个来源 IP（不是每个用户）。为约 10 人同出口加载多个聚合区域预留容量；开发登录独立限制 10 次/分钟。超限返回 429 和 retry-after，请稍后重试。
+
+全员登录后可读取 `/api/dashboard`、`/api/workload`、`/api/gantt`、`/api/demand-statistics`。查询使用同一 workspace 映射与 RepeatableRead 快照；风险读取已持久化版本。总览支持范围、状态、人员（主责或协作）、关键词、部门、阶段、风险、交付日期及归档筛选，`page` 从 1 开始，`pageSize` 默认 20、最大 100。返回全筛选图表明细和分页卡片，同一范围的统计不受当前页影响。
+
+负载和甘特要求 `month=YYYY-MM`；负载区分主责与协作，逾期在途项目仍占用当月人力。甘特保留完整计划区间计算的进度比例，裁剪当前月显示。需求统计支持范围、关键词、状态、部门和提出人，草稿无提交日期不计入月趋势。
+
+`GET /api/manager-grants` 全员只读，`GET /api/manager-grants/candidates` 及 `POST /api/manager-grants` 限有效管理员；写入 `{ userId, enabled, requestId: UUID }`。事务锁保证并发撤权后至少一名有效管理员，记录新旧角色与操作者；撤权后同一会话立即使用部门默认角色。候选来自已登记有效组织用户，真实钉钉组织同步仍由 Phase 9 完成。
+
+前端原位复用 Art 图表、分页、名单弹窗与抽屉；筛选请求取消与乱序保护、失败重试沿现有 API Cookie 边界，不回退 mock。[Vue watch 清理](https://vuejs.org/guide/essentials/watchers.html)、[Element Plus 分页](https://element-plus.org/en-US/component/pagination.html)用于实现核对。
+
 ## 验证与隔离
 
 ```powershell

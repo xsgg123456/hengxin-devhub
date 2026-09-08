@@ -81,7 +81,9 @@ test('领导评审从UI重置开始，四账号连续操作共享同一项目并
   await page.getByRole('button', { name: `主责 · ${name}`, exact: true }).click()
   await expect(drawer).toContainText(name)
   await drawer.getByRole('button', { name: '关闭', exact: true }).click()
-  await page.goto('/#/monthly-gantt')
+  await expect(drawer).not.toBeVisible()
+  await expect(page).not.toHaveURL(/projectId=/)
+  await page.getByRole('menuitem', { name: '甘特图', exact: true }).click()
   await expect(page.getByRole('button', { name: `查看${name}详情`, exact: true })).toContainText(
     '63%'
   )

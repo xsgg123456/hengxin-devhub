@@ -48,7 +48,7 @@ test('同一需求经草稿、立项、主责整体更新、协作个人更新�
   await date(drawer, '期望上线日期', '2099-10-20')
   const initial = await snapshot(page)
   await drawer.getByRole('button', { name: '提交评估' }).click()
-  await expect(drawer.getByText(/请.*PRD|PRD.*必填/)).toBeVisible()
+  await expect(drawer.locator('.el-form-item__error').filter({ hasText: /请.*PRD|PRD.*必填/ })).toBeVisible()
   expect((await snapshot(page)).database.demands).toEqual(initial.database.demands)
   await drawer.getByRole('button', { name: '保存草稿' }).click()
   await expect(row(page, name)).toContainText('草稿')

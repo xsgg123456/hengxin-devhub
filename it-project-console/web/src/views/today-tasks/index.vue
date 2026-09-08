@@ -12,7 +12,11 @@
           ><div class="title"><h4>待处理事项</h4></div
           ><ElTag>{{ tasks.length }} 项</ElTag></div
         >
-        <ElEmpty v-if="!tasks.length" description="当前无待处理事项" />
+        <ElAlert v-if="error" :title="error" type="error" :closable="false"
+          ><ElButton @click="retry">重新加载</ElButton></ElAlert
+        >
+        <ElSkeleton v-if="loading" :rows="4" animated />
+        <ElEmpty v-if="!loading && !error && !tasks.length" description="当前无待处理事项" />
         <div v-for="task in tasks" :key="task.id" class="task-row" :data-task-id="task.id">
           <div
             ><h3 class="font-medium">{{ task.name }}</h3
@@ -39,6 +43,9 @@
   </BusinessPageState>
 </template>
 <script setup lang="ts">
+  import { runtimeConfig } from '@/config/runtime'
+  import { useLiveQuery } from '@/hooks/business/use-live-query'
+  import type { DashboardResult } from '@/services/live-dashboard-types'
   import BusinessPageState from '@/components/system/business-page-state.vue'
   import { computed, ref, watch } from 'vue'
   import { usePrototypeStore } from '@/store/modules/prototype'
@@ -52,9 +59,21 @@
     () =>
       ({ manager: '今日待办', engineer: '我的待办', business: '待我补充' })[store.currentUser.role]
   )
-  const tasks = computed(() =>
-    store.database ? responsibilityTasks(store.database, store.currentUser) : []
-  )
+  const { data, loading, error, retry } = useLiveQuery<DashboardResult>('/dashboard', () => ({
+    scope: 'all'
+  }))
+  const tasks = computed(() => {
+    if (!store.database) return []
+    if (runtimeConfig.isPrototype) return responsibilityTasks(store.database, store.currentUser)
+    if (!data.value) return []
+    const database = { ...store.database, projects: data.value.projects }
+    return responsibilityTasks(database, store.currentUser)
+      .map((task) => ({
+        ...task,
+        days: task.projectId ? (data.value!.attentionDays[task.projectId] ?? task.days) : task.days
+      }))
+      .sort((a, b) => a.severity - b.severity || b.days - a.days || a.id.localeCompare(b.id))
+  })
   const detailId = ref(''),
     updateId = ref(''),
     reviewId = ref(''),

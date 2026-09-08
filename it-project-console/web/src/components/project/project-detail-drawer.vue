@@ -81,7 +81,6 @@
         ><p class="mb-3 whitespace-pre-wrap">{{ demand.description }}</p
         ><MaterialSummary :demand="demand"
       /></template>
-      >
     </template>
     <template #footer
       ><ElButton @click="$emit('update:modelValue', false)">关闭</ElButton

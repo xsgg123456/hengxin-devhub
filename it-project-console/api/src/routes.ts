@@ -1,4 +1,6 @@
 import { registerProgressRoutes } from './modules/progress/progress-routes.js'
+import { registerDashboardRoutes } from './modules/dashboard/dashboard-routes.js'
+import { registerManagerGrantRoutes } from './modules/manager-grants/manager-grant-routes.js'
 import { refreshProjectRisks } from './modules/risks/risk-scan-job.js'
 import { registerWorkspaceRoutes } from './modules/workspace/workspace-routes.js'
 import { registerDemandRoutes } from './modules/demands/demand-routes.js'
@@ -20,16 +22,32 @@ export async function registerRoutes(
 ) {
   const api = app.withTypeProvider<ZodTypeProvider>()
   const auth = authService(db, env)
-  registerProgressRoutes(app, db, auth.authenticate, async (tx, id) => { await refreshProjectRisks(tx, id) })
+  registerDashboardRoutes(app, db, auth.authenticate)
+  registerManagerGrantRoutes(app, db, auth.authenticate)
+  registerProgressRoutes(app, db, auth.authenticate, async (tx, id) => {
+    await refreshProjectRisks(tx, id)
+  })
   registerWorkspaceRoutes(app, db, auth.authenticate)
   registerDemandRoutes(app, db, auth.authenticate)
   registerApprovalRoutes(app, db, auth.authenticate)
   registerProjectRoutes(app, db, auth.authenticate)
   if (env.NODE_ENV !== 'production' && env.DEV_LOGIN) {
-    api.get('/api/auth/dev-accounts', async () => ({ data: await db.user.findMany({
-      where: { active: true, id: { in: ['user-manager-chen', 'user-business-li', 'user-engineer-wang', 'user-engineer-zhao'] } },
-      select: { id: true, name: true, department: true, role: true }
-    }) }))
+    api.get('/api/auth/dev-accounts', async () => ({
+      data: await db.user.findMany({
+        where: {
+          active: true,
+          id: {
+            in: [
+              'user-manager-chen',
+              'user-business-li',
+              'user-engineer-wang',
+              'user-engineer-zhao'
+            ]
+          }
+        },
+        select: { id: true, name: true, department: true, role: true }
+      })
+    }))
     api.post(
       '/api/auth/dev-login',
       {
@@ -92,7 +110,11 @@ export async function registerRoutes(
       data: await attachments.confirmUpload(request.actor!, request.params.id)
     })
   )
-  api.delete('/api/attachments/:id', { preHandler: auth.authenticate, schema: { params } }, async request => ({ data: await attachments.discard(request.actor!, request.params.id) }))
+  api.delete(
+    '/api/attachments/:id',
+    { preHandler: auth.authenticate, schema: { params } },
+    async (request) => ({ data: await attachments.discard(request.actor!, request.params.id) })
+  )
   api.get(
     '/api/attachments/:id/download',
     { preHandler: auth.authenticate, schema: { tags: ['附件'], params } },
