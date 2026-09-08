@@ -19,7 +19,9 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
   let repository: PrototypeRepository | null = null
 
   const currentUser = computed(() => {
-    const activeUser = snapshot.value ? getDemoUser(snapshot.value.activeUserId) : undefined
+    const activeUser = snapshot.value?.database.users.find(
+      (user) => user.id === snapshot.value?.activeUserId
+    )
     return activeUser ?? DEMO_USERS[0]
   })
 

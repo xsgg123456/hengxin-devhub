@@ -99,7 +99,11 @@ export function updateProgress(snapshot: PrototypeSnapshot, input: ProgressInput
     project.lastOverallUpdatedAt = now
     if (status === 'completed') {
       const history = snapshot.database.stageHistories.find(
-        (row) => row.projectId === project.id && row.stage === project.stage && !row.completedAt
+        (row) =>
+          row.projectId === project.id &&
+          row.stage === project.stage &&
+          row.completedAt === null &&
+          !row.interruptedAt
       )
       if (history) history.completedAt = now
       if (nextStage) {

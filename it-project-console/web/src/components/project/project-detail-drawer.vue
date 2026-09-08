@@ -48,6 +48,9 @@
         }}</ElDescriptionsItem>
       </ElDescriptions>
       <StageProgress :stage="project.stage" :status="project.simpleStatus" />
+      <StageHistory :project-id="project.id" />
+      <LifecycleActions :project="project" />
+      <LifecycleHistory :project-id="project.id" />
       <h4 class="mt-6 mb-4 font-medium">更新记录</h4>
       <ElEmpty v-if="!updates.length" description="暂无进度记录，等待首次更新" :image-size="50" />
       <ElTimeline v-else
@@ -105,7 +108,10 @@
   import { computeProjectRisks } from '@/services/risk-service'
   import { displayTime, statusLabel } from '@/utils/project-display'
   import StageProgress from './stage-progress.vue'
+  import StageHistory from './stage-history.vue'
   import RiskTag from './risk-tag.vue'
+  import LifecycleActions from './lifecycle-actions.vue'
+  import LifecycleHistory from './lifecycle-history.vue'
   const props = defineProps<{ modelValue: boolean; project: DemoProject | null }>()
   defineEmits<{ 'update:modelValue': [value: boolean]; edit: [id: string] }>()
   const store = usePrototypeStore()

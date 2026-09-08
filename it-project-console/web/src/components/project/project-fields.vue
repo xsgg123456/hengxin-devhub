@@ -74,7 +74,7 @@
   defineProps<{ hideIdentity?: boolean; disabled?: boolean }>()
   const store = usePrototypeStore()
   const engineers = computed(
-    () => store.database?.users.filter((user) => user.role === 'engineer') ?? []
+    () => store.database?.users.filter((user) => user.department === '信息技术部') ?? []
   )
   const formRef = ref<FormInstance>()
   const rules: FormRules = Object.fromEntries(

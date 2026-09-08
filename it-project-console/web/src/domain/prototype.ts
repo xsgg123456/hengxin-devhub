@@ -95,6 +95,7 @@ export interface DemoStageHistory {
   stage: ProjectStage
   startedAt: string
   completedAt: string | null
+  interruptedAt?: string
 }
 export interface DemoScheduleChange {
   id: string
@@ -115,6 +116,27 @@ export interface PrototypeDatabase {
   progressUpdates: DemoProgressUpdate[]
   stageHistories: DemoStageHistory[]
   scheduleChanges: DemoScheduleChange[]
+  lifecycleEvents: DemoLifecycleEvent[]
+}
+export interface DemoLifecycleEvent {
+  id: string
+  entityType: 'project' | 'demand' | 'user'
+  entityId: string
+  action:
+    | 'complete'
+    | 'cancel'
+    | 'archive'
+    | 'reopen'
+    | 'delete'
+    | 'withdraw'
+    | 'correct'
+    | 'grant'
+    | 'revoke'
+  authorId: string
+  createdAt: string
+  reason: string
+  before: Record<string, string | number | boolean>
+  after: Record<string, string | number | boolean>
 }
 export interface PrototypeSnapshot {
   schemaVersion: 2

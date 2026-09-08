@@ -15,6 +15,20 @@ function storageFor(value: unknown) {
   }
 }
 describe('Phase 2 持久化迁移', () => {
+  it('旧schema2补齐审计数组，持久化名单不会被固定演示角色覆盖', () => {
+    const snapshot = createInitialPrototypeSnapshot()
+    snapshot.database.users[0].role = 'engineer'
+    snapshot.database.users[0].roleLabel = 'IT工程师'
+    snapshot.database.users[1].role = 'manager'
+    snapshot.database.users[1].roleLabel = '管理人员'
+    const old: Record<string, unknown> = { ...snapshot.database }
+    delete old.lifecycleEvents
+    const storage = storageFor({ ...snapshot, database: old })
+    const repo = new PrototypeRepository(storage)
+    expect(repo.load().database.lifecycleEvents).toEqual([])
+    expect(repo.load().database.users[0].role).toBe('engineer')
+    expect(repo.load().database.users[1].role).toBe('manager')
+  })
   it('v1迁移保留ID、状态、历史、身份和revision，补齐分离的日期而不重置', () => {
     const initial = createInitialPrototypeSnapshot()
     const legacy = JSON.parse(JSON.stringify(initial))

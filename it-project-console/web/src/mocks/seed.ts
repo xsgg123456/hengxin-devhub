@@ -14,6 +14,7 @@ export function createInitialPrototypeSnapshot(): PrototypeSnapshot {
     updatedAt: INITIAL_UPDATED_AT,
     database: {
       schemaVersion: 1,
+      lifecycleEvents: [],
       users: structuredClone([...DEMO_USERS]),
       demands: [
         {

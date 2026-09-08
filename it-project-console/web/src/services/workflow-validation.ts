@@ -52,8 +52,9 @@ export function validateAttachment(
       throw new WorkflowError('单文件须大于 0 且不超过 20 MB')
   } else throw new WorkflowError('材料类型无效')
 }
-export function nextId(prefix: string, records: { id: string }[]) {
+export function nextId(prefix: string, records: { id: string }[], reservedIds: string[] = []) {
   let number = records.length + 1
-  while (records.some((row) => row.id === `${prefix}-${String(number).padStart(6, '0')}`)) number++
+  const used = new Set([...records.map((row) => row.id), ...reservedIds])
+  while (used.has(`${prefix}-${String(number).padStart(6, '0')}`)) number++
   return `${prefix}-${String(number).padStart(6, '0')}`
 }

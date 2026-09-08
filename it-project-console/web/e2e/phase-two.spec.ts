@@ -8,7 +8,7 @@ const card = (page: Page, name: string) => page.locator('[data-project-id]').fil
 const row = (page: Page, name: string) => page.getByRole('row').filter({ hasText: name })
 async function identity(page: Page, name: string) {
   await page.getByRole('button', { name: '切换演示身份' }).click()
-  await page.getByRole('button', { name: new RegExp(name + ' ') }).click()
+  await page.locator('.identity-menu-item').filter({ hasText: name }).click()
   await expect(page.getByRole('button', { name: '切换演示身份' })).toContainText(name)
 }
 async function date(drawer: Locator, name: string, value: string) {

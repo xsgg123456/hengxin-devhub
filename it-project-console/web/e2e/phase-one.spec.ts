@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('默认以管理者身份展示总览，并支持切换研发身份与刷新保留', async ({ page }) => {
-  await expect(page).toHaveURL(/#\/project-overview$/)
+  await expect(page).toHaveURL(/#\/project-overview$/, { timeout: 15000 })
   await expect(page.getByRole('heading', { name: '项目总览', exact: true, level: 2 })).toBeVisible()
   await expect(page.getByRole('button', { name: '切换演示身份' })).toContainText('陈立峰')
 

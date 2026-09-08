@@ -1,0 +1,64 @@
+.demand-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.trend-panel {
+  grid-column: 1 / -1;
+}
+.distribution-body {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(180px, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+.demand-ring {
+  height: 230px;
+}
+.quantity-list {
+  max-height: 260px;
+  overflow: auto;
+}
+.quantity-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(55px, 80px) minmax(35px, 1fr) 65px;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  padding: 8px 0;
+  text-align: left;
+  cursor: pointer;
+}
+.quantity-track {
+  height: 10px;
+  background: var(--el-fill-color-light);
+  border-radius: 3px;
+}
+.quantity-track i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+.demand-links {
+  display: grid;
+  max-height: 320px;
+  overflow: auto;
+}
+.demand-links :deep(.el-button) {
+  height: auto;
+  white-space: normal;
+  margin: 0;
+  text-align: left;
+  justify-content: flex-start;
+}
+@media (max-width: 1200px) {
+  .demand-chart-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 520px) {
+  .distribution-body {
+    grid-template-columns: 1fr;
+  }
+}

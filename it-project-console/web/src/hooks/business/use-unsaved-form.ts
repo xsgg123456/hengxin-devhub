@@ -1,8 +1,10 @@
 import { onBeforeUnmount, watch, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { usePrototypeStore } from '@/store/modules/prototype'
+let formSequence = 0
 
 export function useUnsavedForm(key: string, dirty: Ref<boolean>, busy: Ref<boolean>) {
+  key = `${key}-${++formSequence}`
   const store = usePrototypeStore()
   watch(dirty, (value) => store.setDirty(key, value), { immediate: true })
   onBeforeUnmount(() => store.setDirty(key, false))

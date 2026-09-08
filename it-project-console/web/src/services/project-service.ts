@@ -43,7 +43,7 @@ export function createProject(
     return existing
   }
   const engineers = snapshot.database.users
-    .filter((user) => user.role === 'engineer')
+    .filter((user) => user.department === '信息技术部')
     .map((user) => user.id)
   if (!engineers.includes(input.primaryOwnerId)) throw new WorkflowError('请选择唯一 IT 主负责人')
   if (
@@ -59,7 +59,13 @@ export function createProject(
   dateValue(input.stageExpectedDate, '阶段预计完成日期')
   const now = input.now ?? new Date().toISOString()
   const project = {
-    id: nextId('P', snapshot.database.projects),
+    id: nextId(
+      'P',
+      snapshot.database.projects,
+      snapshot.database.lifecycleEvents
+        .filter((e) => e.entityType === 'project')
+        .map((e) => e.entityId)
+    ),
     requestId,
     demandId,
     source: demandId ? ('demand' as const) : ('direct' as const),

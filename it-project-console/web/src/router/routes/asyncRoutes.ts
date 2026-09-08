@@ -2,6 +2,24 @@ import type { RouteRecordRaw } from 'vue-router'
 
 export const asyncRoutes: RouteRecordRaw[] = [
   {
+    path: 'today-tasks',
+    name: 'TodayTasks',
+    component: () => import('@/views/today-tasks/index.vue'),
+    meta: { title: '职责待办', roles: ['manager', 'engineer', 'business'] }
+  },
+  {
+    path: 'monthly-gantt',
+    name: 'MonthlyGantt',
+    component: () => import('@/views/monthly-gantt/index.vue'),
+    meta: { title: '甘特图', roles: ['manager', 'engineer', 'business'] }
+  },
+  {
+    path: 'manager-grants',
+    name: 'ManagerGrants',
+    component: () => import('@/views/manager-grants/index.vue'),
+    meta: { title: '管理人员名单', roles: ['manager'] }
+  },
+  {
     path: 'project-overview',
     name: 'ProjectOverview',
     component: () => import('@/views/project-overview/index.vue'),

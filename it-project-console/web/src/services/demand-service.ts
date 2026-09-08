@@ -48,7 +48,15 @@ export function saveDemand(snapshot: PrototypeSnapshot, input: DemandInput) {
   if ((input.prd?.size ?? 0) + (input.prototype?.size ?? 0) > 50 * 1024 * 1024)
     throw new WorkflowError('单需求附件合计不得超过 50 MB')
   const demand = {
-    id: existing?.id ?? nextId('D', snapshot.database.demands),
+    id:
+      existing?.id ??
+      nextId(
+        'D',
+        snapshot.database.demands,
+        snapshot.database.lifecycleEvents
+          .filter((e) => e.entityType === 'demand')
+          .map((e) => e.entityId)
+      ),
     requestId,
     name,
     description,

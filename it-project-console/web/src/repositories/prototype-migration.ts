@@ -24,8 +24,19 @@ export function migratePrototypeSnapshot(value: unknown): PrototypeSnapshot {
   snapshot.database.schemaVersion = 2
   snapshot.database.users = snapshot.database.users.map((user) => {
     const known = DEMO_USERS.find((row) => row.id === user.id)
-    return known ? structuredClone(known) : user
+    if (legacy && known) return structuredClone(known)
+    // Early schema 2 snapshots still had project-persona display fields.
+    // Normalize the obsolete shape without resetting persisted manager grants.
+    return {
+      id: user.id,
+      name: user.name,
+      department: user.department,
+      role: user.role,
+      roleLabel:
+        user.role === 'manager' ? '管理人员' : user.role === 'engineer' ? 'IT工程师' : '业务人员'
+    }
   })
+  snapshot.database.lifecycleEvents ??= []
   if (legacy) {
     snapshot.database.stageHistories ??= []
     snapshot.database.scheduleChanges ??= []
@@ -66,7 +77,8 @@ export function migratePrototypeSnapshot(value: unknown): PrototypeSnapshot {
   }
   if (
     !Array.isArray(snapshot.database.stageHistories) ||
-    !Array.isArray(snapshot.database.scheduleChanges)
+    !Array.isArray(snapshot.database.scheduleChanges) ||
+    !Array.isArray(snapshot.database.lifecycleEvents)
   )
     throw new Error('历史记录无效')
   for (const demand of snapshot.database.demands) {

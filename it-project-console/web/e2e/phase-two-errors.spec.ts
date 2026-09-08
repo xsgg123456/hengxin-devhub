@@ -15,13 +15,19 @@ test('管理指标区分在手与已归档完成项目，点击筛选口径一�
   await page.reload()
   await page.getByText('含归档', { exact: true }).click()
   await expect(page.getByRole('button', { name: '在手项目 2 个' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '已完成 1 个', exact: true })).toBeVisible()
+  await expect(page.locator('[data-project-id]')).toHaveCount(3)
   await page.getByRole('button', { name: '在手项目 2 个' }).click()
   await expect(page.locator('[data-project-id]')).toHaveCount(2)
-  await expect(page.locator('[data-project-id]').filter({ hasText: '客户数据治理一期' })).toHaveCount(0)
+  await expect(
+    page.locator('[data-project-id]').filter({ hasText: '客户数据治理一期' })
+  ).toHaveCount(0)
   await page.getByRole('button', { name: '清除筛选', exact: true }).click()
   await page.getByText('含归档', { exact: true }).click()
-  await page.getByRole('button', { name: '已完成 1 个', exact: true }).click()
+  await page
+    .locator('.el-select')
+    .filter({ has: page.getByRole('combobox', { name: '项目状态', exact: true }) })
+    .click()
+  await page.getByRole('option', { name: '已完成', exact: true }).click()
   await expect(page.locator('[data-project-id]')).toHaveCount(1)
   await expect(page.locator('[data-project-id]')).toContainText('客户数据治理一期')
 })
@@ -39,9 +45,17 @@ test.describe('浏览器时区与上海提交日不一致', () => {
     await drawer.getByLabel('这次要解决什么问题（一句话）').fill('按上海业务日期接收需求')
     await drawer.getByLabel('期望上线日期', { exact: true }).fill('2026-09-08')
     await drawer.getByLabel('期望上线日期', { exact: true }).press('Tab')
-    await drawer.getByPlaceholder('https://', { exact: true }).nth(0).fill('https://example.com/prd.pdf')
-    await drawer.getByPlaceholder('https://', { exact: true }).nth(1).fill('https://example.com/prototype.html')
+    await drawer
+      .getByPlaceholder('https://', { exact: true })
+      .nth(0)
+      .fill('https://example.com/prd.pdf')
+    await drawer
+      .getByPlaceholder('https://', { exact: true })
+      .nth(1)
+      .fill('https://example.com/prototype.html')
     await drawer.getByRole('button', { name: '提交评估' }).click()
-    await expect(page.getByRole('row').filter({ hasText: '跨时区当天需求' })).toContainText('待评估')
+    await expect(page.getByRole('row').filter({ hasText: '跨时区当天需求' })).toContainText(
+      '待评估'
+    )
   })
 })

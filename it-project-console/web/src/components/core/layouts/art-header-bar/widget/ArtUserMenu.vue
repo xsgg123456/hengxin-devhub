@@ -64,7 +64,7 @@
   const router = useRouter()
   const prototypeStore = usePrototypeStore()
   const userMenuPopover = ref<{ hide: () => void }>()
-  const demoUsers = DEMO_USERS
+  const demoUsers = computed(() => prototypeStore.database?.users ?? DEMO_USERS)
   const initials = computed(() => prototypeStore.currentUser.name.slice(-2))
 
   async function switchIdentity(userId: string): Promise<void> {
