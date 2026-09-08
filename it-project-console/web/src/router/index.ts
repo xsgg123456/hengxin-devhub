@@ -6,6 +6,7 @@ import { usePrototypeStore } from '@/store/modules/prototype'
 import { isSupportedDevice } from '@/utils/device'
 import { canAccessRole, getHomePath } from './access'
 import { asyncRoutes } from './routes/asyncRoutes'
+import { ElMessageBox } from 'element-plus'
 
 export const HOME_PAGE_PATH = '/project-overview'
 
@@ -31,10 +32,23 @@ export const router = createRouter({
   ]
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to, from) => {
   if (!runtimeConfig.isPrototype || !isSupportedDevice()) return true
   const prototypeStore = usePrototypeStore()
   prototypeStore.initialize()
+  if (to.fullPath !== from.fullPath && prototypeStore.hasUnsavedChanges) {
+    if (prototypeStore.saving) return false
+    try {
+      await ElMessageBox.confirm('当前表单尚未保存，离开后会丢失修改。', '离开当前页面？', {
+        confirmButtonText: '放弃并离开',
+        cancelButtonText: '继续编辑',
+        type: 'warning'
+      })
+      prototypeStore.clearDirty()
+    } catch {
+      return false
+    }
+  }
   if (to.path === '/') return getHomePath(prototypeStore.currentUser.role)
 
   const allowedRoles = Array.isArray(to.meta.roles)

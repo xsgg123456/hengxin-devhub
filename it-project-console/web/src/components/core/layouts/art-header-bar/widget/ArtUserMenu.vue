@@ -68,6 +68,19 @@
   const initials = computed(() => prototypeStore.currentUser.name.slice(-2))
 
   async function switchIdentity(userId: string): Promise<void> {
+    if (prototypeStore.saving) return
+    if (prototypeStore.hasUnsavedChanges) {
+      try {
+        await ElMessageBox.confirm('当前表单尚未保存，切换身份后会丢失修改。', '切换演示身份？', {
+          confirmButtonText: '放弃并切换',
+          cancelButtonText: '继续编辑',
+          type: 'warning'
+        })
+        prototypeStore.clearDirty()
+      } catch {
+        return
+      }
+    }
     prototypeStore.switchUser(userId)
     syncPrototypeShell(prototypeStore.currentUser.role)
     userMenuPopover.value?.hide()

@@ -13,8 +13,8 @@
 | 设计交付方式 | 已定版：design/role-prototypes-v2 三角色 HTML；工程师以 engineer.html 为准，开发在现有 Vue 母版原位实现 |
 | 前端技术 | 已确认：复用 Art Design Pro 现有代码和技术栈 |
 | 后端技术架构 | 已确认：Node.js + TypeScript + Fastify + Prisma + PostgreSQL 16 + MinIO |
-| 产品代码 | 保留 Phase 1 历史验收；新定版页面与业务规则尚未在 Vue 中实现 |
-| 当前可执行阶段 | Phase 2：同步定版导航、权限与领域模型并实现业务闭环 |
+| 产品代码 | Phase 2 跨角色核心闭环已实现并通过技术验收；完整 V2 图表、待办与甘特待 Phase 3 |
+| 当前可执行阶段 | Phase 2 待用户预览确认；下一阶段为 Phase 3 管理决策与生命周期 |
 | 后端开工门禁 | Phase 4 通过且领导明确确认流程、信息结构和核心交互后，才允许进入 Phase 5 |
 
 产品采用 pnpm workspace：前端放在 `it-project-console/web/`，后端放在 `it-project-console/api/`。前端参考母版是 `D:/Work_Project/art-design-pro`，基准提交为 `f3aaf58eec1a0e988f162352c33862327a484f95`。复制时不带入 `.git`、`node_modules`、`.playwright-cli`、构建缓存和母版工作区未提交内容；保留上游 MIT License。原母版只读，产品子目录不得再次 `git init`。
@@ -86,7 +86,16 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 
 **定版同步任务（2026-09-08）**：先调整既有路由、角色默认范围与 `domain/prototype.ts`，再补业务流程。复用现有 `views/index/index.vue` 及 ArtSidebarMenu、ArtHeaderBar、ArtPageContent；不得另建三套布局或把 HTML 直接作为生产页面。
 
-**状态**：待开始，依赖 Phase 1
+**状态**：已实现并通过四步技术验证（2026-09-08），待用户预览确认。验收记录：`it-project-console/docs/PHASE-2-VERIFICATION.md`。
+
+**本轮执行与验收顺序**：
+
+1. 共享领域模型与事务服务：草稿/提交、评估/直接建项目、整体/个人更新；以权限、幂等、日期历史和旧数据迁移单测验收。
+2. 需求列表与抽屉：原位改造 `views/my-demands/index.vue`，复用 Element Plus 表格、表单和 Drawer；以材料校验、退回原单重提、管理立项验收。
+3. 项目列表与抽屉：原位改造 `views/project-overview/index.vue`、`views/my-projects/index.vue`；保留 Art 布局，抽取共用业务卡片/详情/更新组件，以同源进度、日期、风险及职责写权限验收。
+4. 导航、集成与阶段验证：全员只读与默认范围分离；跨角色 E2E、持久化、失败不落盘、类型检查、生产构建和独立两阶段审查全部通过后记录证据。
+
+完整图表、甘特与职责待办按 Phase 3 交付；本轮不把这些后续能力标为完成，也不以无行为按钮冒充交付。
 
 **交付内容**：
 
@@ -99,22 +108,22 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 **关键文件**：
 
 - `it-project-console/web/src/views/my-demands/index.vue` — 业务需求列表。
-- `it-project-console/web/src/components/demand/demand-form-drawer.vue` — 复用表单组件，在右侧全高抽屉提交和编辑需求。
-- `it-project-console/web/src/views/demand-approval/index.vue` — 待评估列表。
-- `it-project-console/web/src/components/demand/attachment-field.vue` — 明确标识为模拟上传的 PRD 和 HTML 原型输入。
-- `it-project-console/web/src/components/demand/approval-drawer.vue` — 立项与退回操作。
+- `it-project-console/web/src/components/demand/demand-editor.vue` — 复用表单组件，在右侧全高抽屉提交和编辑需求。
+- `it-project-console/web/src/views/my-demands/index.vue` — 管理评估复用同一需求池，以状态筛选待评估记录，不另建审批页面。
+- `it-project-console/web/src/components/demand/material-field.vue` — 明确标识为模拟上传的 PRD 和 HTML 原型输入。
+- `it-project-console/web/src/components/demand/demand-review.vue` — 立项与退回操作。
 - `it-project-console/web/src/views/my-projects/index.vue` — 工程师项目入口。
 - `it-project-console/web/src/components/project/project-detail-drawer.vue` — 项目详情抽屉，卡片/甘特/深链共用；路由仅定位记录并自动打开弹窗。
 - `it-project-console/web/src/views/project-overview/index.vue` — 风险优先管理首页。
-- `it-project-console/web/src/views/project-overview/modules/risk-project-table.vue` — 风险项目表格。
+- `it-project-console/web/src/components/project/project-card.vue` — 按 V2 展示项目卡片及风险，复用总览与工程师页面。
 - `it-project-console/web/src/components/project/stage-progress.vue` — 固定七阶段进度条。
 - `it-project-console/web/src/components/project/progress-update-drawer.vue` — 进度更新抽屉。
 - `it-project-console/web/src/components/project/risk-tag.vue` — 文字加颜色的风险标签。
 - `it-project-console/web/src/domain/prototype.ts` — 原位扩展共享领域模型：来源、材料、需求状态、整体百分比、两类日期、整体更新时间；现有类型优先复用，避免平行定义。
-- `it-project-console/web/src/router/routes/asyncRoutes.ts`、`it-project-console/web/src/router/access.ts` — 四个主模块、全员只读与职责写权限。
+- `it-project-console/web/src/router/routes/asyncRoutes.ts`、`it-project-console/web/src/router/access.ts` — 先开放本阶段已实现的项目、需求入口，完成全员只读与职责写权限；四个主模块的最终顺序在 Phase 3 待办、甘特交付时同步启用，不展示空入口。
 - `it-project-console/web/src/components/project/project-create-drawer.vue` — 复用项目字段的管理人员直接创建入口。
 - `it-project-console/web/src/domain/demand.ts` — 若需拆分则由既有领域模型提取需求状态与附件类型，禁止重复定义。
-- `it-project-console/web/src/domain/project.ts` — 阶段、状态和成员类型。
+- `it-project-console/web/src/domain/prototype.ts` — 本轮阶段、状态、材料与成员类型沿用同一领域文件，不重复拆分。
 - `it-project-console/web/src/services/demand-service.ts` — 需求数据接口边界。
 - `it-project-console/web/src/services/project-service.ts` — 项目与管理总览数据接口边界。
 - `it-project-console/web/src/services/progress-service.ts` — 进度数据接口边界。
@@ -136,6 +145,7 @@ Phase 9 钉钉身份与风险通知 ─> Phase 10 部署准备与最终验收
 
 **交付内容**：
 
+- 随职责待办与甘特页面交付，按 Design Brief 4.2 完成三角色四个主模块的导航顺序与文案。
 - 按 V2 完成总览指标、项目分布柱形图、人员负载及完整项目卡片；完成需求池提出人/部门环形图与数量条、月度部门堆叠趋势和需求表格。图表和明细共用范围筛选。
 - 完成职责待办与确定性风险：管理人员看评估和全局异常，工程师看本人更新，业务看补充材料；停更只按最近整体更新计算 3 个工作日，不强制日报。
 - 完成项目详情的日期调整历史、进度历史和管理纠正；支持需求退回/重提/撤回/删除，以及项目完成、取消、归档、重新打开和符合条件的误建删除。

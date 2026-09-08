@@ -13,6 +13,9 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
   const snapshot = ref<PrototypeSnapshot | null>(null)
   const ready = ref(false)
   const corrupted = ref(false)
+  const dirtyForms = ref<Record<string, boolean>>({})
+  const hasUnsavedChanges = computed(() => Object.values(dirtyForms.value).some(Boolean))
+  const saving = ref(false)
   let repository: PrototypeRepository | null = null
 
   const currentUser = computed(() => {
@@ -25,37 +28,12 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
 
   const visibleProjects = computed<DemoProject[]>(() => {
     const projects = database.value?.projects ?? []
-    const user = currentUser.value
-    if (user.role === 'manager') return projects
-    if (user.role === 'business') {
-      return projects.filter((project) => project.department === user.department)
-    }
-    return projects.filter(
-      (project) => project.primaryOwnerId === user.id || project.collaboratorIds.includes(user.id)
-    )
+    return projects
   })
 
   const visibleDemands = computed(() => {
     const demands = database.value?.demands ?? []
-    const user = currentUser.value
-    if (user.role === 'manager') return demands
-    if (user.role === 'business') {
-      return demands.filter((demand) => demand.department === user.department)
-    }
-    return []
-  })
-
-  const overviewStats = computed(() => {
-    const projects = database.value?.projects ?? []
-    return {
-      active: projects.filter((project) => project.status === 'active' && !project.archived).length,
-      delayed: projects.filter((project) => project.risks.some((risk) => risk.includes('晚')))
-        .length,
-      stale: projects.filter((project) => project.risks.some((risk) => risk.includes('未更新')))
-        .length,
-      blocked: projects.filter((project) => project.simpleStatus === 'blocked').length,
-      pending: database.value?.demands.filter((demand) => demand.status === 'pending').length ?? 0
-    }
+    return demands
   })
 
   function getRepository(): PrototypeRepository {
@@ -87,6 +65,30 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
     snapshot.value = getRepository().reset(currentUser.value.id)
     corrupted.value = false
     ready.value = true
+    clearDirty()
+  }
+
+  function setDirty(key: string, dirty: boolean): void {
+    dirtyForms.value[key] = dirty
+  }
+
+  function clearDirty(): void {
+    dirtyForms.value = {}
+  }
+
+  async function runCommand(mutator: (draft: PrototypeSnapshot) => void): Promise<void> {
+    if (saving.value) throw new Error('正在保存，请稍候')
+    saving.value = true
+    try {
+      // Yield one frame so the disabled/loading controls are painted before persistence.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      snapshot.value = getRepository().transact(mutator)
+    } catch (error) {
+      if (error instanceof PrototypeDataError) corrupted.value = true
+      throw error
+    } finally {
+      saving.value = false
+    }
   }
 
   return {
@@ -98,9 +100,13 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
     database,
     visibleProjects,
     visibleDemands,
-    overviewStats,
     initialize,
     switchUser,
-    reset
+    reset,
+    runCommand,
+    saving,
+    setDirty,
+    clearDirty,
+    hasUnsavedChanges
   }
 })

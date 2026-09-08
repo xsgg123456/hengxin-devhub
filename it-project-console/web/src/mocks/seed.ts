@@ -1,10 +1,12 @@
 import type { PrototypeSnapshot } from '@/domain/prototype'
+import { migratePrototypeSnapshot } from '@/repositories/prototype-migration'
+import { computeProjectRisks } from '@/services/risk-service'
 import { DEFAULT_DEMO_USER_ID, DEMO_USERS } from './auth-context'
 
 const INITIAL_UPDATED_AT = '2026-09-04T09:00:00+08:00'
 
 export function createInitialPrototypeSnapshot(): PrototypeSnapshot {
-  return {
+  const legacy = {
     schemaVersion: 1,
     revision: 0,
     activeUserId: DEFAULT_DEMO_USER_ID,
@@ -114,4 +116,38 @@ export function createInitialPrototypeSnapshot(): PrototypeSnapshot {
       ]
     }
   }
+  const snapshot = migratePrototypeSnapshot(legacy)
+  for (const demand of snapshot.database.demands) {
+    demand.description = `${demand.name}：统一部门协作流程，减少重复录入。`
+    demand.prd = {
+      kind: 'file',
+      name: `${demand.name}-PRD.pdf`,
+      size: 240000,
+      mime: 'application/pdf',
+      status: 'ready'
+    }
+    demand.prototype = {
+      kind: 'file',
+      name: `${demand.name}-原型.html`,
+      size: 18000,
+      mime: 'text/html',
+      status: 'ready'
+    }
+  }
+  const progress = [65, 82, 25]
+  snapshot.database.projects.forEach((project, index) => {
+    project.overallProgress = progress[index]
+    project.createdAt = snapshot.database.demands.find(
+      (demand) => demand.id === project.demandId
+    )!.submittedAt
+    project.stageExpectedDate = ['2026-09-18', '2026-09-07', '2026-09-10'][index]
+    if (project.simpleStatus === 'blocked') project.blocker = '等待供应商测试环境'
+    project.risks = computeProjectRisks(
+      project,
+      snapshot.database.scheduleChanges,
+      INITIAL_UPDATED_AT
+    )
+  })
+  snapshot.database.progressUpdates[0].overallProgress = 65
+  return snapshot
 }

@@ -1,9 +1,9 @@
 export type SystemRole = 'business' | 'engineer' | 'manager'
 export type PrototypeScenario = 'normal' | 'empty' | 'loading' | 'save-error' | 'forbidden'
-export type DemandStatus = 'pending' | 'returned' | 'established' | 'withdrawn'
+export type DemandStatus =
+  'draft' | 'pending' | 'returned' | 'rejected' | 'established' | 'withdrawn'
 export type ProjectStatus = 'active' | 'completed' | 'cancelled'
 export type SimpleStatus = 'not-started' | 'in-progress' | 'nearly-done' | 'completed' | 'blocked'
-
 export const PROJECT_STAGES = [
   '需求受理',
   '立项评审',
@@ -13,9 +13,14 @@ export const PROJECT_STAGES = [
   '上线部署',
   '验收交付'
 ] as const
-
+export const SCHEDULE_REASONS = [
+  '业务新增或变更需求',
+  '技术问题',
+  '等待外部资源',
+  '人员安排变化',
+  '其他'
+] as const
 export type ProjectStage = (typeof PROJECT_STAGES)[number]
-
 export interface DemoUser {
   id: string
   name: string
@@ -23,54 +28,96 @@ export interface DemoUser {
   role: SystemRole
   roleLabel: '业务人员' | 'IT工程师' | '管理人员'
 }
-
+export interface DemoAttachment {
+  kind: 'file' | 'link'
+  name: string
+  url?: string
+  size?: number
+  mime?: string
+  status: 'ready' | 'failed' | 'uploading'
+}
 export interface DemoDemand {
   id: string
+  requestId: string
   name: string
+  description: string
   department: string
   submitterId: string
   expectedLaunchDate: string
+  prd: DemoAttachment | null
+  prototype: DemoAttachment | null
   status: DemandStatus
+  reviewReason: string
+  reviewedBy?: string
+  reviewedAt?: string
   submittedAt: string
 }
-
 export interface DemoProject {
   id: string
-  demandId: string
+  requestId: string
+  demandId: string | null
+  source: 'demand' | 'direct'
   name: string
   department: string
+  priority: 'P0' | 'P1' | 'P2'
   primaryOwnerId: string
   collaboratorIds: string[]
   stage: ProjectStage
   simpleStatus: SimpleStatus
+  overallProgress: number
+  stageExpectedDate: string
   originalLaunchDate: string
   expectedLaunchDate: string
+  originalDeliveryDate: string
+  expectedDeliveryDate: string
   status: ProjectStatus
   archived: boolean
   risks: string[]
+  blocker: string
+  createdAt: string
+  lastOverallUpdatedAt: string
   updatedAt: string
 }
-
 export interface DemoProgressUpdate {
   id: string
   projectId: string
   authorId: string
+  kind: 'overall' | 'personal'
+  overallProgress?: number
   stage: ProjectStage
   status: SimpleStatus
   summary: string
+  blocker: string
   createdAt: string
 }
-
+export interface DemoStageHistory {
+  projectId: string
+  stage: ProjectStage
+  startedAt: string
+  completedAt: string | null
+}
+export interface DemoScheduleChange {
+  id: string
+  projectId: string
+  field: 'stageExpectedDate' | 'expectedLaunchDate' | 'expectedDeliveryDate'
+  oldValue: string
+  newValue: string
+  reason: string
+  description: string
+  authorId: string
+  createdAt: string
+}
 export interface PrototypeDatabase {
-  schemaVersion: 1
+  schemaVersion: 2
   users: DemoUser[]
   demands: DemoDemand[]
   projects: DemoProject[]
   progressUpdates: DemoProgressUpdate[]
+  stageHistories: DemoStageHistory[]
+  scheduleChanges: DemoScheduleChange[]
 }
-
 export interface PrototypeSnapshot {
-  schemaVersion: 1
+  schemaVersion: 2
   revision: number
   activeUserId: string
   scenario: PrototypeScenario

@@ -8,7 +8,10 @@ describe('角色访问策略', () => {
     ['business', '/my-demands']
   ] as const)('%s 进入对应首页', (role, path) => {
     expect(getHomePath(role)).toBe(path)
-    expect(getNavigation(role)).toEqual([expect.objectContaining({ path })])
+    expect(getNavigation(role)[0]).toEqual(expect.objectContaining({ path }))
+    expect(getNavigation(role)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: '/my-demands' })])
+    )
   })
 
   it('拒绝访问其他角色页面', () => {
