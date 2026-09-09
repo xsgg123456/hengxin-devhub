@@ -1,4 +1,5 @@
 import { PROJECT_STAGES, type PrototypeSnapshot } from '@/domain/prototype'
+import { isItDepartment } from '@/utils/it-department'
 import { computeProjectRisks } from './risk-service'
 import {
   assertWrite,
@@ -43,7 +44,7 @@ export function createProject(
     return existing
   }
   const engineers = snapshot.database.users
-    .filter((user) => user.department === '信息技术部')
+    .filter((user) => isItDepartment(user.department))
     .map((user) => user.id)
   if (!engineers.includes(input.primaryOwnerId)) throw new WorkflowError('请选择唯一 IT 主负责人')
   if (

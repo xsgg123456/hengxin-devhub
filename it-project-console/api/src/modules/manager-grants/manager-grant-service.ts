@@ -1,3 +1,4 @@
+import { isItDepartment } from '../../lib/it-department.js'
 import type { PrismaClient } from '../../generated/prisma/client.js'
 import type { Actor } from '../../plugins/auth.js'
 import { assertActive, assertManager, command } from '../../lib/business-command.js'
@@ -79,7 +80,7 @@ export class ManagerGrantService {
         }
         const role = input.enabled
           ? 'MANAGER'
-          : user.departmentRecord?.name === '信息技术部'
+          : isItDepartment(user.departmentRecord?.name)
             ? 'ENGINEER'
             : 'BUSINESS'
         await tx.managerGrant.upsert({

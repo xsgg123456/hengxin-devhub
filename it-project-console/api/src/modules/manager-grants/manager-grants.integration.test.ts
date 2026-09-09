@@ -26,6 +26,23 @@ const manager: Actor = {
 const business: Actor = { ...manager, id: 'user-business-li', role: 'BUSINESS' }
 const input = (userId: string, enabled: boolean) => ({ userId, enabled, requestId: randomUUID() })
 
+it('IT部成员撤销管理员后恢复工程师权限', async () => {
+  const id = randomUUID(), departmentId = randomUUID()
+  await db.department.create({ data: { id: departmentId, name: 'IT部' } })
+  await db.user.create({ data: { id, name: '真实部门回归', department: 'IT部', departmentId, role: 'ENGINEER' } })
+  try {
+    await service.set(manager, input(id, true))
+    expect((await db.user.findUniqueOrThrow({ where: { id } })).role).toBe('MANAGER')
+    await service.set(manager, input(id, false))
+    expect((await db.user.findUniqueOrThrow({ where: { id } })).role).toBe('ENGINEER')
+  } finally {
+    await db.managerGrant.deleteMany({ where: { userId: id } })
+    await db.auditLog.deleteMany({ where: { entityId: id } })
+    await db.user.delete({ where: { id } })
+    await db.department.delete({ where: { id: departmentId } })
+  }
+})
+
 it('企业模式排除样例授权且始终保留真实管理员，允许清理遗留样例授权', async () => {
   const ids = Array.from({ length: 3 }, () => randomUUID())
   const [firstId, secondId] = ids as [string, string, string]

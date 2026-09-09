@@ -5,6 +5,7 @@ import type { DashboardResult } from '@/services/live-dashboard-types'
 import { useRouter } from 'vue-router'
 import { usePrototypeStore } from '@/store/modules/prototype'
 import { computeProjectRisks } from '@/services/risk-service'
+import { isItDepartment } from '@/utils/it-department'
 
 export function useProjectOverviewFilters(personal = false) {
   const store = usePrototypeStore(),
@@ -19,7 +20,7 @@ export function useProjectOverviewFilters(personal = false) {
   const dates = ref<[string, string] | null>(null),
     includeArchived = ref(false)
   const engineers = computed(
-    () => store.database?.users.filter((u) => u.department === '信息技术部') ?? []
+    () => store.database?.users.filter((u) => isItDepartment(u.department)) ?? []
   )
   const departments = computed(() => [...new Set(store.visibleProjects.map((p) => p.department))])
   const prototypeProjects = computed(() =>

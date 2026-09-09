@@ -50,6 +50,18 @@ beforeAll(async () => {
 afterAll(async () => { await runtime?.app.close(); await db.$disconnect() })
 
 describe('真实需求与立项事务', () => {
+  it('真实 IT部名称允许分派，名称相似的非 IT 部门不能分派', async () => {
+    const original = await db.user.findUniqueOrThrow({ where: { id: engineer } })
+    try {
+      await db.user.update({ where: { id: engineer }, data: { department: 'IT部' } })
+      const created = await call('POST', '/api/projects', project(), manager)
+      expect(created.statusCode, created.body).toBe(200)
+      await db.user.update({ where: { id: engineer }, data: { department: 'IT部业务支持' } })
+      expect((await call('POST', '/api/projects', project(), manager)).statusCode).toBe(400)
+    } finally {
+      await db.user.update({ where: { id: engineer }, data: { department: original.department } })
+    }
+  })
   it('并发网络重试只创建一次，不同内容复用key拒绝', async () => {
     const input = valid()
     const responses = await Promise.all([call('POST', '/api/demands', input), call('POST', '/api/demands', input)])

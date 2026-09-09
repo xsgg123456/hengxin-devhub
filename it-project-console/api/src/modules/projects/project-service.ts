@@ -1,3 +1,4 @@
+import { IT_DEPARTMENT_NAMES } from '../../lib/it-department.js'
 import { refreshProjectRisks } from '../risks/risk-scan-job.js'
 import type { Prisma, PrismaClient } from '../../generated/prisma/client.js'
 import type { Actor } from '../../plugins/auth.js'
@@ -9,7 +10,7 @@ import { lifecycleEvent } from '../notifications/lifecycle-event-service.js'
 export async function createProject(tx: Prisma.TransactionClient, input: ProjectInput, demandId?: string) {
   const ids = [input.primaryOwnerId, ...input.collaboratorIds]
   if (new Set(ids).size !== ids.length) throw new AppError(400, 'INVALID_MEMBERS', '主负责人与协作人员不能重复')
-  const users = await tx.user.count({ where: { id: { in: ids }, department: '信息技术部', active: true } })
+  const users = await tx.user.count({ where: { id: { in: ids }, department: { in: IT_DEPARTMENT_NAMES }, active: true } })
   if (users !== ids.length) throw new AppError(400, 'INVALID_MEMBERS', '主负责人与协作人员必须是有效 IT 用户')
   const now = new Date()
   const project = await tx.project.create({ data: {

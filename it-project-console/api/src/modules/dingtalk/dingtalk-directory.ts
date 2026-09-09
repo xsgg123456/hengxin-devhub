@@ -1,3 +1,4 @@
+import { isItDepartment } from '../../lib/it-department.js'
 import type { PrismaClient, Prisma } from '../../generated/prisma/client.js'
 import { AppError } from '../../lib/errors.js'
 import type { DingTalkClient, DingIdentity } from './dingtalk-client.js'
@@ -102,8 +103,8 @@ export class DingtalkDirectory {
         if (matches.length > 1) throw conflict()
         const existing = matches[0]
         if (existing?.dingUnionId && existing.dingUnionId !== identity.unionId) throw conflict()
-        const department = identity.departmentIds.map(id => departmentMap.get(id)!).find(d => d.name === '信息技术部') ?? departmentMap.get(identity.departmentIds[0]!)!
-        const role = identity.active && existing?.managerGrant?.active ? 'MANAGER' : department.name === '信息技术部' ? 'ENGINEER' : 'BUSINESS'
+        const department = identity.departmentIds.map(id => departmentMap.get(id)!).find(d => isItDepartment(d.name)) ?? departmentMap.get(identity.departmentIds[0]!)!
+        const role = identity.active && existing?.managerGrant?.active ? 'MANAGER' : isItDepartment(department.name) ? 'ENGINEER' : 'BUSINESS'
         const data = { name: identity.name, dingUserId: identity.userId, dingUnionId: identity.unionId,
           department: department.name, departmentId: department.id, active: identity.active, role } as const
         const saved = existing ? await tx.user.update({ where: { id: existing.id }, data }) : await tx.user.create({ data })
@@ -144,9 +145,9 @@ export class DingtalkDirectory {
   private async refreshRole(tx: Prisma.TransactionClient, userId: string, identity: DingIdentity, manager: boolean) {
     const departments = await tx.department.findMany({ where: { dingDeptId: { in: identity.departmentIds } } })
     if (!departments.length) throw denied()
-    const department = departments.find(d => d.name === '信息技术部') ?? departments.find(d => d.dingDeptId === identity.departmentIds[0])
+    const department = departments.find(d => isItDepartment(d.name)) ?? departments.find(d => d.dingDeptId === identity.departmentIds[0])
     if (!department) throw denied()
     return tx.user.update({ where: { id: userId }, data: { name: identity.name, department: department.name,
-      departmentId: department.id, role: manager ? 'MANAGER' : department.name === '信息技术部' ? 'ENGINEER' : 'BUSINESS' } })
+      departmentId: department.id, role: manager ? 'MANAGER' : isItDepartment(department.name) ? 'ENGINEER' : 'BUSINESS' } })
   }
 }

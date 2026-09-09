@@ -8,6 +8,7 @@ import {
 import { assertWrite, dateValue, nextId, textValue, WorkflowError } from './workflow-validation'
 import { projectState, recordLifecycle } from './lifecycle-service'
 import { computeProjectRisks } from './risk-service'
+import { isItDepartment } from '@/utils/it-department'
 
 export interface ManagerInput {
   userId: string
@@ -38,7 +39,7 @@ export function setManager(snapshot: PrototypeSnapshot, input: ManagerInput) {
   if (!input.enabled && snapshot.database.users.filter((row) => row.role === 'manager').length <= 1)
     throw new WorkflowError('不能移除最后一名管理人员')
   const before = { role: user.role, roleLabel: user.roleLabel }
-  user.role = input.enabled ? 'manager' : user.department === '信息技术部' ? 'engineer' : 'business'
+  user.role = input.enabled ? 'manager' : isItDepartment(user.department) ? 'engineer' : 'business'
   user.roleLabel =
     user.role === 'manager' ? '管理人员' : user.role === 'engineer' ? 'IT工程师' : '业务人员'
   recordLifecycle(snapshot, {

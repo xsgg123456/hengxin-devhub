@@ -10,7 +10,7 @@ if (env.NODE_ENV !== 'test' || !new URL(env.DATABASE_URL).searchParams.get('sche
 const db = createPrisma(env.DATABASE_URL)
 afterAll(() => db.$disconnect())
 
-it('完整快照、稳定身份、角色映射、首次管理员、冲突回滚及离职撤会话', async () => {
+it.each(['信息技术部', 'IT部'])('%s：完整快照、稳定身份、角色映射、首次管理员、冲突回滚及离职撤会话', async (itDepartmentName) => {
   const prefix = randomUUID()
   const identity = (suffix: string, department = '902'): DingIdentity => ({ userId: `${prefix}-${suffix}`, unionId: `${prefix}-union-${suffix}`, name: '陈立峰', departmentIds: [department], active: true })
   let users = [identity('admin'), identity('business', '903')]
@@ -20,7 +20,7 @@ it('完整快照、稳定身份、角色映射、首次管理员、冲突回滚�
       if (fail) throw new Error('分页权限失败')
       const input = body as { dept_id: number }
       if (path.endsWith('department/get')) return { result: { name: '测试企业' } }
-      if (path.endsWith('listsub')) return { result: input.dept_id === 1 ? [{ dept_id: 902, parent_id: 1, name: '信息技术部' }, { dept_id: 903, parent_id: 1, name: '市场部' }] : [] }
+      if (path.endsWith('listsub')) return { result: input.dept_id === 1 ? [{ dept_id: 902, parent_id: 1, name: itDepartmentName }, { dept_id: 903, parent_id: 1, name: '市场部' }] : [] }
       return { result: { list: users.filter(u => u.departmentIds.includes(String(input.dept_id))).map(u => ({ userid: u.userId })), has_more: false } }
     },
     staff: async (id: string) => {
