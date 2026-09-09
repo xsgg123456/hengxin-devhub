@@ -35,6 +35,12 @@
       "timeoutSeconds": 180
     },
     {
+      "name": "发布配置与产物审计测试",
+      "cwd": "it-project-console",
+      "argv": ["pnpm", "test:release"],
+      "timeoutSeconds": 120
+    },
+    {
       "name": "前后端构建",
       "cwd": "it-project-console",
       "argv": ["pnpm", "build"],
