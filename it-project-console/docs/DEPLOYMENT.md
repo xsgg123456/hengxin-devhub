@@ -4,7 +4,7 @@
 
 默认目标：`root@192.168.1.245:22`，新系统目录 `/opt/it-project-console`。SSH 使用交互密码或 `-IdentityFile` 指定的私钥；脚本、Git 和发布包均不保存 SSH 密码。
 
-**当前准入状态（2026-09-09）**：本地验证包已能构建；既有 Vite/xlsx 依赖审计仍有 5 项 high，正式 Deploy 会在改动运行容器之前拒绝该包。下面是整改完成后的统一操作流程，不代表当前已满足上线条件。
+**当前准入状态（2026-09-09）**：Vite/xlsx 已完成安全补丁升级，生产依赖审计各等级为零。重新构建的新包可进入服务器独立安装与联调；此前含 5 项 high 的中间包仍不可用于部署。正式入口切换需完成企业验收。
 
 ## 环境与边界
 
@@ -54,6 +54,8 @@ pnpm release -Action Upload -BundlePath $bundle
 ```
 
 远程验收前可使用 SSH 隧道把服务器内部端口带到本机；钉钉 OAuth 验收仍需正确的公开域名和回调代理链路。不要通过本地演示登录代替钉钉验收。
+
+本服务器的独立 HTTPS 联调可使用 `deploy/compose.preview.yaml` 和 `preview.nginx.conf`：只读复用 `itpd-prod_tls_certs_prod`，连接 `itpc-prod_default`，仅绑定服务器 `127.0.0.1:18443`。将这两个文件上传新系统 `preview/` 后，以当前 `release.env` 启动独立 `itpc-preview` 项目。此操作不修改旧代理。通过 SSH 转发本机 8443 到服务器 18443，再用专用浏览器进程的 `--host-resolver-rules=MAP pmg.qhhengxin.top 127.0.0.1` 访问 **`https://pmg.qhhengxin.top:8443`**（必须保留 8443 端口，旧 NEXTAUTH_URL/S3_PUBLIC_ENDPOINT 也含该端口）；仅该浏览器看到新系统，系统 hosts 和普通浏览器不变。
 
 ## 3. 以后统一更新
 

@@ -1,0 +1,19 @@
+name: itpc-preview
+services:
+  https:
+    image: ${WEB_IMAGE:?load current release.env}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18443:8443"
+    volumes:
+      - ./preview.nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - legacy-tls:/etc/nginx/tls:ro
+    networks: [application]
+volumes:
+  legacy-tls:
+    external: true
+    name: itpd-prod_tls_certs_prod
+networks:
+  application:
+    external: true
+    name: itpc-prod_default

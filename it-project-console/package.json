@@ -12,7 +12,7 @@
     "dev:api": "pnpm --filter @it-project-console/api dev",
     "setup:local": "node scripts/setup-local.mjs",
     "audit:api": "node scripts/audit-api.mjs",
-    "test:release": "node --test scripts/deploy/release.test.mjs",
+    "test:release": "node --test scripts/deploy/*.test.mjs",
     "release": "pwsh -NoProfile -File scripts/deploy/publish.ps1",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
