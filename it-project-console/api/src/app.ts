@@ -19,10 +19,12 @@ import { AppError } from './lib/errors.js'
 import { S3Storage } from './modules/storage/s3-storage.js'
 import { AttachmentService } from './modules/attachments/attachment-service.js'
 import { registerRoutes } from './routes.js'
+import { registerDingTalkAuth, supportedDesktop } from './modules/dingtalk/dingtalk-auth.js'
+import { DingTalkClient } from './modules/dingtalk/dingtalk-client.js'
 
 export async function buildApp(
   env: Env,
-  overrides: { db?: PrismaClient; storage?: S3Storage; logging?: boolean } = {}
+  overrides: { db?: PrismaClient; storage?: S3Storage; logging?: boolean; dingClient?: DingTalkClient } = {}
 ) {
   const db = overrides.db ?? createPrisma(env.DATABASE_URL)
   const storage =
@@ -64,6 +66,8 @@ export async function buildApp(
   await app.register(helmet)
   await app.register(rateLimit, { max: env.REQUESTS_PER_MINUTE, timeWindow: '1 minute' })
   app.addHook('onRequest', async (request) => {
+    if (request.url.startsWith('/api/') && request.url.split('?')[0] !== '/api/auth/dingtalk/config' && !supportedDesktop(request.headers['user-agent']))
+      throw new AppError(403, 'DESKTOP_REQUIRED', '第一版仅支持电脑端，请使用电脑浏览器或电脑钉钉客户端打开')
     if (
       ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) &&
       request.headers.origin !== env.WEB_ORIGIN
@@ -121,9 +125,11 @@ export async function buildApp(
     }
   })
   await registerRoutes(app, db, env, attachments)
+  const dingClient = overrides.dingClient ?? new DingTalkClient({clientId:env.DINGTALK_CLIENT_ID,clientSecret:env.DINGTALK_CLIENT_SECRET})
+  const directory = registerDingTalkAuth(app, db, env, dingClient)
   app.addHook('onClose', async () => {
     if (!overrides.db) await db.$disconnect()
     if (!overrides.storage) storage.close()
   })
-  return { app, attachments, scanRisks: () => scanProjectRisks(db) }
+  return { app, attachments, directory, dingClient, db, scanRisks: () => scanProjectRisks(db) }
 }

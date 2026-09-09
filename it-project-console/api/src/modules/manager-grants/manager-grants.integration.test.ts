@@ -26,6 +26,45 @@ const manager: Actor = {
 const business: Actor = { ...manager, id: 'user-business-li', role: 'BUSINESS' }
 const input = (userId: string, enabled: boolean) => ({ userId, enabled, requestId: randomUUID() })
 
+it('企业模式排除样例授权且始终保留真实管理员，允许清理遗留样例授权', async () => {
+  const ids = Array.from({ length: 3 }, () => randomUUID())
+  const [firstId, secondId] = ids as [string, string, string]
+  const enterpriseManager: Actor = { ...manager, id: firstId }
+  const seedManager = await db.user.findUniqueOrThrow({ where: { id: manager.id } })
+  expect(await db.systemSetting.findUnique({ where: { key: 'dingtalk.directory' } })).toBeNull()
+  try {
+    await db.user.createMany({ data: ids.map((id, index) => ({
+      id, name: `企业授权回归${index}`, department: '信息技术部', departmentId: seedManager.departmentId,
+      dingUnionId: `grant-union-${id}`, active: index !== 2,
+      role: index === 0 ? 'MANAGER' as const : 'ENGINEER' as const
+    })) })
+    await db.managerGrant.create({ data: { userId: firstId, active: true } })
+    await db.systemSetting.create({ data: { key: 'dingtalk.directory', value: { userIds: ids } } })
+    // Keep the seed grant active: it must never count toward enterprise availability.
+    expect((await db.managerGrant.findUniqueOrThrow({ where: { userId: manager.id } })).active).toBe(true)
+    expect((await service.list(enterpriseManager)).map((user) => user.id)).toEqual([firstId])
+    expect((await service.candidates(enterpriseManager)).map((user) => user.id)).toEqual([secondId])
+    await expect(service.candidates(manager)).rejects.toMatchObject({ statusCode: 403 })
+    await expect(service.set(manager, input(secondId, true))).rejects.toMatchObject({ statusCode: 403 })
+    await expect(service.set(enterpriseManager, input(business.id, true))).rejects.toMatchObject({ code: 'INVALID_MEMBER' })
+    await expect(service.set(enterpriseManager, input(firstId, false))).rejects.toMatchObject({ code: 'LAST_MANAGER' })
+    await service.set(enterpriseManager, input(manager.id, false))
+    expect((await db.managerGrant.findUniqueOrThrow({ where: { userId: firstId } })).active).toBe(true)
+    await service.set(enterpriseManager, input(secondId, true))
+    await service.set(enterpriseManager, input(firstId, false))
+    expect((await service.list({ ...manager, id: secondId })).map((user) => user.id)).toEqual([secondId])
+    await expect(service.set({ ...manager, id: secondId }, input(secondId, false))).rejects.toMatchObject({ code: 'LAST_MANAGER' })
+  } finally {
+    await db.systemSetting.deleteMany({ where: { key: 'dingtalk.directory' } })
+    await db.user.update({ where: { id: manager.id }, data: { role: 'MANAGER' } })
+    await db.managerGrant.update({ where: { userId: manager.id }, data: { active: true } })
+    await db.managerGrant.deleteMany({ where: { userId: { in: ids } } })
+    await db.auditLog.deleteMany({ where: { actorId: { in: ids } } })
+    await db.commandReceipt.deleteMany({ where: { actorId: { in: ids } } })
+    await db.user.deleteMany({ where: { id: { in: ids } } })
+  }
+})
+
 it('组织名单只读、真实授权、幂等、审计、撤销回落与并发最后管理员保护', async () => {
   const id = randomUUID()
   await db.user.create({

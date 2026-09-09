@@ -109,6 +109,10 @@ test.describe('生产静态产物边界', () => {
         response.writeHead(401, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: '请登录' } }))
         return
       }
+      if (path === '/api/auth/dingtalk/config') {
+        response.writeHead(200, {'Content-Type':'application/json'}).end(JSON.stringify({data:{enabled:false,clientId:'',corpId:''}}))
+        return
+      }
       const target = resolve(dist, '.' + (path === '/' ? '/index.html' : path))
       if (!target.startsWith(dist + '/') && !target.startsWith(dist + '\\')) {
         response.writeHead(403).end()
@@ -147,7 +151,7 @@ test.describe('生产静态产物边界', () => {
     '/#/my-demands',
     '/?mock=true&mode=prototype&scenario=normal#/project-overview'
   ]) {
-    test(`直接路由与Mock开关均不能越过未开放登录边界 ${route}`, async ({ page, browser }) => {
+    test(`直接路由与Mock开关均不能越过钉钉登录边界 ${route}`, async ({ page, browser }) => {
       await page.goto('/')
       const demo = await snapshot(page)
       const context = await browser.newContext()
@@ -161,12 +165,13 @@ test.describe('生产静态产物边界', () => {
         const api: string[] = []
         production.on('pageerror', (e) => errors.push(e.message))
         production.on('request', (r) => {
-          if (r.resourceType() === 'fetch' || r.resourceType() === 'xhr') api.push(r.url())
+          if ((r.resourceType() === 'fetch' || r.resourceType() === 'xhr') &&
+            new URL(r.url()).pathname.startsWith('/api/')) api.push(r.url())
         })
         await production.goto(origin + route)
-        await expect(production.getByRole('heading', { name: '企业登录暂未开放' })).toBeVisible()
+        await expect(production.getByRole('heading', { name: '登录 IT 项目管理台' })).toBeVisible()
         await expect(
-          production.getByText('请联系系统管理员确认开放时间。', { exact: true })
+          production.getByText('企业登录尚未配置，请联系管理员', { exact: true })
         ).toBeVisible()
         await expect(
           production.getByText(/演示模式|切换演示身份|重置演示数据|客户数据治理一期/)
@@ -176,7 +181,7 @@ test.describe('生产静态产物边界', () => {
           demo
         )
         expect(errors).toEqual([])
-        expect(api).toEqual([origin + '/api/workspace'])
+        expect(api).toEqual([origin + '/api/workspace',origin+'/api/auth/dingtalk/config'])
       } finally {
         await context.close()
       }

@@ -1,106 +1,35 @@
-<!-- 登录页面 -->
+<!-- 原位保留 Art 授权页布局，身份验证由企业服务完成。 -->
 <template>
   <div class="flex w-full h-screen">
-    <LoginLeftView />
-
+    <LoginLeftView fixed-theme />
     <div class="relative flex-1">
-      <AuthTopBar />
-
+      <AuthTopBar fixed-theme />
       <div class="auth-right-wrap">
         <div class="form">
-          <h3 class="title">{{ $t('login.title') }}</h3>
-          <p class="sub-title">{{ $t('login.subTitle') }}</p>
-          <ElForm
-            ref="formRef"
-            :model="formData"
-            :rules="rules"
-            :key="formKey"
-            @keyup.enter="handleSubmit"
-            style="margin-top: 25px"
-          >
-            <ElFormItem prop="account">
-              <ElSelect v-model="formData.account" @change="setupAccount">
-                <ElOption
-                  v-for="account in accounts"
-                  :key="account.key"
-                  :label="account.label"
-                  :value="account.key"
-                >
-                  <span>{{ account.label }}</span>
-                </ElOption>
-              </ElSelect>
-            </ElFormItem>
-            <ElFormItem prop="username">
-              <ElInput
-                class="custom-height"
-                :placeholder="$t('login.placeholder.username')"
-                v-model.trim="formData.username"
-              />
-            </ElFormItem>
-            <ElFormItem prop="password">
-              <ElInput
-                class="custom-height"
-                :placeholder="$t('login.placeholder.password')"
-                v-model.trim="formData.password"
-                type="password"
-                autocomplete="off"
-                show-password
-              />
-            </ElFormItem>
-
-            <!-- 推拽验证 -->
-            <div class="relative pb-5 mt-6">
-              <div
-                class="relative z-[2] overflow-hidden select-none rounded-lg border border-transparent tad-300"
-                :class="{ '!border-[#FF4E4F]': !isPassing && isClickPass }"
-              >
-                <ArtDragVerify
-                  ref="dragVerify"
-                  v-model:value="isPassing"
-                  :text="$t('login.sliderText')"
-                  textColor="var(--art-gray-700)"
-                  :successText="$t('login.sliderSuccessText')"
-                  progressBarBg="var(--main-color)"
-                  :background="isDark ? '#26272F' : '#F1F1F4'"
-                  handlerBg="var(--default-box-color)"
-                />
-              </div>
-              <p
-                class="absolute top-0 z-[1] px-px mt-2 text-xs text-[#f56c6c] tad-300"
-                :class="{ 'translate-y-10': !isPassing && isClickPass }"
-              >
-                {{ $t('login.placeholder.slider') }}
-              </p>
-            </div>
-
-            <div class="flex-cb mt-2 text-sm">
-              <ElCheckbox v-model="formData.rememberPassword">{{
-                $t('login.rememberPwd')
-              }}</ElCheckbox>
-              <RouterLink class="text-theme" :to="{ name: 'ForgetPassword' }">{{
-                $t('login.forgetPwd')
-              }}</RouterLink>
-            </div>
-
-            <div style="margin-top: 30px">
-              <ElButton
-                class="w-full custom-height"
-                type="primary"
-                @click="handleSubmit"
-                :loading="loading"
-                v-ripple
-              >
-                {{ $t('login.btnText') }}
-              </ElButton>
-            </div>
-
-            <div class="mt-5 text-sm text-gray-600">
-              <span>{{ $t('login.noAccount') }}</span>
-              <RouterLink class="text-theme" :to="{ name: 'Register' }">{{
-                $t('login.register')
-              }}</RouterLink>
-            </div>
-          </ElForm>
+          <h3 class="title">登录 IT 项目管理台</h3>
+          <p class="sub-title">通过钉钉登录，权限由企业组织身份自动分配。</p>
+          <div class="mt-8" aria-live="polite" :aria-busy="busy">
+            <p v-if="busy" class="mb-5" role="status">正在确认你的身份…</p>
+            <ElAlert v-if="error" class="mb-5" :title="error" type="error" :closable="false" />
+            <ElButton
+              v-if="desktopDingTalk || error"
+              class="w-full custom-height mb-4"
+              type="primary"
+              :loading="busy"
+              @click="start()"
+              >{{ desktopDingTalk ? '重新登录' : '重新检查登录配置' }}</ElButton
+            >
+            <ElButton
+              v-if="config?.enabled && config.clientId && config.corpId"
+              class="!ml-0 w-full custom-height"
+              :type="desktopDingTalk ? 'default' : 'primary'"
+              :disabled="busy"
+              @click="scanLogin"
+              >钉钉扫码登录</ElButton
+            >
+            <p class="mt-4 text-sm text-g-600">仅限本公司成员使用；授权失败请重试或联系管理员。</p>
+          </div>
+          <LiveLogin v-if="LiveLogin" class="mt-5" />
         </div>
       </div>
     </div>
@@ -108,177 +37,74 @@
 </template>
 
 <script setup lang="ts">
-  import AppConfig from '@/config'
-  import { useUserStore } from '@/store/modules/user'
-  import { useI18n } from 'vue-i18n'
-  import { HttpError } from '@/utils/http/error'
-  import { fetchLogin } from '@/api/auth'
-  import { ElNotification, type FormInstance, type FormRules } from 'element-plus'
-  import { useSettingStore } from '@/store/modules/setting'
+  import { defineAsyncComponent, onMounted, onBeforeUnmount } from 'vue'
+  import { useRouter } from 'vue-router'
+  import LoginLeftView from '@/components/core/views/login/LoginLeftView.vue'
+  import AuthTopBar from '@/components/core/views/login/AuthTopBar.vue'
+  import { usePrototypeStore } from '@/store/modules/prototype'
+  import { syncPrototypeShell } from '@/prototype/sync-shell'
+  import { getHomePath } from '@/router/access'
+  import { useDingTalkLogin } from '@/hooks/business/use-dingtalk-login'
+  import { dingTalkStartUrl } from '@/services/dingtalk-auth'
+  import { isDesktopDingTalk } from '@/utils/dingtalk/runtime'
+  import { isSupportedDevice } from '@/utils/device'
 
   defineOptions({ name: 'Login' })
-
-  const settingStore = useSettingStore()
-  const { isDark } = storeToRefs(settingStore)
-  const { t, locale } = useI18n()
-  const formKey = ref(0)
-
-  // 监听语言切换，重置表单
-  watch(locale, () => {
-    formKey.value++
-  })
-
-  type AccountKey = 'super' | 'admin' | 'user'
-
-  export interface Account {
-    key: AccountKey
-    label: string
-    userName: string
-    password: string
-    roles: string[]
-  }
-
-  const accounts = computed<Account[]>(() => [
-    {
-      key: 'super',
-      label: t('login.roles.super'),
-      userName: 'Super',
-      password: '123456',
-      roles: ['R_SUPER']
-    },
-    {
-      key: 'admin',
-      label: t('login.roles.admin'),
-      userName: 'Admin',
-      password: '123456',
-      roles: ['R_ADMIN']
-    },
-    {
-      key: 'user',
-      label: t('login.roles.user'),
-      userName: 'User',
-      password: '123456',
-      roles: ['R_USER']
-    }
-  ])
-
-  const dragVerify = ref()
-
-  const userStore = useUserStore()
+  const LiveLogin =
+    import.meta.env.MODE === 'live'
+      ? defineAsyncComponent(() => import('@/components/system/live-user-controls.vue'))
+      : null
+  const store = usePrototypeStore()
   const router = useRouter()
-  const route = useRoute()
-  const isPassing = ref(false)
-  const isClickPass = ref(false)
-
-  const systemName = AppConfig.systemInfo.name
-  const formRef = ref<FormInstance>()
-
-  const formData = reactive({
-    account: '',
-    username: '',
-    password: '',
-    rememberPassword: true
+  const desktopDingTalk = isDesktopDingTalk(window.navigator.userAgent)
+  const { busy, error, config, start, cancel } = useDingTalkLogin(async () => {
+    const target = window.location.hash.slice(1)
+    await store.refreshLive()
+    syncPrototypeShell(store.currentUser.role)
+    await router.replace(
+      target && target !== '/' && !target.startsWith('/auth/login')
+        ? target
+        : getHomePath(store.currentUser.role)
+    )
   })
-
-  const rules = computed<FormRules>(() => ({
-    username: [{ required: true, message: t('login.placeholder.username'), trigger: 'blur' }],
-    password: [{ required: true, message: t('login.placeholder.password'), trigger: 'blur' }]
-  }))
-
-  const loading = ref(false)
-
+  function scanLogin() {
+    if (busy.value || !config.value?.enabled || !isSupportedDevice()) return
+    window.location.assign(dingTalkStartUrl(window.location.hash))
+  }
   onMounted(() => {
-    setupAccount('super')
+    const authorizationFailed = new URLSearchParams(window.location.hash.split('?')[1]).has(
+      'dingError'
+    )
+    void start(!authorizationFailed).then(() => {
+      if (authorizationFailed && !error.value) error.value = '钉钉授权失败或已取消，请重新登录'
+    })
   })
-
-  // 设置账号
-  const setupAccount = (key: AccountKey) => {
-    const selectedAccount = accounts.value.find((account: Account) => account.key === key)
-    formData.account = key
-    formData.username = selectedAccount?.userName ?? ''
-    formData.password = selectedAccount?.password ?? ''
-  }
-
-  // 登录
-  const handleSubmit = async () => {
-    if (!formRef.value) return
-
-    try {
-      // 表单验证
-      const valid = await formRef.value.validate()
-      if (!valid) return
-
-      // 拖拽验证
-      if (!isPassing.value) {
-        isClickPass.value = true
-        return
-      }
-
-      loading.value = true
-
-      // 登录请求
-      const { username, password } = formData
-
-      const { token, refreshToken } = await fetchLogin({
-        userName: username,
-        password
-      })
-
-      // 验证token
-      if (!token) {
-        throw new Error('Login failed - no token received')
-      }
-
-      // 存储 token 和登录状态
-      userStore.setToken(token, refreshToken)
-      userStore.setLoginStatus(true)
-
-      // 登录成功处理
-      showLoginSuccessNotice()
-
-      // 获取 redirect 参数，如果存在则跳转到指定页面，否则跳转到首页
-      const redirect = route.query.redirect as string
-      router.push(redirect || '/')
-    } catch (error) {
-      // 处理 HttpError
-      if (error instanceof HttpError) {
-        // console.log(error.code)
-      } else {
-        // 处理非 HttpError
-        // ElMessage.error('登录失败，请稍后重试')
-        console.error('[Login] Unexpected error:', error)
-      }
-    } finally {
-      loading.value = false
-      resetDragVerify()
-    }
-  }
-
-  // 重置拖拽验证
-  const resetDragVerify = () => {
-    dragVerify.value.reset()
-  }
-
-  // 登录成功提示
-  const showLoginSuccessNotice = () => {
-    setTimeout(() => {
-      ElNotification({
-        title: t('login.success.title'),
-        type: 'success',
-        duration: 2500,
-        zIndex: 10000,
-        message: `${t('login.success.message')}, ${systemName}!`
-      })
-    }, 1000)
-  }
+  onBeforeUnmount(cancel)
 </script>
 
 <style scoped>
   @import './style.css';
-</style>
 
-<style lang="scss" scoped>
-  :deep(.el-select__wrapper) {
-    height: 40px !important;
+  /* 保留母版装饰的最终姿态，按设计规范取消首屏入场动效。 */
+  :deep(.login-left-view *),
+  :deep(.login-left-view *::before),
+  :deep(.login-left-view *::after) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :deep(.login-left-view *) {
+      transition: none !important;
+    }
+  }
+
+  .auth-right-wrap {
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+  }
+
+  .auth-right-wrap .form {
+    height: auto;
   }
 </style>

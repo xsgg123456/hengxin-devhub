@@ -114,6 +114,8 @@ for (const [role, person, route] of [
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
     await page.goto('/')
+    // Vite cold-start loads the Art modules after the document load event.
+    await expect(page.getByRole('button', { name: '切换演示身份' })).toBeVisible({ timeout: 20000 })
     if (role !== 'manager') await identity(page, person)
     await page.goto('/#/' + route)
     for (const width of [1024, 1280, 1440]) {

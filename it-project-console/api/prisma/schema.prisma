@@ -65,6 +65,7 @@ model User {
   departmentId     String?              @map("department_id")
   departmentRecord Department?          @relation(fields: [departmentId], references: [id], onDelete: Restrict)
   dingUserId       String?              @unique @map("ding_user_id")
+  dingUnionId      String?              @unique @map("ding_union_id")
   role             Role                 @default(BUSINESS)
   active           Boolean              @default(true)
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -202,6 +203,7 @@ model Attachment {
   @@map("attachments")
 }
 model NotificationOutbox {
+  deliveryLog NotificationLog?
   id             String       @id @default(cuid())
   recipientId    String       @map("recipient_id")
   recipient      User         @relation(fields: [recipientId], references: [id], onDelete: Restrict)

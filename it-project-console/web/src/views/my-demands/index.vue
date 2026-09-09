@@ -39,6 +39,13 @@
         ><ElButton @click="retry">重新加载</ElButton></ElAlert
       >
       <ElSkeleton v-if="loading" :rows="5" animated class="mb-5" />
+      <ElAlert
+        v-if="deepLinkError"
+        :title="deepLinkError"
+        type="warning"
+        class="mb-5"
+        @close="closeDetail"
+      />
       <DemandCharts
         v-if="!loading && !error"
         :statistics="statistics"
@@ -152,7 +159,7 @@
         @close="editing = false"
         @saved="editing = false"
       />
-      <DemandDetail v-if="detail" :demand="detail" @close="detail = undefined" />
+      <DemandDetail v-if="detail" :demand="detail" @close="closeDetail" />
       <DemandReview
         v-if="review"
         :demand="review"
@@ -183,6 +190,8 @@
     editing,
     selected,
     detail,
+    deepLinkError,
+    closeDetail,
     review,
     showDemand,
     userName,

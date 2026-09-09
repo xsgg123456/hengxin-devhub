@@ -10,6 +10,10 @@ await isolatedIntegration(async ({ run }) => {
     'src/modules/risks/risks.integration.test.ts',
     'src/modules/manager-grants/manager-grants.integration.test.ts',
     'src/modules/dashboard/dashboard.integration.test.ts',
+    'src/modules/dingtalk/directory.integration.test.ts',
+    'src/modules/dingtalk/auth.integration.test.ts',
+    'src/modules/notifications/notifications.integration.test.ts',
+    'src/modules/notifications/manager-risk-digest.integration.test.ts',
     '--maxWorkers=1',
     '--no-file-parallelism'
   ])

@@ -37,7 +37,7 @@
       <div
         class="geo-element circle-top-right animate-fade-in-down"
         style="animation-delay: 0.5"
-        @click="themeAnimation"
+        @click="!fixedTheme && themeAnimation($event)"
       ></div>
 
       <!-- 装饰点 -->
@@ -77,6 +77,7 @@
 
   // 定义 props
   defineProps<{
+    fixedTheme?: boolean
     hideContent?: boolean // 是否隐藏内容，只显示 logo
   }>()
 </script>

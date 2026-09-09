@@ -8,8 +8,9 @@ export class ManagerGrantService {
 
   async list(actor: Actor) {
     assertActive(actor)
+    const enterprise = await this.db.systemSetting.findUnique({ where: { key: 'dingtalk.directory' } })
     const grants = await this.db.managerGrant.findMany({
-      where: { active: true },
+      where: { active: true, ...(enterprise ? { user: { active: true, dingUnionId: { not: null } } } : {}) },
       include: { user: true, grantedBy: true },
       orderBy: { createdAt: 'asc' }
     })
@@ -26,10 +27,17 @@ export class ManagerGrantService {
 
   async candidates(actor: Actor) {
     assertManager(actor)
+    const enterprise = await this.db.systemSetting.findUnique({ where: { key: 'dingtalk.directory' } })
+    if (enterprise) {
+      const current = await this.db.user.findUnique({ where: { id: actor.id }, include: { managerGrant: true } })
+      if (!current?.active || !current.dingUnionId || current.role !== 'MANAGER' || !current.managerGrant?.active)
+        throw new AppError(403, 'FORBIDDEN', '需要有效管理人员权限')
+    }
     return this.db.user.findMany({
       where: {
         active: true,
         departmentId: { not: null },
+        ...(enterprise ? { dingUnionId: { not: null } } : {}),
         OR: [{ managerGrant: null }, { managerGrant: { active: false } }]
       },
       select: { id: true, name: true, department: true },
@@ -47,24 +55,25 @@ export class ManagerGrantService {
       async (tx) => {
         // Every roster mutation uses one lock: concurrent removals cannot both observe two managers.
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended('manager-grants', 0))::text`
+        const enterprise = await tx.systemSetting.findUnique({ where: { key: 'dingtalk.directory' } })
         const current = await tx.user.findUnique({
           where: { id: actor.id },
           include: { managerGrant: true }
         })
-        if (!current?.active || current.role !== 'MANAGER' || !current.managerGrant?.active)
+        if (!current?.active || current.role !== 'MANAGER' || !current.managerGrant?.active || (enterprise && !current.dingUnionId))
           throw new AppError(403, 'FORBIDDEN', '需要有效管理人员权限')
         const user = await tx.user.findUnique({
           where: { id: input.userId },
           include: { departmentRecord: true, managerGrant: true }
         })
-        if (!user || (input.enabled && (!user.active || !user.departmentRecord)))
+        if (!user || (input.enabled && (!user.active || !user.departmentRecord || (enterprise && !user.dingUnionId))))
           throw new AppError(422, 'INVALID_MEMBER', '请选择有效的公司组织成员')
         const oldEnabled = user.managerGrant?.active ?? false
         if (oldEnabled === input.enabled)
           throw new AppError(409, 'GRANT_CONFLICT', '名单已更新，请刷新后重试')
-        if (!input.enabled && user.active) {
+        if (!input.enabled && user.active && (!enterprise || user.dingUnionId)) {
           const count = await tx.managerGrant.count({
-            where: { active: true, user: { active: true } }
+            where: { active: true, user: { active: true, ...(enterprise ? { dingUnionId: { not: null } } : {}) } }
           })
           if (count <= 1) throw new AppError(409, 'LAST_MANAGER', '至少保留一名有效管理人员')
         }

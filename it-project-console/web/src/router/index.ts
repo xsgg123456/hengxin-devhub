@@ -13,6 +13,12 @@ export const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     {
+      path: '/auth/login',
+      name: 'Login',
+      component: () => import('@/views/auth/login/index.vue'),
+      meta: { title: '企业登录' }
+    },
+    {
       path: '/',
       name: 'PrototypeLayout',
       component: () => import('@/views/index/index.vue'),
@@ -35,6 +41,8 @@ router.beforeEach(async (to, from) => {
   if (!isSupportedDevice()) return true
   const prototypeStore = usePrototypeStore()
   prototypeStore.initialize()
+  // 未鉴权时保留深链，等待登录完成后再按服务端身份判断权限。
+  if (!prototypeStore.ready && import.meta.env.MODE !== 'prototype') return true
   if (to.fullPath !== from.fullPath && prototypeStore.uploading) return false
   if (to.fullPath !== from.fullPath && prototypeStore.hasUnsavedChanges) {
     if (prototypeStore.saving || prototypeStore.uploading) return false
@@ -49,7 +57,8 @@ router.beforeEach(async (to, from) => {
       return false
     }
   }
-  if (to.path === '/') return getHomePath(prototypeStore.currentUser.role)
+  if (to.path === '/' || to.path === '/auth/login')
+    return getHomePath(prototypeStore.currentUser.role)
 
   const allowedRoles = Array.isArray(to.meta.roles)
     ? to.meta.roles.filter(

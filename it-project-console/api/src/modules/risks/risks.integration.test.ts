@@ -42,6 +42,9 @@ it('并发扫描只写一个风险版本，同状态重扫不重复收件通知'
   ])
   await scanProjectRisks(db, now)
   expect(await db.notificationOutbox.count({ where: { projectId: row.id } })).toBe(2)
+  await scanProjectRisks(db, new Date(now.getTime()+86400000))
+  expect((await db.project.findUniqueOrThrow({where:{id:row.id}})).risks).toContain('环节延期 3 天')
+  expect(await db.notificationOutbox.count({where:{projectId:row.id}})).toBe(2)
   await db.$transaction(async (tx) => {
     await tx.project.update({
       where: { id: row.id },

@@ -5,8 +5,7 @@
     <div
       v-else-if="!prototypeStore.ready && (prototypeStore.authRequired || prototypeStore.loadError)"
     >
-      <LiveLogin v-if="LiveLogin && prototypeStore.authRequired" />
-      <ProductionAuthBoundary v-else-if="prototypeStore.authRequired" />
+      <ProductionLogin v-if="prototypeStore.authRequired" />
       <ElResult v-else icon="error" title="服务连接失败" :sub-title="prototypeStore.loadError">
         <template #extra><ElButton @click="retryLive">重新连接</ElButton></template>
       </ElResult>
@@ -30,14 +29,10 @@
   import { isSupportedDevice } from '@/utils/device'
   import { initializeTheme } from '@/hooks/core/useTheme'
   import UnsupportedDevice from '@/components/system/unsupported-device.vue'
-  import ProductionAuthBoundary from '@/components/system/production-auth-boundary.vue'
+  const ProductionLogin = defineAsyncComponent(() => import('@/views/auth/login/index.vue'))
   const PrototypeDataError =
     import.meta.env.MODE === 'prototype'
       ? defineAsyncComponent(() => import('@/components/system/prototype-data-error.vue'))
-      : null
-  const LiveLogin =
-    import.meta.env.MODE === 'live'
-      ? defineAsyncComponent(() => import('@/components/system/live-user-controls.vue'))
       : null
 
   const router = useRouter()

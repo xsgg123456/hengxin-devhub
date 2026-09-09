@@ -9,7 +9,7 @@
     </div>
 
     <div class="flex-cc gap-1.5 mr-2 max-sm:mr-5">
-      <div class="color-picker-expandable relative flex-c max-sm:!hidden">
+      <div v-if="!fixedTheme" class="color-picker-expandable relative flex-c max-sm:!hidden">
         <div
           class="color-dots absolute right-0 rounded-full flex-c gap-2 rounded-5 px-2.5 py-2 pr-9 pl-2.5 opacity-0"
         >
@@ -57,7 +57,7 @@
         </template>
       </ElDropdown>
       <div
-        v-if="shouldShowThemeToggle"
+        v-if="!fixedTheme && shouldShowThemeToggle"
         class="btn theme-btn h-8 w-8 c-p flex-cc tad-300"
         @click="themeAnimation"
       >
@@ -81,6 +81,7 @@
   import AppConfig from '@/config'
 
   defineOptions({ name: 'AuthTopBar' })
+  defineProps<{ fixedTheme?: boolean }>()
 
   const settingStore = useSettingStore()
   const userStore = useUserStore()

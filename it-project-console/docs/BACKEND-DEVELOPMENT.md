@@ -48,7 +48,7 @@ pnpm dev:live
 
 `GET /api/workspace` 返回当前会话可读的真实用户、需求、项目及阶段历史，兼容既有页面 DTO。需求使用 POST 创建、PATCH 修改、POST `/:id/withdraw` 撤回和 DELETE 删除。管理人员通过 POST `/api/demands/:id/review` 评估；POST `/api/projects` 直接立项。
 
-每个写命令携带 `requestId`，修改还携带 `version`。相同请求重试返回已提交结果；同请求号不同内容或过期版本返回409。通知只写入 outbox，Phase 9 前不会发送钉钉消息。真实模式可更新进度、纠正、完成归档和管理重开；管理员授权仍待后续身份管理阶段。原型保留原有演示交互。
+每个写命令携带 `requestId`，修改还携带 `version`。相同请求重试返回已提交结果；同请求号不同内容或过期版本返回409。业务事务写入 outbox，独立通知任务按配置投递。真实模式可更新进度、纠正、完成归档和管理重开；管理员授权由管理名单维护。原型保留原有演示交互。
 
 ## 进度、历史与风险
 
@@ -58,7 +58,7 @@ pnpm dev:live
 
 风险由服务端统一生成 `Project.risks/riskVersion` 和版本历史 `RiskSnapshot`，页面、待办和甘特读取同一快照。每次项目变更同事务重算，另由 node-cron 启动扫描并默认每分钟运行一次。`RISK_SCAN_CRON` 可改变扫描周期，时区固定 Asia/Shanghai；单实例 noOverlap、按数据库schema区分的 advisory lock 防止重复扫描。关闭服务等待在途风险事务。
 
-工作日与停更阈值从 `SystemSetting` 的 `risk-policy` JSON 读取，默认 `{ "staleWorkdays": 3, "weekdays": [1,2,3,4,5] }`。工作日采用周一至周五，暂未接公司节假日日历。工程师仅收到自己主责项目的临期、延期、停更、阻塞事件；管理人员接收风险集合变化事件，业务人员不接风险事件。空风险不写通知，风险解除仍保留快照历史，再次出现会分配新版本。Phase 9 前仅写 outbox，不实际投递消息。
+工作日与停更阈值从 `SystemSetting` 的 `risk-policy` JSON 读取，默认 `{ "staleWorkdays": 3, "weekdays": [1,2,3,4,5] }`。工作日采用周一至周五，暂未接公司节假日日历。工程师仅收到自己主责项目的临期、延期、停更、阻塞事件；管理人员接收风险集合变化汇总，业务人员不接风险事件。空风险不写通知，风险解除仍保留快照历史，再次出现会分配新版本。仅天数增长更新显示快照，不重复通知相同风险状态；实际投递默认关闭。
 
 Prisma模型按职责拆在 `prisma/schema.prisma` 与 `prisma/progress.prisma`，配置指定同一个prisma目录；迁移目录仍是 `prisma/migrations`，没有新建数据库或第二套客户端。[Prisma多文件配置](https://docs.prisma.io/docs/orm/reference/prisma-config-reference)、[node-cron调度文档](https://nodecron.com/scheduling-options)用于本期实现核对。
 
@@ -70,7 +70,11 @@ Prisma模型按职责拆在 `prisma/schema.prisma` 与 `prisma/progress.prisma`�
 
 负载和甘特要求 `month=YYYY-MM`；负载区分主责与协作，逾期在途项目仍占用当月人力。甘特保留完整计划区间计算的进度比例，裁剪当前月显示。需求统计支持范围、关键词、状态、部门和提出人，草稿无提交日期不计入月趋势。
 
-`GET /api/manager-grants` 全员只读，`GET /api/manager-grants/candidates` 及 `POST /api/manager-grants` 限有效管理员；写入 `{ userId, enabled, requestId: UUID }`。事务锁保证并发撤权后至少一名有效管理员，记录新旧角色与操作者；撤权后同一会话立即使用部门默认角色。候选来自已登记有效组织用户，真实钉钉组织同步仍由 Phase 9 完成。
+`GET /api/manager-grants` 全员只读，`GET /api/manager-grants/candidates` 及 `POST /api/manager-grants` 限有效管理员；写入 `{ userId, enabled, requestId: UUID }`。事务锁保证并发撤权后至少一名有效管理员，记录新旧角色与操作者；撤权后同一会话立即使用部门默认角色。完成钉钉同步后，候选、授权与最后管理员保护采用已绑定有效企业成员口径，样例授权不充当企业管理员。
+
+## Phase 9 钉钉接入
+
+复用旧项目 Token、组织分页、免登/扫码和工作通知逻辑，适配当前 Cookie 会话及持久队列。配置、同步周期、一次性首位管理员、消息重试与企业验收边界见 [DINGTALK-INTEGRATION.md](DINGTALK-INTEGRATION.md)。未配置企业凭据时保留本地开发入口，生产登录明确显示配置缺失；通知默认关闭。
 
 前端原位复用 Art 图表、分页、名单弹窗与抽屉；筛选请求取消与乱序保护、失败重试沿现有 API Cookie 边界，不回退 mock。[Vue watch 清理](https://vuejs.org/guide/essentials/watchers.html)、[Element Plus 分页](https://element-plus.org/en-US/component/pagination.html)用于实现核对。
 

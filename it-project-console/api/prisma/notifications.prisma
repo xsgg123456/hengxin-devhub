@@ -1,0 +1,12 @@
+model NotificationLog {
+  id String @id @default(cuid())
+  outboxId String @unique @map("outbox_id")
+  outbox NotificationOutbox @relation(fields: [outboxId], references: [id], onDelete: Cascade)
+  state String
+  taskId String? @map("task_id")
+  safeError String? @map("safe_error")
+  sentAt DateTime? @map("sent_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@map("notification_logs")
+}

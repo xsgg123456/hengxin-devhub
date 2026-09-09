@@ -1,0 +1,8 @@
+model AuthChallenge {
+  id String @id
+  returnTo String @map("return_to")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([expiresAt])
+  @@map("auth_challenges")
+}

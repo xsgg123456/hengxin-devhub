@@ -18,6 +18,14 @@ const schema = z
       .default('false')
       .transform((v) => v === 'true'),
     SESSION_HOURS: z.coerce.number().int().min(1).max(24).default(8),
+    DINGTALK_CLIENT_ID: z.string().trim().default(''),
+    DINGTALK_CLIENT_SECRET: z.string().trim().default(''),
+    DINGTALK_CORP_ID: z.string().trim().default(''),
+    DINGTALK_AGENT_ID: z.string().trim().default(''),
+    DINGTALK_REDIRECT_URI: z.union([z.literal(''), z.string().url()]).default(''),
+    BOOTSTRAP_ADMIN_DING_USER_ID: z.string().trim().default(''),
+    DINGTALK_NOTIFICATIONS_ENABLED: z.enum(['true', 'false']).default('false').transform(v => v === 'true'),
+    DINGTALK_MANAGER_DIGEST_TIME: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('09:00'),
     S3_ENDPOINT: z.string().url(),
     S3_PUBLIC_ENDPOINT: z.string().url(),
     S3_REGION: z.string().default('us-east-1'),
@@ -38,6 +46,10 @@ const schema = z
       .default(50 * 1024 * 1024)
   })
   .superRefine((v, context) => {
+    if (v.DINGTALK_NOTIFICATIONS_ENABLED && (!v.DINGTALK_CLIENT_ID || !v.DINGTALK_CLIENT_SECRET || !v.DINGTALK_CORP_ID || !/^\d+$/.test(v.DINGTALK_AGENT_ID) || Number(v.DINGTALK_AGENT_ID) <= 0))
+      context.addIssue({code:'custom',path:['DINGTALK_NOTIFICATIONS_ENABLED'],message:'通知投递需要完整钉钉企业应用配置'})
+    if (v.NODE_ENV === 'production' && v.DINGTALK_REDIRECT_URI && !v.DINGTALK_REDIRECT_URI.startsWith('https://'))
+      context.addIssue({code:'custom',path:['DINGTALK_REDIRECT_URI'],message:'生产回调必须使用HTTPS'})
     if (new URL(v.WEB_ORIGIN).origin !== v.WEB_ORIGIN)
       context.addIssue({
         code: 'custom',

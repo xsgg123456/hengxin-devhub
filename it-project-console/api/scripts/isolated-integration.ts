@@ -41,6 +41,11 @@ const isolated = {
   ...process.env,
   NODE_ENV: 'test',
   DEV_LOGIN: 'true',
+  DINGTALK_CLIENT_ID: '',
+  DINGTALK_CLIENT_SECRET: '',
+  DINGTALK_CORP_ID: '',
+  DINGTALK_REDIRECT_URI: '',
+  DINGTALK_NOTIFICATIONS_ENABLED: 'false',
   DATABASE_URL: database.toString(),
   S3_BUCKET: bucket
 }

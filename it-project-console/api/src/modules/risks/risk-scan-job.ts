@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { riskState } from './risk-state.js'
 import type { Prisma, PrismaClient } from '../../generated/prisma/client.js'
 import { computeRisks, defaultRiskPolicy, type RiskPolicy } from './risk-engine.js'
 const policySchema = z
@@ -30,7 +31,7 @@ export async function refreshProjectRisks(
   const version = project.riskVersion + 1
   await tx.project.update({ where: { id }, data: { risks, riskVersion: version } })
   await tx.riskSnapshot.create({ data: { projectId: id, version, risks } })
-  if (!risks.length) return true
+  if (!risks.length || riskState(project.risks) === riskState(risks)) return true
   const managers = await tx.user.findMany({
     where: { role: 'MANAGER', active: true },
     select: { id: true }
@@ -47,7 +48,7 @@ export async function refreshProjectRisks(
     owner?.active &&
     owner.role === 'ENGINEER' &&
     ownerAlerts.length &&
-    JSON.stringify(previousAlerts) !== JSON.stringify(ownerAlerts)
+    riskState(previousAlerts) !== riskState(ownerAlerts)
   )
     recipients.add(owner.id)
   await tx.notificationOutbox.createMany({

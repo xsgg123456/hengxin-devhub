@@ -1,5 +1,6 @@
 import { runtimeConfig } from '@/config/runtime'
 import { useLiveQuery } from './use-live-query'
+import { useDemandDeepLink } from './use-demand-deep-link'
 import type { DemandStatistics } from '@/services/live-dashboard-types'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -29,6 +30,15 @@ export function useDemandPage() {
   const editing = ref(false)
   const selected = ref<DemoDemand>()
   const detail = ref<DemoDemand>()
+  const { deepLinkError, closeDetail } = useDemandDeepLink(
+    () => route.query.demandId,
+    () => prototypeStore.visibleDemands,
+    detail,
+    () => {
+      const { demandId: _demandId, ...query } = route.query
+      void router.replace({ query })
+    }
+  )
   const review = ref<DemoDemand>()
   const showDemand = (id: string) => {
     detail.value = prototypeStore.visibleDemands.find((d) => d.id === id)
@@ -140,6 +150,8 @@ export function useDemandPage() {
     editing,
     selected,
     detail,
+    deepLinkError,
+    closeDetail,
     review,
     showDemand,
     userName,
