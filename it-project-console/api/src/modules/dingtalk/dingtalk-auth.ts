@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { z } from 'zod'
 import type { PrismaClient } from '../../generated/prisma/client.js'
 import type { Env } from '../../config/env.js'
@@ -27,7 +27,7 @@ export function registerDingTalkAuth(app: FastifyInstance, db: PrismaClient, env
   const configured = () => {
     if (!dingConfigured(env)) throw new AppError(503, 'DINGTALK_NOT_CONFIGURED', '钉钉登录尚未配置，请联系管理员')
   }
-  const cookieOptions = {httpOnly:true,secure:env.NODE_ENV==='production',sameSite:'lax' as const,path:'/api/auth/dingtalk'}
+  const cookieOptions = {httpOnly:true,secure:env.NODE_ENV==='production',sameSite:'lax' as const,path:'/api/auth'}
   app.get('/api/auth/dingtalk/config', async (_, reply) => {
     reply.header('cache-control','no-store')
     return {data:{enabled:dingConfigured(env),clientId:env.DINGTALK_CLIENT_ID,corpId:env.DINGTALK_CORP_ID}}
@@ -44,7 +44,7 @@ export function registerDingTalkAuth(app: FastifyInstance, db: PrismaClient, env
       response_type:'code',scope:'openid',state,prompt:'consent'}).toString()
     return reply.header('cache-control','no-store').redirect(url.toString())
   })
-  app.get('/api/auth/dingtalk/callback', {config:{rateLimit:{max:20,timeWindow:'1 minute'}}}, async (request, reply) => {
+  const callback = async (request: FastifyRequest, reply: FastifyReply) => {
     reply.header('cache-control','no-store').header('referrer-policy','no-referrer')
     reply.clearCookie(cookieName,cookieOptions)
     try {
@@ -66,7 +66,10 @@ export function registerDingTalkAuth(app: FastifyInstance, db: PrismaClient, env
       // Never reflect provider errors, codes or state into the page or logs.
       return reply.redirect(env.WEB_ORIGIN+'/#/auth/login?dingError=authorization_failed')
     }
-  })
+  }
+  for (const path of ['/api/auth/callback/dingtalk', '/api/auth/dingtalk/callback']) {
+    app.get(path, {config:{rateLimit:{max:20,timeWindow:'1 minute'}}}, callback)
+  }
   app.post('/api/auth/dingtalk/h5', {config:{rateLimit:{max:10,timeWindow:'1 minute'}}}, async (request,reply) => {
     configured()
     const {code} = z.object({code:z.string().min(1).max(2048)}).strict().parse(request.body)

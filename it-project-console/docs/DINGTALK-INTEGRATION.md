@@ -16,7 +16,18 @@
 
 在 API 的本地 `.env` 或部署环境注入 `DINGTALK_CLIENT_ID`、`DINGTALK_CLIENT_SECRET`、`DINGTALK_CORP_ID`、`DINGTALK_AGENT_ID`。密钥仅在后端使用，不进入前端构建变量。
 
-`DINGTALK_REDIRECT_URI` 指向对外可访问的 `/api/auth/dingtalk/callback`，必须与开放平台登录配置一致。生产使用 HTTPS；`WEB_ORIGIN` 为业务前端 origin。公开 `/api/auth/dingtalk/config` 只返回 Client ID、Corp ID 和是否已配置。
+`DINGTALK_REDIRECT_URI` 沿用旧应用对外可访问的 `/api/auth/callback/dingtalk`，与开放平台现有登录配置一致。生产使用 HTTPS；`WEB_ORIGIN` 为业务前端 origin。公开 `/api/auth/dingtalk/config` 只返回 Client ID、Corp ID 和是否已配置。
+
+2026-09-09 用户确认沿用旧入口并在正式切换后替代旧系统：
+
+```env
+WEB_ORIGIN=https://pmg.qhhengxin.top:8443
+DINGTALK_REDIRECT_URI=https://pmg.qhhengxin.top:8443/api/auth/callback/dingtalk
+```
+
+按用户最终确认，正式回调直接沿用旧系统 `/api/auth/callback/dingtalk`，无需为路径变化修改钉钉后台；同时兼容此前新路径 `/api/auth/dingtalk/callback`。现有应用凭据已在服务器运行环境中确认存在，密钥不写入文档。当前尚未切换代理或停用旧应用；正式入口切换安排见根目录 `DEV-PLAN.md` Phase 10。
+
+旧配置 `DINGTALK_APP_KEY/SECRET` 自动映射到 `DINGTALK_CLIENT_ID/SECRET`，`NEXTAUTH_URL` 自动映射到 `WEB_ORIGIN`，未指定回调时从该访问地址生成旧回调。非空的新配置优先；`DINGTALK_CORP_ID/AGENT_ID`、S3 同名配置保留。仅复用所需配置，不启用旧 AI/机器人等无关功能；数据库结构和 NextAuth 会话不同，不能将旧库及会话密钥直接当成新系统的数据和登录状态。切换后首次访问需重新进行钉钉认证。
 
 `BOOTSTRAP_ADMIN_DING_USER_ID` 指定已验证企业员工。完整同步后首次初始化；本地样例管理授权不阻止企业初始化，已有企业管理名单（含撤销记录）不得被环境变量重新授予。首位企业管理员缺失会输出脱敏告警。
 

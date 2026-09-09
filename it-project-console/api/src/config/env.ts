@@ -50,7 +50,7 @@ const schema = z
       context.addIssue({code:'custom',path:['DINGTALK_NOTIFICATIONS_ENABLED'],message:'通知投递需要完整钉钉企业应用配置'})
     if (v.NODE_ENV === 'production' && v.DINGTALK_REDIRECT_URI && !v.DINGTALK_REDIRECT_URI.startsWith('https://'))
       context.addIssue({code:'custom',path:['DINGTALK_REDIRECT_URI'],message:'生产回调必须使用HTTPS'})
-    if (new URL(v.WEB_ORIGIN).origin !== v.WEB_ORIGIN)
+    if (!URL.canParse(v.WEB_ORIGIN) || new URL(v.WEB_ORIGIN).origin !== v.WEB_ORIGIN)
       context.addIssue({
         code: 'custom',
         path: ['WEB_ORIGIN'],
@@ -71,7 +71,16 @@ const schema = z
   })
 export type Env = z.infer<typeof schema>
 export function parseEnv(input: NodeJS.ProcessEnv): Env {
-  const result = schema.safeParse(input)
+  const nonempty = (value: string | undefined) => value?.trim() || undefined
+  const origin = nonempty(input.WEB_ORIGIN) ?? nonempty(input.NEXTAUTH_URL)?.replace(/\/$/, '')
+  const result = schema.safeParse({
+    ...input,
+    WEB_ORIGIN: origin,
+    DINGTALK_CLIENT_ID: nonempty(input.DINGTALK_CLIENT_ID) ?? nonempty(input.DINGTALK_APP_KEY),
+    DINGTALK_CLIENT_SECRET: nonempty(input.DINGTALK_CLIENT_SECRET) ?? nonempty(input.DINGTALK_APP_SECRET),
+    DINGTALK_REDIRECT_URI: nonempty(input.DINGTALK_REDIRECT_URI) ??
+      (origin ? `${origin}/api/auth/callback/dingtalk` : '')
+  })
   if (!result.success)
     throw new Error(
       `配置无效：${[...new Set(result.error.issues.map((i) => i.path.join('.')))].join(', ')}`

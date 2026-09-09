@@ -34,3 +34,15 @@
 需要企业应用凭据、回调域名/开放平台配置和指定测试收件人后，验证电脑钉钉免登、真实扫码、应用可见范围与组织权限、消息送达及深链。当前测试使用模拟远端响应与隔离数据库，不能替代真实企业联调。
 
 实际通知默认关闭，未发送外部消息；旧项目及其生产环境未修改，当前样例业务记录保留。配置与复用映射见 [DINGTALK-INTEGRATION.md](DINGTALK-INTEGRATION.md)。
+
+## 旧生产配置兼容复核（2026-09-09）
+
+按用户确认，正式切换沿用旧域名、端口、钉钉应用和回调，不再要求补配钉钉后台。新代码兼容 `DINGTALK_APP_KEY/SECRET`、`NEXTAUTH_URL`；两条回调使用同一个处理函数与一次性挑战，Cookie Path 为 `/api/auth`，覆盖旧 `/api/auth/callback/dingtalk` 与此前新路径。
+
+- 只读取得旧生产容器环境变量，在本机仅调用新 `parseEnv`：解析成功，访问 origin 与旧回调均保持原值，旧/新凭据别名一致，开发登录及通知关闭。未启动连接旧数据库的新应用，未将密钥写入文件或日志。
+- `pnpm check`：Web 128 项 + API 55 项单测、前后端类型检查和构建通过；新测试覆盖旧别名、优先级、HTTPS/origin 校验和错误脱敏。
+- 隔离集成：12 文件、69 项通过，覆盖两路径成功登录、Cookie 绑定、跨路径重放拒绝、过期与停用用户；旧凭据别名也在隔离入口清空。
+- 真实后端浏览器 7 项通过（1.3 分钟），隔离资源已回收。日志：`output/legacy-config-check.log`、`output/legacy-config-integration.log`、`output/legacy-config-browser.log`。
+- 本轮独立审查 Stage 1 PASS、Stage 2 PASS，无 HIGH/MEDIUM；已复核旧项目原回调与凭据别名、Cookie 路径、跨路径防重放及切换边界。
+
+以上是接入配置兼容性证据。旧数据库结构、附件存量、首位管理员以及旧 NextAuth 会话不因此自动迁移；生产切换与真实钉钉验收仍按 Phase 10 执行。
