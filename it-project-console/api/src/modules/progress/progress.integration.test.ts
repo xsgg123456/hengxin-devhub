@@ -73,12 +73,14 @@ describe('进度、阶段、纠正和生命周期真实事务', () => {
     expect((await db.stageHistory.findUniqueOrThrow({ where: { id: old.id } })).completedAt).toEqual(old.completedAt)
     expect(await db.stageHistory.count({ where: { projectId: id, stage: '方案设计', enteredAt: { not: null } } })).toBe(2)
     expect(await db.stageHistory.count({ where: { projectId: id, stage: '开发编码', interruptedAt: { not: null } } })).toBe(1)
-    expect((await action(id, 4, 'delete')).statusCode).toBe(409)
+    expect((await action(id, 4, 'delete', owner)).statusCode).toBe(403)
     expect((await action(id, 4, 'cancel')).statusCode).toBe(200)
     expect((await call(url, overall(5))).statusCode).toBe(409)
     expect((await action(id, 5, 'archive')).statusCode).toBe(200)
     expect((await action(id, 6, 'reopen')).statusCode).toBe(200)
     expect((await call(url, overall(7))).statusCode).toBe(200)
+    expect((await action(id, 8, 'delete')).statusCode).toBe(200)
+    expect(await db.project.findUnique({ where: { id } })).toBeNull()
   })
   it('依序完成验收后只有主责可关闭，直接项目不伪造收件人，重开保留完成历史', async () => {
     const id = await create(), url = `/api/projects/${id}/progress`
@@ -114,12 +116,18 @@ describe('进度、阶段、纠正和生命周期真实事务', () => {
     expect(await db.stageHistory.count({ where: { projectId: id, stage: '验收交付', completedAt: { not: null } } })).toBe(2)
     expect((await db.stageHistory.findUniqueOrThrow({ where: { id: previous.id } })).completedAt).toEqual(previous.completedAt)
   })
-  it('关联需求删除恢复待评估version递增；完成通知同事务，故障整体回滚后可重试', async () => {
+  it('关联项目删除同时删除需求；完成通知同事务，故障整体回滚后可重试', async () => {
     async function approved() {
       const response = await call('/api/demands', { requestId: key(), name: '完成需求', description: '说明', expectedLaunchDate: '2099-12-01',
-        prd: { kind: 'link', url: 'https://example.com/prd' }, prototype: { kind: 'link', url: 'https://example.com/prototype' }, submit: true }, business)
+        prd: { kind: 'link', url: 'https://example.com/prd' }, prototype: { kind: 'link', url: 'https://example.com/prototype' }, submit: false }, business)
       expect(response.statusCode, response.body).toBe(200)
       const demandId = response.json<{ data: { id: string } }>().data.id
+      const upload = await call('/api/attachments/upload', { demandId, kind: 'FILE', name: '完成需求.bin', mime: 'application/octet-stream', size: 12 }, business)
+      expect(upload.statusCode, upload.body).toBe(200)
+      const ticket = upload.json<{ data: { attachmentId: string; uploadUrl: string; headers: Record<string, string> } }>().data
+      expect((await fetch(ticket.uploadUrl, { method: 'PUT', headers: ticket.headers, body: 'hello world!' })).status).toBe(200)
+      expect((await call(`/api/attachments/${ticket.attachmentId}/confirm`, {}, business)).statusCode).toBe(200)
+      await db.demand.update({ where: { id: demandId }, data: { attachmentIds: [ticket.attachmentId], status: 'PENDING', submittedAt: new Date() } })
       const review = await call(`/api/demands/${demandId}/review`, { requestId: key(), version: 1, decision: 'approve', priority: 'P1',
         primaryOwnerId: owner, collaboratorIds: [], originalLaunchDate: '2099-11-01', originalDeliveryDate: '2099-12-01', stageExpectedDate: '2099-10-01' }, manager)
       expect(review.statusCode, review.body).toBe(200)
@@ -127,7 +135,7 @@ describe('进度、阶段、纠正和生命周期真实事务', () => {
     }
     const removed = await approved()
     expect((await action(removed.projectId, 1, 'delete')).statusCode).toBe(200)
-    expect(await db.demand.findUniqueOrThrow({ where: { id: removed.demandId } })).toMatchObject({ status: 'PENDING', version: 3, reviewedAt: null, reviewedBy: null })
+    expect(await db.demand.findUnique({ where: { id: removed.demandId } })).toBeNull()
     const { projectId: id, demandId } = await approved()
     for (let version = 1; version <= 5; version++)
       expect((await call(`/api/projects/${id}/progress`, overall(version, { status: 'completed', nextStageExpectedDate: '2099-11-01' }))).statusCode).toBe(200)

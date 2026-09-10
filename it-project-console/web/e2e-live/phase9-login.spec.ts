@@ -29,6 +29,9 @@ test('扫码入口携带站内深链，授权失败显示重试',async({page})=>
   expect(new URL(startUrl).searchParams.get('returnTo')).toBe('/#/project-overview?projectId=fixture')
   await page.goto('/#/auth/login?dingError=authorization_failed')
   await expect(page.getByText('钉钉授权失败或已取消，请重新登录',{exact:true})).toBeVisible()
+  await page.getByRole('button',{name:'钉钉扫码登录',exact:true}).click()
+  await expect(page.getByText('隔离授权跳转检查')).toBeVisible()
+  expect(new URL(startUrl).searchParams.get('returnTo')).toBe('/#/')
 })
 
 test('手机即使桌面宽度也不请求业务API',async({browser})=>{

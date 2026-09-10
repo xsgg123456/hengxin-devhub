@@ -24,13 +24,19 @@
       class="mb-5"
     />
     <MaterialSummary :demand="demand" />
-    <template #footer><ElButton @click="emit('close')">关闭</ElButton></template>
+    <template #footer
+      ><DemandLifecycleActions :demand="demand" @deleted="emit('close')" /><ElButton
+        @click="emit('close')"
+        >关闭</ElButton
+      ></template
+    >
   </ElDrawer>
 </template>
 <script setup lang="ts">
   import { computed } from 'vue'
   import type { DemoDemand } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'
+  import DemandLifecycleActions from './demand-lifecycle-actions.vue'
   import MaterialSummary from './material-summary.vue'
   const props = defineProps<{ demand: DemoDemand }>()
   const emit = defineEmits<{ close: [] }>()

@@ -39,6 +39,8 @@ export const mapDemand = (demand: Demand & { attachments: Attachment[] }) => {
     department: demand.department,
     submitterId: demand.ownerId,
     expectedLaunchDate: date(demand.expectedLaunchDate),
+    attachmentIds: demand.attachmentIds,
+    attachments: demand.attachmentIds.map(id => material(null, id)).filter(file => file !== null),
     prd: material(demand.prdUrl, demand.prdAttachmentId),
     prototype: material(demand.prototypeUrl, demand.prototypeAttachmentId),
     status: demand.status === 'APPROVED' ? 'established' : demand.status.toLowerCase(),

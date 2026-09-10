@@ -32,21 +32,46 @@ export function projectState(project: DemoProject) {
     overallProgress: project.overallProgress
   }
 }
+function removeGroup(snapshot: PrototypeSnapshot, demandId?: string | null, projectId?: string) {
+  snapshot.database.demands = snapshot.database.demands.filter((row) => row.id !== demandId)
+  snapshot.database.projects = snapshot.database.projects.filter((row) => row.id !== projectId)
+  snapshot.database.progressUpdates = snapshot.database.progressUpdates.filter(
+    (row) => row.projectId !== projectId
+  )
+  snapshot.database.stageHistories = snapshot.database.stageHistories.filter(
+    (row) => row.projectId !== projectId
+  )
+  snapshot.database.scheduleChanges = snapshot.database.scheduleChanges.filter(
+    (row) => row.projectId !== projectId
+  )
+}
 export function actionDemand(snapshot: PrototypeSnapshot, input: DemandActionInput) {
   const actor = assertWrite(snapshot)
   const demand = snapshot.database.demands.find((row) => row.id === input.demandId)
   if (!demand) throw new WorkflowError('需求不存在')
-  if (demand.submitterId !== actor.id) throw new WorkflowError('只能维护本人需求')
   if (!['withdraw', 'delete'].includes(input.action)) throw new WorkflowError('需求操作无效')
-  const allowed =
-    input.action === 'delete' ? ['draft', 'pending', 'returned'] : ['pending', 'returned']
-  if (!allowed.includes(demand.status)) throw new WorkflowError('当前需求状态不允许此操作')
-  if (snapshot.database.projects.some((row) => row.demandId === demand.id))
-    throw new WorkflowError('已关联项目的需求不可撤回或删除')
+  const project = snapshot.database.projects.find((row) => row.demandId === demand.id)
+  if (input.action === 'delete') {
+    if (actor.role !== 'manager' && !(actor.role === 'business' && demand.submitterId === actor.id))
+      throw new WorkflowError('只有管理人员或需求本人业务提交人可以删除')
+    removeGroup(snapshot, demand.id, project?.id)
+    if (project)
+      recordLifecycle(snapshot, {
+        entityType: 'project',
+        entityId: project.id,
+        action: 'delete',
+        createdAt: input.now ?? new Date().toISOString(),
+        reason: '',
+        before: projectState(project),
+        after: { deleted: true }
+      })
+  } else {
+    if (demand.submitterId !== actor.id) throw new WorkflowError('只能维护本人需求')
+    if (!['pending', 'returned'].includes(demand.status) || project)
+      throw new WorkflowError('当前需求状态不允许撤回')
+  }
   const before = { status: demand.status, name: demand.name }
-  if (input.action === 'delete')
-    snapshot.database.demands = snapshot.database.demands.filter((row) => row.id !== demand.id)
-  else demand.status = 'withdrawn'
+  if (input.action === 'withdraw') demand.status = 'withdrawn'
   recordLifecycle(snapshot, {
     entityType: 'demand',
     entityId: demand.id,
@@ -69,12 +94,14 @@ export function actionProject(snapshot: PrototypeSnapshot, input: ProjectActionI
     if (project.status !== 'active' || project.archived) throw new WorkflowError('当前项目只读')
     if (project.stage !== '验收交付' || project.simpleStatus !== 'completed')
       throw new WorkflowError('须先完成验收交付阶段')
+  } else if (input.action === 'delete') {
+    const demand = snapshot.database.demands.find((row) => row.id === project.demandId)
+    if (
+      actor.role !== 'manager' &&
+      !(actor.role === 'business' && demand?.submitterId === actor.id)
+    )
+      throw new WorkflowError('只有管理人员或需求本人业务提交人可以删除')
   } else if (actor.role !== 'manager') throw new WorkflowError('只有管理人员可以执行此操作')
-  if (
-    input.action === 'delete' &&
-    snapshot.database.progressUpdates.some((row) => row.projectId === project.id)
-  )
-    throw new WorkflowError('已有进度记录，请取消或归档项目')
   if (input.action === 'cancel' && (project.status !== 'active' || project.archived))
     throw new WorkflowError('只有未归档的进行中项目可以取消')
   if (input.action === 'archive' && project.archived) throw new WorkflowError('项目已经归档')
@@ -87,20 +114,17 @@ export function actionProject(snapshot: PrototypeSnapshot, input: ProjectActionI
   const before = projectState(project)
   const now = input.now ?? new Date().toISOString()
   if (input.action === 'delete') {
-    snapshot.database.projects = snapshot.database.projects.filter((row) => row.id !== project.id)
-    snapshot.database.stageHistories = snapshot.database.stageHistories.filter(
-      (row) => row.projectId !== project.id
-    )
-    snapshot.database.scheduleChanges = snapshot.database.scheduleChanges.filter(
-      (row) => row.projectId !== project.id
-    )
-    const demand = snapshot.database.demands.find((row) => row.id === project.demandId)
-    if (demand) {
-      demand.status = 'pending'
-      demand.reviewReason = ''
-      delete demand.reviewedBy
-      delete demand.reviewedAt
-    }
+    removeGroup(snapshot, project.demandId, project.id)
+    if (project.demandId)
+      recordLifecycle(snapshot, {
+        entityType: 'demand',
+        entityId: project.demandId,
+        action: 'delete',
+        createdAt: now,
+        reason,
+        before: { projectId: project.id },
+        after: { deleted: true }
+      })
   } else {
     if (input.action === 'complete') {
       project.status = 'completed'

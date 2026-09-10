@@ -19,13 +19,13 @@ export class ApprovalService {
       if (input.decision === 'approve') {
         // Revalidate persisted materials, but the original submission date may now be in the past.
         if (!demand.name || !demand.description || !demand.expectedLaunchDate ||
-          !(demand.prdUrl || demand.prdAttachmentId) || !(demand.prototypeUrl || demand.prototypeAttachmentId))
+          !demand.attachmentIds.length)
           throw new AppError(400, 'MISSING_FIELDS', '需求材料不完整')
         await demandData(tx, id, {
           requestId: input.requestId, name: demand.name, description: demand.description, submit: false,
-          expectedLaunchDate: demand.expectedLaunchDate.toISOString().slice(0, 10),
-          prd: demand.prdAttachmentId ? { kind: 'file', attachmentId: demand.prdAttachmentId } : { kind: 'link', url: demand.prdUrl! },
-          prototype: demand.prototypeAttachmentId ? { kind: 'file', attachmentId: demand.prototypeAttachmentId } : { kind: 'link', url: demand.prototypeUrl! }
+          expectedLaunchDate: demand.expectedLaunchDate.toISOString().slice(0, 10), attachmentIds: demand.attachmentIds,
+          prd: demand.prdAttachmentId ? { kind: 'file', attachmentId: demand.prdAttachmentId } : demand.prdUrl ? { kind: 'link', url: demand.prdUrl } : null,
+          prototype: demand.prototypeAttachmentId ? { kind: 'file', attachmentId: demand.prototypeAttachmentId } : demand.prototypeUrl ? { kind: 'link', url: demand.prototypeUrl } : null
         })
         const project = await createProject(tx, { ...input, name: demand.name, department: demand.department }, id)
         const updated = await tx.demand.update({ where: { id }, data: {

@@ -107,7 +107,8 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
         (d.expectedLaunchDate === '' || date(d.expectedLaunchDate)) &&
         (d.submittedAt === '' || timestamp(d.submittedAt)) &&
         attachment(d.prd) &&
-        attachment(d.prototype)
+        attachment(d.prototype) &&
+        (d.attachments === undefined || (Array.isArray(d.attachments) && d.attachments.every(attachment)))
     )
   )
     return false

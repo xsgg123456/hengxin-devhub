@@ -26,7 +26,7 @@ export async function demandStatistics(
       (!q.keyword || `${d.name} ${d.id}`.toLowerCase().includes(q.keyword.toLowerCase()))
   )
   const attachmentIds = filtered
-    .flatMap((d) => [d.prdAttachmentId, d.prototypeAttachmentId])
+    .flatMap((d) => [...d.attachmentIds, d.prdAttachmentId, d.prototypeAttachmentId])
     .filter((id): id is string => !!id)
   const attachments = attachmentIds.length
     ? await tx.attachment.findMany({ where: { id: { in: attachmentIds }, status: 'READY' } })

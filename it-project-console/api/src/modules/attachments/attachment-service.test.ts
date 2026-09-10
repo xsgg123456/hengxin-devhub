@@ -13,7 +13,7 @@ const input: UploadInput = {
 }
 
 function setup() {
-  const demand = { id: 'demand', ownerId: 'owner', status: 'DRAFT' }
+  const demand = { id: 'demand', ownerId: 'owner', status: 'DRAFT', attachmentIds: [] as string[] }
   const attachment = {
     ...input,
     id: 'file',
@@ -87,26 +87,37 @@ describe('附件权限、预算和确认边界', () => {
     })
   })
 
-  it('拒绝伪类型、路径文件名、非整数、单文件及合计超限', async () => {
+  it('拒绝路径文件名、非整数、单文件及合计超限', async () => {
     const { service, db } = setup()
     for (const bad of [
-      { mime: 'text/html' },
       { name: '../x.pdf' },
       { size: 0.5 },
-      { size: 20 * 1024 * 1024 + 1 }
+      { size: 100 * 1024 * 1024 + 1 }
     ]) {
       await expect(service.requestUpload(actor, { ...input, ...bad })).rejects.toMatchObject({
         statusCode: 400
       })
     }
     db.attachment.aggregate.mockResolvedValue({
-      _sum: { size: 50 * 1024 * 1024 - 1 }
+      _sum: { size: 500 * 1024 * 1024 - 1 }
     })
     await expect(service.requestUpload(actor, input)).rejects.toMatchObject({
       code: 'DEMAND_STORAGE_LIMIT'
     })
     expect(db.attachment.create).not.toHaveBeenCalled()
     expect(db.$queryRaw).toHaveBeenCalled()
+  })
+
+  it('任意扩展名和空MIME可申请，空MIME签名采用通用二进制类型', async () => {
+    const { service, storage } = setup()
+    await service.requestUpload(actor, { ...input, kind: 'FILE', name: '设计源文件.unknown', mime: '' })
+    expect(storage.presignUpload).toHaveBeenCalledWith(expect.any(String), 'application/octet-stream', 12)
+  })
+  it('统一列表中已保存文件不能discard', async () => {
+    const { service, demand, db } = setup()
+    demand.attachmentIds = ['file']
+    await expect(service.discard(actor, 'file')).rejects.toMatchObject({ code: 'ATTACHMENT_IN_USE' })
+    expect(db.attachment.delete).not.toHaveBeenCalled()
   })
 
   it('大小/MIME伪造确认与Copy条件失败均保持可重试PENDING', async () => {

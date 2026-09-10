@@ -168,10 +168,10 @@ describe('真实PostgreSQL/MinIO附件闭环', () => {
     ).toBe(401)
   })
 
-  it('HTTP入口拒绝伪类型、单文件超限与其他用户写入', async () => {
+  it('HTTP入口拒绝路径文件名、单文件超限与其他用户写入', async () => {
     const item = await demand()
-    expect((await request(item.id, 12, { mime: 'application/pdf' })).statusCode).toBe(400)
-    expect((await request(item.id, 20 * 1024 * 1024 + 1)).statusCode).toBe(400)
+    expect((await request(item.id, 12, { name: '../invalid' })).statusCode).toBe(400)
+    expect((await request(item.id, 100 * 1024 * 1024 + 1)).statusCode).toBe(400)
     expect((await request(item.id, 12, {}, otherCookie)).statusCode).toBe(403)
     expect(await db.attachment.count({ where: { demandId: item.id } })).toBe(0)
     const upload = await ticket(item.id)
@@ -210,18 +210,18 @@ describe('真实PostgreSQL/MinIO附件闭环', () => {
     expect((await confirm(upload.attachmentId)).statusCode).toBe(200)
   })
 
-  it('并发申请在50MB预算下仅允许两份20MB保留记录', async () => {
+  it('并发申请在500MB预算下仅允许五份100MB保留记录', async () => {
     const item = await demand()
     const responses = await Promise.all(
-      Array.from({ length: 4 }, () => request(item.id, 20 * 1024 * 1024))
+      Array.from({ length: 7 }, () => request(item.id, 100 * 1024 * 1024))
     )
-    expect(responses.filter((response) => response.statusCode === 200)).toHaveLength(2)
+    expect(responses.filter((response) => response.statusCode === 200)).toHaveLength(5)
     expect(responses.filter((response) => response.statusCode === 400)).toHaveLength(2)
     const total = await db.attachment.aggregate({
       where: { demandId: item.id },
       _sum: { size: true }
     })
-    expect(total._sum.size).toBe(40 * 1024 * 1024)
+    expect(total._sum.size).toBe(500 * 1024 * 1024)
   })
 
   it('Head后对象被替换时条件Copy拒绝，数据库不产生假READY', async () => {

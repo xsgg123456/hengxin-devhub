@@ -28,9 +28,9 @@
         >
       </template>
     </div>
-    <div v-if="manager && (active || canDelete)" class="danger-actions">
+    <div v-if="(manager && active) || canDelete" class="danger-actions">
       <ElButton
-        v-if="active"
+        v-if="manager && active"
         type="danger"
         plain
         :disabled="store.saving || confirming"
@@ -43,7 +43,7 @@
         plain
         :disabled="store.saving || confirming"
         @click="act('delete')"
-        >删除误建项目</ElButton
+        >删除项目</ElButton
       >
     </div>
     <ElAlert v-if="error" class="mt-3" type="error" :title="error" :closable="false" />
@@ -81,19 +81,25 @@
       props.project.simpleStatus === 'completed'
   )
   const canDelete = computed(
-    () => !store.database?.progressUpdates.some((p) => p.projectId === props.project.id)
+    () =>
+      manager.value ||
+      (store.currentUser.role === 'business' &&
+        store.database?.demands.some(
+          (demand) =>
+            demand.id === props.project.demandId && demand.submitterId === store.currentUser.id
+        ))
   )
   const labels = {
     complete: '完成并归档',
     cancel: '取消项目',
     archive: '归档项目',
     reopen: '重新打开',
-    delete: '删除误建项目'
+    delete: '删除项目'
   }
   async function act(action: keyof typeof labels) {
-    if (store.saving || confirming.value) return
+    if (store.saving || confirming.value || (action === 'delete' && !canDelete.value)) return
     confirming.value = true
-    const target = props.project
+    const target = { ...props.project }
     error.value = ''
     let reason = reasons.get(action) ?? ''
     try {
@@ -101,7 +107,9 @@
         const result = await ElMessageBox.prompt(
           `项目「${target.name}」：` +
             (action === 'delete'
-              ? '删除不可恢复；关联需求将回到待评估。请填写误建原因。'
+              ? target.demandId
+                ? '将永久删除此项目及原需求、全部进度记录和附件，并取消待发送通知，无法恢复。请填写删除原因。'
+                : '将永久删除此项目及全部进度记录，并取消待发送通知，无法恢复。请填写删除原因。'
               : '取消后保留全部历史和材料。请填写原因。'),
           labels[action],
           {

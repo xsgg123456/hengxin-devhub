@@ -1,12 +1,13 @@
 import { PROJECT_STAGES, type PrototypeSnapshot } from '@/domain/prototype'
 import { isItDepartment } from '@/utils/it-department'
 import { computeProjectRisks } from './risk-service'
+import { demandMaterials } from './demand-materials'
 import {
   assertWrite,
   dateValue,
   nextId,
   textValue,
-  validateAttachment,
+  validateMaterials,
   WorkflowError
 } from './workflow-validation'
 export interface ProjectInput {
@@ -115,8 +116,7 @@ export function reviewDemand(snapshot: PrototypeSnapshot, input: ReviewInput) {
   if (demand.status !== 'pending') throw new WorkflowError('仅待评估需求可处理')
   if (input.decision === 'establish') {
     if (!input.project) throw new WorkflowError('请填写立项信息')
-    validateAttachment(demand.prd, 'prd')
-    validateAttachment(demand.prototype, 'prototype')
+    validateMaterials(demandMaterials(demand))
     const project = createProject(
       snapshot,
       {

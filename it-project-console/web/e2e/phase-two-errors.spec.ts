@@ -45,14 +45,7 @@ test.describe('浏览器时区与上海提交日不一致', () => {
     await drawer.getByLabel('这次要解决什么问题（一句话）').fill('按上海业务日期接收需求')
     await drawer.getByLabel('期望上线日期', { exact: true }).fill('2026-09-08')
     await drawer.getByLabel('期望上线日期', { exact: true }).press('Tab')
-    await drawer
-      .getByPlaceholder('https://', { exact: true })
-      .nth(0)
-      .fill('https://example.com/prd.pdf')
-    await drawer
-      .getByPlaceholder('https://', { exact: true })
-      .nth(1)
-      .fill('https://example.com/prototype.html')
+    await drawer.locator('input[type=file]').setInputFiles({ name: '需求.txt', mimeType: 'text/plain', buffer: Buffer.from('需求说明') })
     await drawer.getByRole('button', { name: '提交评估' }).click()
     await expect(page.getByRole('row').filter({ hasText: '跨时区当天需求' })).toContainText(
       '待评估'

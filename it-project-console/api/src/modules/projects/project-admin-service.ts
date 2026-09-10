@@ -2,6 +2,7 @@ import type { PrismaClient } from '../../generated/prisma/client.js'
 import type { Actor } from '../../plugins/auth.js'
 import { assertManager, command } from '../../lib/business-command.js'
 import { AppError } from '../../lib/errors.js'
+import { deleteProjectGroup } from '../demands/demand-deletion.js'
 import { lifecycleEvent } from '../notifications/lifecycle-event-service.js'
 import { actionSchema, correctionSchema, STAGES } from '../progress/progress-schemas.js'
 import { enterStage, invalid, lockedProject, projectState, scheduleChanges, unchanged, writable, type ProjectChanged } from '../progress/progress-state.js'
@@ -9,8 +10,14 @@ export class ProjectAdminService {
   constructor(private readonly db: PrismaClient, private readonly onProjectChanged: ProjectChanged = unchanged) {}
   async action(actor: Actor, id: string, body: unknown) {
     const input = actionSchema.parse(body)
-    if (input.action !== 'complete') assertManager(actor)
+    if (input.action !== 'complete' && input.action !== 'delete') assertManager(actor)
     return command(this.db, actor, input.requestId, { operation: 'project-action', id, input }, async tx => {
+      if (input.action === 'delete') return deleteProjectGroup(tx, actor, id, input.version, input.reason)
+      // Completing enqueues a demand-linked notification: use the same lock order as deletion.
+      if (input.action === 'complete') {
+        const source = await tx.project.findUnique({ where: { id }, select: { demandId: true } })
+        if (source?.demandId) await tx.$queryRaw`SELECT id FROM demands WHERE id = ${source.demandId} FOR UPDATE`
+      }
       const project = await lockedProject(tx, id, input.version)
       const before = projectState(project), now = new Date()
       if (input.action === 'complete') {
@@ -24,17 +31,6 @@ export class ProjectAdminService {
       }
       if (input.action === 'archive' && project.archived) invalid('项目已经归档')
       if (input.action === 'reopen' && project.status === 'ACTIVE' && !project.archived) invalid('项目已经处于进行中')
-      if (input.action === 'delete') {
-        if (await tx.progressUpdate.count({ where: { projectId: id } }))
-          throw new AppError(409, 'PROJECT_HAS_PROGRESS', '已有进度记录，请取消或归档项目')
-        if (project.demandId) await tx.demand.update({ where: { id: project.demandId }, data: {
-          status: 'PENDING', reviewReason: null, reviewedAt: null, reviewedBy: null, version: { increment: 1 } } })
-        await tx.notificationOutbox.updateMany({ where: { projectId: id }, data: { projectId: null } })
-        await tx.project.delete({ where: { id } })
-        await tx.lifecycleEvent.create({ data: { entityType: 'project', entityId: id, authorId: actor.id,
-          action: input.action, reason: input.reason ?? '', before, after: { deleted: true } } })
-        return { id, deleted: true, version: project.version + 1 }
-      }
       if (input.action === 'reopen') {
         const open = await tx.stageHistory.findFirst({ where: { projectId: id, stage: project.stage,
           enteredAt: { not: null }, completedAt: null, interruptedAt: null } })

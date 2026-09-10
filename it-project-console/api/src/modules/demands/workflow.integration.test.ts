@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 type HTTPMethods = 'POST' | 'PATCH' | 'DELETE' | 'GET'
 import { buildApp } from '../../app.js'
@@ -24,12 +25,15 @@ function call(method: HTTPMethods, url: string, payload?: Record<string, unknown
   return runtime.app.inject({ method, url, payload, headers: { cookie: cookies[user], origin: env.WEB_ORIGIN } })
 }
 async function create() {
-  const result = await call('POST', '/api/demands', valid())
+  const result = await call('POST', '/api/demands', { ...valid(), submit: false })
   expect(result.statusCode, result.body).toBe(200)
-  return result.json<{ data: { id: string; version: number } }>().data
+  const row = result.json<{ data: { id: string; version: number } }>().data
+  const file = await uploadedFile(row.id)
+  await db.demand.update({ where: { id: row.id }, data: { attachmentIds: [file.id], status: 'PENDING', submittedAt: new Date() } })
+  return row
 }
-async function uploadedFile(demandId: string) {
-  const upload = await call('POST', '/api/attachments/upload', { demandId, kind: 'PROTOTYPE', name: 'cleanup.html', mime: 'text/html', size: 12 })
+async function uploadedFile(demandId: string, unified = false) {
+  const upload = await call('POST', '/api/attachments/upload', { demandId, kind: unified ? 'FILE' : 'PROTOTYPE', name: unified ? '设计源文件.unknown' : 'cleanup.html', mime: unified ? '' : 'text/html', size: 12 })
   expect(upload.statusCode, upload.body).toBe(200)
   const ticket = upload.json<{ data: { attachmentId: string; uploadUrl: string; headers: Record<string, string> } }>().data
   expect((await fetch(ticket.uploadUrl, { method: 'PUT', headers: ticket.headers, body: 'hello world!' })).status).toBe(200)
@@ -50,6 +54,32 @@ beforeAll(async () => {
 afterAll(async () => { await runtime?.app.close(); await db.$disconnect() })
 
 describe('真实需求与立项事务', () => {
+  it('多文件按保存顺序读取，重复与空提交拒绝，移除文件持久清理', async () => {
+    const { id } = await create()
+    const first = await uploadedFile(id, true), second = await uploadedFile(id, true)
+    for (const attachmentIds of [[], [first.id, first.id]])
+      expect((await call('PATCH', `/api/demands/${id}`, { ...valid(), version: 1, attachmentIds })).statusCode).toBe(400)
+    const saved = await call('PATCH', `/api/demands/${id}`, { ...valid(), version: 1, attachmentIds: [second.id, first.id] })
+    expect(saved.statusCode, saved.body).toBe(200)
+    expect((await db.demand.findUniqueOrThrow({ where: { id } })).attachmentIds).toEqual([second.id, first.id])
+    expect((await call('DELETE', `/api/attachments/${first.id}`)).statusCode).toBe(409)
+    expect((await call('PATCH', `/api/demands/${id}`, { ...valid(), version: 2, attachmentIds: [second.id], prd: null, prototype: null })).statusCode).toBe(200)
+    expect(await db.attachment.findUnique({ where: { id: first.id } })).toBeNull()
+    expect(await db.objectDeletion.findUnique({ where: { objectKey: `attachments/${first.id}` } })).not.toBeNull()
+    expect(await db.attachment.findUnique({ where: { id: second.id } })).not.toBeNull()
+  })
+  it('迁移回填旧文件顺序且重复引用只保留一份，HTTPS资料保留', async () => {
+    const { id } = await create()
+    const first = await uploadedFile(id), second = await uploadedFile(id)
+    await db.demand.update({ where: { id }, data: { attachmentIds: [], prdAttachmentId: first.id, prototypeAttachmentId: second.id } })
+    const migration = await readFile(new URL('../../../prisma/migrations/202609100001_unified_attachments/migration.sql', import.meta.url), 'utf8')
+    const backfill = migration.slice(migration.indexOf('UPDATE demands'))
+    await db.$executeRawUnsafe(backfill)
+    expect((await db.demand.findUniqueOrThrow({ where: { id } })).attachmentIds).toEqual([first.id, second.id])
+    await db.demand.update({ where: { id }, data: { attachmentIds: [], prototypeAttachmentId: first.id } })
+    await db.$executeRawUnsafe(backfill)
+    expect(await db.demand.findUniqueOrThrow({ where: { id } })).toMatchObject({ attachmentIds: [first.id], prdUrl: 'https://example.com/prd' })
+  })
   it('真实 IT部名称允许分派，名称相似的非 IT 部门不能分派', async () => {
     const original = await db.user.findUniqueOrThrow({ where: { id: engineer } })
     try {
@@ -63,7 +93,7 @@ describe('真实需求与立项事务', () => {
     }
   })
   it('并发网络重试只创建一次，不同内容复用key拒绝', async () => {
-    const input = valid()
+    const input = { ...valid(), submit: false }
     const responses = await Promise.all([call('POST', '/api/demands', input), call('POST', '/api/demands', input)])
     expect(responses.map(r => r.statusCode)).toEqual([200, 200])
     expect(responses[0].json()).toEqual(responses[1].json())
@@ -77,12 +107,12 @@ describe('真实需求与立项事务', () => {
     const workspace = await call('GET', '/api/workspace')
     expect(workspace.json<{ data: { database: { demands: Array<{ id: string; submittedAt: string }> } } }>().data.database.demands.find(row => row.id === id)?.submittedAt).toBe('')
     expect((await call('PATCH', `/api/demands/${id}`, { ...valid(), version: 1 }, engineer)).statusCode).toBe(403)
-    expect((await call('PATCH', `/api/demands/${id}`, { ...valid(), version: 1 })).statusCode).toBe(200)
-    expect((await call('PATCH', `/api/demands/${id}`, { ...valid(), prd: null, submit: false, version: 2 })).statusCode).toBe(400)
+    const file = await uploadedFile(id)
+    expect((await call('PATCH', `/api/demands/${id}`, { ...valid(), attachmentIds: [file.id], version: 1 })).statusCode).toBe(200)
+    expect((await call('PATCH', `/api/demands/${id}`, { ...valid(), attachmentIds: [], submit: false, version: 2 })).statusCode).toBe(400)
     expect((await db.demand.findUniqueOrThrow({ where: { id } })).status).toBe('PENDING')
     expect((await call('POST', `/api/demands/${id}/withdraw`, { requestId: key(), version: 1 })).statusCode).toBe(409)
     expect((await call('POST', `/api/demands/${id}/withdraw`, { requestId: key(), version: 2 })).statusCode).toBe(200)
-    expect((await call('DELETE', `/api/demands/${id}`, { requestId: key(), version: 3 })).statusCode).toBe(409)
     expect((await call('PATCH', `/api/demands/${id}`, { ...valid(), version: 3 })).statusCode).toBe(200)
     const removal = { requestId: key(), version: 4 }
     expect((await call('DELETE', `/api/demands/${id}`, removal)).statusCode).toBe(200)
@@ -124,7 +154,7 @@ describe('真实需求与立项事务', () => {
     expect(row.stageHistories.filter(s => s.status === 'future')).toHaveLength(4)
     expect((await db.notificationOutbox.findMany({ where: { projectId: row.id } })).map(e => e.recipientId).sort())
       .toEqual([business, engineer, 'user-engineer-zhao'].sort())
-    expect((await call('DELETE', `/api/demands/${id}`, { requestId: key(), version: 2 })).statusCode).toBe(409)
+    expect((await call('DELETE', `/api/demands/${id}`, { requestId: key(), version: 2 })).statusCode).toBe(200)
   })
   it('无效人员不落半成品，直接创建不伪造需求、日期初始化且可幂等重试', async () => {
     const count = await db.demand.count()
@@ -155,7 +185,6 @@ describe('真实需求与立项事务', () => {
     expect((await call('PATCH', `/api/demands/${id}`, { ...valid(), version: 1, prototype: material })).statusCode).toBe(200)
     const { name: _name, department: _department, ...fields } = project()
     expect((await call('POST', `/api/demands/${id}/review`, { ...fields, version: 2, decision: 'approve' }, manager)).statusCode).toBe(200)
-    expect((await call('DELETE', `/api/demands/${id}`, { requestId: key(), version: 3 })).statusCode).toBe(409)
     const downloaded = await call('GET', `/api/attachments/${ticket.attachmentId}/download`, undefined, engineer)
     expect(downloaded.statusCode).toBe(200)
     expect(await (await fetch(downloaded.json<{ data: { downloadUrl: string } }>().data.downloadUrl)).text()).toBe('hello world!')

@@ -1,8 +1,8 @@
 <template>
-  <div class="gantt-scroll" tabindex="0" aria-label="月度项目时间轴，可横向滚动">
-    <div class="gantt-grid" :style="{ gridTemplateColumns: `230px ${days * dayWidth}px` }">
+  <div class="gantt-scroll" tabindex="0" aria-label="月度项目时间轴，可横向和纵向滚动">
+    <div class="gantt-grid" :style="{ '--days': days, minWidth: `${230 + days * 36}px` }">
       <div class="frozen header">项目 / 主负责人 / 当前环节</div>
-      <div class="track header day-grid" :style="{ gridTemplateColumns: `repeat(${days}, 26px)` }">
+      <div class="track header day-grid" :style="{ gridTemplateColumns: `repeat(${days}, minmax(0, 1fr))` }">
         <span v-for="day in days" :key="day" :class="{ weekend: isWeekend(day) }">{{ day }}</span>
       </div>
       <template v-for="row in rows" :key="row.project.id">
@@ -51,13 +51,13 @@
             <span
               v-if="row.originalMarker !== null"
               class="original-marker"
-              :style="{ left: `${row.originalMarker * dayWidth}px` }"
+              :style="{ left: `${row.originalMarker / days * 100}%` }"
               aria-label="原计划交付"
             ></span>
             <span
               v-if="todayIndex >= 0"
               class="today-line"
-              :style="{ left: `${(todayIndex + 0.5) * dayWidth}px` }"
+              :style="{ left: `${(todayIndex + 0.5) / days * 100}%` }"
             ></span>
           </button>
         </ElTooltip>
@@ -75,15 +75,14 @@
   import { monthDays, type GanttRow } from '@/services/gantt-service'
   const props = defineProps<{ rows: GanttRow[]; month: string; today: string; users: DemoUser[] }>()
   const emit = defineEmits<{ detail: [id: string] }>()
-  const dayWidth = 26
   const days = computed(() => monthDays(props.month))
   const todayIndex = computed(() =>
     props.today.startsWith(props.month) ? Number(props.today.slice(8)) - 1 : -1
   )
   const ownerName = (id: string) => props.users.find((user) => user.id === id)?.name ?? '未分配'
   const barStyle = (left: number, width: number) => ({
-    left: `${left * dayWidth}px`,
-    width: `${width * dayWidth}px`
+    left: `${left / days.value * 100}%`,
+    width: `${width / days.value * 100}%`
   })
   const statusText = (row: GanttRow) =>
     row.project.status === 'completed'
@@ -99,13 +98,41 @@
 <style scoped>
   .gantt-scroll {
     max-width: 100%;
-    overflow-x: auto;
+    height: max(400px, calc(100dvh - 370px));
+    overflow: auto;
+    scrollbar-gutter: stable;
+    scrollbar-width: auto;
+    scrollbar-color: #aeb7c6 #f1f3f7;
     border: 1px solid var(--el-border-color-light);
     border-radius: 10px;
   }
   .gantt-grid {
     display: grid;
-    width: max-content;
+    width: 100%;
+    grid-template-columns: 230px minmax(0, 1fr);
+  }
+  .gantt-scroll::-webkit-scrollbar {
+    /* Override the application's global zero-height horizontal scrollbar. */
+    width: 12px !important;
+    height: 12px !important;
+    display: block;
+  }
+  .gantt-scroll::-webkit-scrollbar-thumb {
+    background: #aeb7c6;
+    border: 2px solid #f1f3f7;
+    border-radius: 8px;
+  }
+  .gantt-scroll::-webkit-scrollbar-track {
+    background: #f1f3f7;
+  }
+  .gantt-grid > .header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    box-shadow: 0 1px 0 var(--el-border-color-light);
+  }
+  .gantt-grid > .frozen.header {
+    z-index: 6;
   }
   .frozen {
     position: sticky;
@@ -164,9 +191,9 @@
     background: repeating-linear-gradient(
       to right,
       transparent 0,
-      transparent 25px,
-      var(--el-border-color-lighter) 25px,
-      var(--el-border-color-lighter) 26px
+      transparent calc(100% / var(--days) - 1px),
+      var(--el-border-color-lighter) calc(100% / var(--days) - 1px),
+      var(--el-border-color-lighter) calc(100% / var(--days))
     );
   }
   .plan-bar,

@@ -51,12 +51,13 @@ export class AttachmentService {
     private readonly storage: ObjectStorage,
     limits: AttachmentLimits = {}
   ) {
-    this.maxFileBytes = limits.maxFileBytes ?? 20 * 1024 * 1024
-    this.maxDemandBytes = limits.maxDemandBytes ?? 50 * 1024 * 1024
+    this.maxFileBytes = limits.maxFileBytes ?? 100 * 1024 * 1024
+    this.maxDemandBytes = limits.maxDemandBytes ?? 500 * 1024 * 1024
   }
 
   async requestUpload(actor: AttachmentActor, input: UploadInput) {
     assertActive(actor)
+    input = { ...input, mime: input.mime.trim() || 'application/octet-stream' }
     validateUpload(input, this.maxFileBytes)
     return this.prisma.$transaction(async (tx) => {
       const demand = await lockedDemand(tx, input.demandId)
@@ -130,7 +131,7 @@ export class AttachmentService {
     await this.prisma.$transaction(async tx => {
       const demand = await lockedDemand(tx, existing.demandId)
       assertWritable(actor, demand)
-      if ([demand.prdAttachmentId, demand.prototypeAttachmentId].includes(id))
+      if ([...demand.attachmentIds, demand.prdAttachmentId, demand.prototypeAttachmentId].includes(id))
         throw new AppError(409, 'ATTACHMENT_IN_USE', '附件已保存到需求，请通过编辑需求移除')
       await queueAttachmentDeletion(tx, [id])
     })
@@ -160,12 +161,13 @@ export class AttachmentService {
     const abandoned = await this.prisma.$queryRaw<Array<{ id: string; demandId: string }>>`
       SELECT a.id, a.demand_id AS "demandId" FROM attachments a JOIN demands d ON d.id = a.demand_id
       WHERE a.status = 'READY' AND a.created_at < ${new Date(now.getTime() - 86400000)}
+        AND NOT (a.id = ANY(d.attachment_ids))
         AND a.id IS DISTINCT FROM d.prd_attachment_id AND a.id IS DISTINCT FROM d.prototype_attachment_id
       ORDER BY a.created_at LIMIT 100`
     for (const file of abandoned) {
       await this.prisma.$transaction(async tx => {
         const demand = await lockedDemand(tx, file.demandId)
-        if (![demand.prdAttachmentId, demand.prototypeAttachmentId].includes(file.id))
+        if (![...demand.attachmentIds, demand.prdAttachmentId, demand.prototypeAttachmentId].includes(file.id))
           await queueAttachmentDeletion(tx, [file.id])
       })
     }

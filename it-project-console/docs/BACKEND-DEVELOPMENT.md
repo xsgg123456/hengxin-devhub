@@ -38,7 +38,7 @@ pnpm dev:live
 附件流程：
 
 1. `POST /api/attachments/upload`，Body `{demandId,kind,name,mime,size}`。kind 为 `PRD` 或 `PROTOTYPE`；仅需求本人且状态可编辑时允许申请。
-2. 使用返回的 `uploadUrl` 和 `headers` 执行 PUT，Body 为原文件。单文件20MB、同需求含待确认上传合计50MB；文件类型和MIME必须匹配。签名有效期5分钟。
+2. 使用返回的 `uploadUrl` 和 `headers` 执行 PUT，Body 为原文件。单文件100MB、同需求含待确认上传合计500MB；任意格式，空MIME按application/octet-stream处理，仍验证申请与实际文件大小/Content-Type一致。签名有效期5分钟。保存需求通过attachmentIds提交完整保留文件集合，至少一个READY文件方可提交评估。
 3. `POST /api/attachments/:id/confirm`。服务端检查真实对象大小/MIME、条件复制到客户端不可写的最终对象并再次检查；重复确认幂等。尚未真实上传、大小不符、过期或越权都会拒绝。
 4. `GET /api/attachments/:id/download` 返回5分钟下载链接。必须先登录，下载强制 attachment/octet-stream，HTML不会在应用同源页面执行。
 

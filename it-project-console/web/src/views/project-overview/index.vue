@@ -121,7 +121,7 @@
           ><strong>{{ metric.value }}<small> 个</small></strong></button
         ></div
       >
-      <div class="overview-charts mb-5"
+      <div v-if="store.currentUser.role !== 'engineer' || scope !== 'mine'" class="overview-charts mb-5"
         ><ProjectDistribution
           v-if="!loading && !error"
           :distribution="distribution"

@@ -18,25 +18,9 @@ export interface AttachmentLimits {
   maxDemandBytes?: number
 }
 
-const types: Record<AttachmentKind, Record<string, readonly string[]>> = {
-  PRD: {
-    pdf: ['application/pdf'],
-    doc: ['application/msword'],
-    docx: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-  },
-  PROTOTYPE: {
-    html: ['text/html'],
-    zip: ['application/zip', 'application/x-zip-compressed']
-  }
-}
-
 export function validateUpload(input: UploadInput, maxFileBytes: number): void {
   if (!input.name || input.name.length > 180 || /[\x00-\x1f\x7f/\\]/.test(input.name)) {
     throw new AppError(400, 'INVALID_FILENAME', '文件名无效或过长')
-  }
-  const extension = input.name.slice(input.name.lastIndexOf('.') + 1).toLowerCase()
-  if (!types[input.kind]?.[extension]?.includes(input.mime)) {
-    throw new AppError(400, 'INVALID_FILE_TYPE', '扩展名、材料类型与 MIME 不匹配')
   }
   if (!Number.isSafeInteger(input.size) || input.size <= 0 || input.size > maxFileBytes) {
     throw new AppError(400, 'FILE_TOO_LARGE', `文件大小须为 1 至 ${maxFileBytes} 字节`)

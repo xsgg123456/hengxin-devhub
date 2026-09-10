@@ -15,14 +15,7 @@ test('领导评审从UI重置开始，四账号连续操作共享同一项目并
   await drawer.getByLabel('项目名称', { exact: true }).fill(name)
   await drawer.getByLabel('这次要解决什么问题（一句话）').fill('让预算进度和风险在各角色同步可见')
   await date(drawer, '期望上线日期', '2099-10-20')
-  await drawer
-    .getByPlaceholder('https://', { exact: true })
-    .nth(0)
-    .fill('https://example.com/prd.pdf')
-  await drawer
-    .getByPlaceholder('https://', { exact: true })
-    .nth(1)
-    .fill('https://example.com/prototype.html')
+  await drawer.locator('input[type=file]').setInputFiles({ name: '需求.txt', mimeType: 'text/plain', buffer: Buffer.from('需求说明') })
   await drawer.getByRole('button', { name: '提交评估' }).click()
   await expect(row(page, name)).toContainText('待评估')
   const demand = (await snapshot(page)).database.demands.find((d) => d.name === name)!

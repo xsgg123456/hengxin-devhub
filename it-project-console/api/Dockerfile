@@ -15,6 +15,9 @@ RUN pnpm --filter @it-project-console/api build \
     && pnpm --filter @it-project-console/api deploy --legacy /out
 
 FROM toolchain AS runtime
+# Package managers are build tools; production and offline migrations call Node directly.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/pnpm \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/pnpm /usr/local/bin/pnpx
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=4322
 WORKDIR /app
 # Deploy creates a self-contained node_modules; retain Prisma CLI for offline migration.

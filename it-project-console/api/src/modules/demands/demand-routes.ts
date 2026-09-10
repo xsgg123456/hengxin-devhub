@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import type { PrismaClient } from '../../generated/prisma/client.js'
 import { AppError } from '../../lib/errors.js'
+import { deleteDemand } from './demand-deletion.js'
 import { DemandService } from './demand-service.js'
 import { demandSchema, demandUpdateSchema, commandSchema, idSchema } from './demand-schemas.js'
 export async function registerDemandRoutes(app: FastifyInstance, db: PrismaClient, authenticate: preHandlerHookHandler) {
@@ -27,6 +28,6 @@ export async function registerDemandRoutes(app: FastifyInstance, db: PrismaClien
     data: await service.withdraw(request.actor!, request.params.id, request.body)
   }))
   api.delete('/api/demands/:id', { preHandler: authenticate, schema: { params, body: commandSchema } }, async request => ({
-    data: await service.delete(request.actor!, request.params.id, request.body)
+    data: await deleteDemand(db, request.actor!, request.params.id, request.body)
   }))
 }

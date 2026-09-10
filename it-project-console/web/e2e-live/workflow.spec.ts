@@ -11,7 +11,7 @@ async function switchUser(page: Page, name: string) {
   await page.getByRole('button', { name: new RegExp(name + ' ·') }).click()
   await expect(page.getByRole('button', { name: '当前用户' })).toContainText(name)
 }
-test('真实PDF上传失败重试→提交→跨角色立项→刷新持久与审批隔离', async ({ page }) => {
+test('真实多格式多文件失败重试→提交→跨角色立项→刷新持久与审批隔离', async ({ page }) => {
   await mkdir(resolve('../output'), { recursive: true })
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto('/')
@@ -23,14 +23,18 @@ test('真实PDF上传失败重试→提交→跨角色立项→刷新持久与�
   await drawer.getByLabel('项目名称', { exact: true }).fill(name)
   await drawer.getByLabel('这次要解决什么问题（一句话）').fill('真实上传预算需求并完成管理立项')
   await date(drawer, '期望上线日期', '2099-12-31')
-  await drawer.getByText('上传文件', { exact: true }).first().click()
   await page.route(/\/staging\//, route => route.abort('failed'), { times: 1 })
   await drawer.locator('input[type=file]').setInputFiles({ name: '需求.pdf', mimeType: 'application/pdf',
     buffer: Buffer.from('%PDF-1.4\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n2 0 obj << /Type /Pages /Kids [] /Count 0 >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF') })
   await expect(drawer.getByRole('button', { name: '重试上传' })).toBeVisible()
   await drawer.getByRole('button', { name: '重试上传' }).click()
   await expect(drawer.getByText('已上传', { exact: true })).toBeVisible()
-  await drawer.getByPlaceholder('https://', { exact: true }).fill('https://example.com/prototype.html')
+  await drawer.locator('input[type=file]').setInputFiles([
+    { name: '原型设计.fig', mimeType: 'application/octet-stream', buffer: Buffer.from('design-file-fixture') },
+    { name: '需求清单.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from('spreadsheet-fixture') }
+  ])
+  await expect(drawer.getByText('已上传', { exact: true })).toHaveCount(3)
+  await drawer.screenshot({ path: resolve('../output/attachment-upload-preview.png') })
   await page.screenshot({ path: resolve('../output/phase6-live-submit.png'), fullPage: true })
   await drawer.getByRole('button', { name: '提交评估' }).click()
   await expect(drawer).not.toBeVisible()
@@ -63,7 +67,8 @@ test('真实PDF上传失败重试→提交→跨角色立项→刷新持久与�
   const workspace = await (await page.request.get('/api/workspace')).json()
   const demand = workspace.data.database.demands.find((item: { name: string }) => item.name === name)
   const saved = await (await page.request.get(`/api/demands/${demand.id}`)).json()
-  expect(saved.data.attachments).toHaveLength(1)
+  expect(saved.data.attachments).toHaveLength(3)
+  expect(saved.data.attachmentIds).toHaveLength(3)
   expect(saved.data.attachments[0].status).toBe('READY')
   const denied = await page.request.post(`/api/demands/${demand.id}/review`, {
     headers: { origin: 'http://127.0.0.1:4325' },

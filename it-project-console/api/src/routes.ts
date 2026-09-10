@@ -90,9 +90,9 @@ export async function registerRoutes(
         body: z
           .object({
             demandId: z.string().min(1).max(100),
-            kind: z.enum(['PRD', 'PROTOTYPE']),
+            kind: z.enum(['FILE', 'PRD', 'PROTOTYPE']),
             name: z.string().min(1).max(255),
-            mime: z.string().min(1).max(150),
+            mime: z.string().trim().max(150).default('').transform(value => value || 'application/octet-stream'),
             size: z.number().int().positive()
           })
           .strict()

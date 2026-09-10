@@ -98,9 +98,6 @@ describe('管理纠正', () => {
       before: { stage: '开发编码' },
       after: { stage: '方案设计' }
     })
-    expect(() => actionProject(snapshot, { projectId: project.id, action: 'delete' })).toThrow(
-      '进度记录'
-    )
     actionProject(snapshot, { projectId: project.id, action: 'archive' })
     expect(() =>
       correctProject(snapshot, {
@@ -110,6 +107,23 @@ describe('管理纠正', () => {
         reason: '纠正'
       })
     ).toThrow('重新打开')
+    actionProject(snapshot, { projectId: project.id, action: 'delete' })
+    expect(snapshot.database.projects.some((row) => row.id === project.id)).toBe(false)
+    expect(snapshot.database.progressUpdates.some((row) => row.projectId === project.id)).toBe(
+      false
+    )
+    expect(snapshot.database.scheduleChanges.some((row) => row.projectId === project.id)).toBe(
+      false
+    )
+    expect(
+      snapshot.database.lifecycleEvents.some(
+        (row) => row.entityId === project.id && row.action === 'correct'
+      )
+    ).toBe(true)
+    expect(snapshot.database.lifecycleEvents[0]).toMatchObject({
+      action: 'delete',
+      authorId: snapshot.activeUserId
+    })
   })
   it.each(['save-error', 'forbidden'] as const)('场景%s授权与纠正均无写入', (scenario) => {
     const snapshot = fresh()

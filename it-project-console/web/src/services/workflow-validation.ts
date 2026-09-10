@@ -32,15 +32,15 @@ export function shanghaiDay(now: string) {
 }
 export function validateAttachment(
   material: DemoAttachment | null,
-  type: 'prd' | 'prototype',
+  type: 'prd' | 'prototype' | 'file',
   required = true
 ) {
-  const label = type === 'prd' ? 'PRD 文档' : 'HTML 原型'
+  const label = type === 'prd' ? 'PRD 文档' : type === 'prototype' ? 'HTML 原型' : '需求附件'
   if (!material) {
     if (required) throw new WorkflowError(`请提供${label}`)
     return
   }
-  if (material.status !== 'ready') throw new WorkflowError(`${label}模拟上传未完成，请重试`)
+  if (material.status !== 'ready') throw new WorkflowError(`${label}上传未完成，请重试`)
   if (material.kind === 'link') {
     try {
       const url = new URL(material.url ?? '')
@@ -50,11 +50,18 @@ export function validateAttachment(
       throw new WorkflowError(`${label}必须使用有效 HTTPS 链接`)
     }
   } else if (material.kind === 'file') {
-    const extensions = type === 'prd' ? /\.(pdf|doc|docx)$/i : /\.(html|zip)$/i
-    if (!extensions.test(material.name)) throw new WorkflowError(`${label}文件格式不支持`)
-    if (!material.size || material.size < 0 || material.size > 20 * 1024 * 1024)
-      throw new WorkflowError('单文件须大于 0 且不超过 20 MB')
+    if (!material.name || material.name.length > 180 || /[\x00-\x1f\x7f/\\]/.test(material.name))
+      throw new WorkflowError('文件名无效或过长')
+    if (!Number.isSafeInteger(material.size) || !material.size || material.size < 0 || material.size > 100 * 1024 * 1024)
+      throw new WorkflowError('单文件须大于 0 且不超过 100 MB')
   } else throw new WorkflowError('材料类型无效')
+}
+export function validateMaterials(materials: DemoAttachment[], required = true) {
+  if (required && !materials.some(file => file.kind === 'file'))
+    throw new WorkflowError('请至少上传一个文件')
+  for (const material of materials) validateAttachment(material, 'file', false)
+  if (materials.reduce((size, file) => size + (file.kind === 'file' ? file.size ?? 0 : 0), 0) > 500 * 1024 * 1024)
+    throw new WorkflowError('单需求附件合计不得超过 500 MB')
 }
 export function nextId(prefix: string, records: { id: string }[], reservedIds: string[] = []) {
   let number = records.length + 1

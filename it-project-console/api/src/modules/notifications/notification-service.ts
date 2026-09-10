@@ -56,24 +56,24 @@ export class NotificationService {
       const items = await tx.notificationOutbox.findMany({
         where: { status: { in: ['PENDING', 'FAILED'] }, availableAt: { lte: now },
           NOT: { eventType: 'PROJECT_RISKS_CHANGED', recipient: { role: 'MANAGER' }, deliveryLog: null },
-          OR: [{ deliveryLog: null }, { deliveryLog: { state: { in: ['ACCEPTED', 'POLLING', 'SENDING', 'RETRY'] } } }] },
+          OR: [{ deliveryLog: null }, { deliveryLog: { state: { in: ['ACCEPTED', 'POLLING', 'SENDING', 'CLAIMED', 'RETRY'] } } }] },
         include, orderBy: [{ availableAt: 'asc' }, { createdAt: 'asc' }], take: 5
       })
       for (const item of items) {
         await tx.notificationLog.upsert({ where: { outboxId: item.id },
-          create: { outboxId: item.id, state: 'SENDING' },
-          update: { state: item.deliveryLog?.taskId ? 'POLLING' : 'SENDING' } })
-        // A durable lease precedes network I/O. Crashes before receipt persistence never auto-resend.
+          create: { outboxId: item.id, state: 'CLAIMED' },
+          update: { state: item.deliveryLog?.taskId ? 'POLLING' : item.deliveryLog?.state === 'SENDING' ? 'SENDING' : 'CLAIMED' } })
+        // A CLAIMED lease is safe to cancel; SENDING is persisted separately before external I/O.
         await tx.notificationOutbox.update({ where: { id: item.id }, data: { availableAt: new Date(now.getTime() + 5 * 60_000) } })
       }
       return items
     })
   }
 
-  private async record(item: Item, state: State, now: Date, safeError: string | null = null, taskId?: string) {
+  private async record(tx: Prisma.TransactionClient, item: Item, state: State, now: Date, safeError: string | null = null, taskId?: string) {
     const retry = state === 'RETRY'
     const terminal = ['FAILED', 'UNKNOWN', 'SKIPPED'].includes(state)
-    await this.db.$transaction(async tx => {
+    {
       await tx.notificationLog.update({ where: { outboxId: item.id }, data: {
         state, safeError, ...(taskId !== undefined ? { taskId } : {}),
         ...(retry ? { taskId: null } : {}), ...(state === 'SENT' ? { sentAt: now } : {})
@@ -82,11 +82,14 @@ export class NotificationService {
         status: state === 'SENT' ? 'SENT' : retry || terminal ? 'FAILED' : 'PENDING',
         availableAt: new Date(now.getTime() + (retry ? Math.min(60, 2 ** item.attempts) : 1) * 60_000)
       } })
-    })
+    }
   }
 
   private skip(item: Item) {
-    return !supported.has(item.eventType) || !item.recipient.active || !item.recipient.dingUserId ||
+    const payload = item.payload && typeof item.payload === 'object' && !Array.isArray(item.payload) ? item.payload : {}
+    return (item.eventType !== 'MANAGER_RISK_DIGEST' && !item.projectId && !item.demandId) ||
+      (item.eventType === 'MANAGER_RISK_DIGEST' && (!Array.isArray(payload.projects) || payload.projects.length === 0)) ||
+      !supported.has(item.eventType) || !item.recipient.active || !item.recipient.dingUserId ||
       (item.eventType === 'MANAGER_RISK_DIGEST' && item.recipient.role !== 'MANAGER') ||
       (item.eventType === 'PROJECT_RISKS_CHANGED' && item.recipient.role !== 'MANAGER' &&
         !(item.recipient.role === 'ENGINEER' && item.project?.primaryOwnerId === item.recipientId)) ||
@@ -100,52 +103,68 @@ export class NotificationService {
     if (!/^\d+$/.test(this.options.agentId) || !/^https?:$/.test(new URL(this.options.webOrigin).protocol))
       throw new Error('钉钉工作通知配置无效')
     await prepareManagerRiskDigest(this.db, now, this.options.managerDigestTime)
-    for (const item of await this.claim(now)) {
-      if (this.skip(item)) {
-        await this.record(item, 'SKIPPED', now, '目标停用、未绑定、样例数据或事件不支持')
-        outcome.skipped++
-        continue
-      }
-      const taskId = item.deliveryLog?.taskId
-      if (taskId) {
-        try {
-          const result = await workMessageResult(this.client, this.options.agentId, taskId, item.recipient.dingUserId!)
-          if (result === 'sent') { await this.record(item, 'SENT', now); outcome.sent++ }
-          else if (result === 'failed') {
-            await this.record(item, item.attempts < 5 ? 'RETRY' : 'FAILED', now, '钉钉确认收件人投递失败')
-            outcome.failed++
-          } else await this.pendingReceipt(item, now, outcome)
-        } catch { await this.pendingReceipt(item, now, outcome) }
-        continue
-      }
-      if (item.deliveryLog?.state === 'SENDING' || item.attempts >= 5) {
-        await this.record(item, item.attempts >= 5 ? 'FAILED' : 'UNKNOWN', now, '投递结果待人工核查')
-        outcome.unknown++
-        continue
-      }
-      // Increment before sending so interrupted attempts remain accounted for.
-      await this.db.notificationOutbox.update({ where: { id: item.id }, data: { attempts: { increment: 1 } } })
-      item.attempts++
-      let receipt: string
-      try { receipt = await sendWorkMessage(this.client, this.options.agentId, item.recipient.dingUserId!, notificationContent(item, this.options.webOrigin)) }
-      catch (error) {
-        const known = error instanceof DingTalkError && !error.uncertain
-        const state = known ? error.retryable && item.attempts < 5 ? 'RETRY' : 'FAILED' : 'UNKNOWN'
-        await this.record(item, state, now, known ? '钉钉拒绝投递' : '投递结果待人工核查')
-        if (state === 'UNKNOWN') outcome.unknown++; else outcome.failed++
-        continue
-      }
-      // Keep this write outside the send catch: DB failure after acceptance must not trigger resend.
-      await this.record(item, 'ACCEPTED', now, null, receipt)
-      outcome.accepted++
+    for (const claimed of await this.claim(now)) {
+      // Serialize one external operation and its receipt with deletion, then release
+      // the lock so a batch cannot hold deletion behind five network requests.
+      await this.db.$transaction(async tx => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':notification-flush', 0))::text`
+        const item = await tx.notificationOutbox.findUnique({ where: { id: claimed.id }, include })
+        if (!item || item.status === 'SENT' || !['CLAIMED', 'SENDING', 'POLLING'].includes(item.deliveryLog?.state ?? '')) {
+          outcome.skipped++
+          return
+        }
+
+        const taskId = item.deliveryLog?.taskId
+        if (taskId) {
+          try {
+            const result = await workMessageResult(this.client, this.options.agentId, taskId, item.recipient.dingUserId!)
+            if (result === 'sent') { await this.record(tx, item, 'SENT', now); outcome.sent++ }
+            else if (result === 'failed') {
+              await this.record(tx, item, item.attempts < 5 ? 'RETRY' : 'FAILED', now, '钉钉确认收件人投递失败')
+              outcome.failed++
+            } else await this.pendingReceipt(tx, item, now, outcome)
+          } catch { await this.pendingReceipt(tx, item, now, outcome) }
+          return
+        }
+        if (item.deliveryLog?.state === 'SENDING' || item.attempts >= 5) {
+          await this.record(tx, item, item.attempts >= 5 ? 'FAILED' : 'UNKNOWN', now, '投递结果待人工核查')
+          outcome.unknown++
+          return
+        }
+        if (this.skip(item)) {
+          await this.record(tx, item, 'SKIPPED', now, '目标停用、未绑定、样例数据或事件不支持')
+          outcome.skipped++
+          return
+        }
+        // Commit the sending marker independently while holding the advisory lock.
+        // The outer transaction has not written/locked these rows, avoiding self-deadlock.
+        // If receipt persistence rolls back after external acceptance, SENDING survives.
+        await this.db.$transaction(async sendingTx => {
+          await sendingTx.notificationLog.update({ where: { outboxId: item.id }, data: { state: 'SENDING' } })
+          await sendingTx.notificationOutbox.update({ where: { id: item.id }, data: { attempts: { increment: 1 } } })
+        })
+        item.attempts++
+        let receipt: string
+        try { receipt = await sendWorkMessage(this.client, this.options.agentId, item.recipient.dingUserId!, notificationContent(item, this.options.webOrigin)) }
+        catch (error) {
+          const known = error instanceof DingTalkError && !error.uncertain
+          const state = known ? error.retryable && item.attempts < 5 ? 'RETRY' : 'FAILED' : 'UNKNOWN'
+          await this.record(tx, item, state, now, known ? '钉钉拒绝投递' : '投递结果待人工核查')
+          if (state === 'UNKNOWN') outcome.unknown++; else outcome.failed++
+          return
+        }
+        // Keep this write outside the send catch: DB failure after acceptance must not trigger resend.
+        await this.record(tx, item, 'ACCEPTED', now, null, receipt)
+        outcome.accepted++
+      }, { timeout: 60_000, maxWait: 10_000 })
     }
     return outcome
   }
 
-  private async pendingReceipt(item: Item, now: Date, outcome: NotificationOutcome) {
+  private async pendingReceipt(tx: Prisma.TransactionClient, item: Item, now: Date, outcome: NotificationOutcome) {
     if (now.getTime() - item.deliveryLog!.createdAt.getTime() >= 24 * 60 * 60_000) {
-      await this.record(item, 'UNKNOWN', now, '回执超过24小时未确认，待人工核查')
+      await this.record(tx, item, 'UNKNOWN', now, '回执超过24小时未确认，待人工核查')
       outcome.unknown++
-    } else { await this.record(item, 'ACCEPTED', now, '等待钉钉送达回执'); outcome.accepted++ }
+    } else { await this.record(tx, item, 'ACCEPTED', now, '等待钉钉送达回执'); outcome.accepted++ }
   }
 }

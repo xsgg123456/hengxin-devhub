@@ -5,10 +5,12 @@ import {
   nextId,
   shanghaiDay,
   textValue,
-  validateAttachment,
+  validateMaterials,
   WorkflowError
 } from './workflow-validation'
+import { demandMaterials } from './demand-materials'
 export interface DemandInput {
+  attachments?: DemoAttachment[]
   id?: string
   requestId: string
   name: string
@@ -43,10 +45,8 @@ export function saveDemand(snapshot: PrototypeSnapshot, input: DemandInput) {
   if (input.submit || input.expectedLaunchDate) dateValue(input.expectedLaunchDate, '期望上线日期')
   if (input.submit && input.expectedLaunchDate < shanghaiDay(now))
     throw new WorkflowError('期望上线日期不得早于提交日')
-  validateAttachment(input.prd, 'prd', input.submit)
-  validateAttachment(input.prototype, 'prototype', input.submit)
-  if ((input.prd?.size ?? 0) + (input.prototype?.size ?? 0) > 50 * 1024 * 1024)
-    throw new WorkflowError('单需求附件合计不得超过 50 MB')
+  const materials = input.attachments ?? demandMaterials(input)
+  validateMaterials(materials, input.submit || existing?.status === 'pending')
   const demand = {
     id:
       existing?.id ??
@@ -63,6 +63,7 @@ export function saveDemand(snapshot: PrototypeSnapshot, input: DemandInput) {
     department: actor.department,
     submitterId: actor.id,
     expectedLaunchDate: input.expectedLaunchDate,
+    attachments: structuredClone(materials),
     prd: structuredClone(input.prd),
     prototype: structuredClone(input.prototype),
     status: input.submit ? ('pending' as const) : ('draft' as const),

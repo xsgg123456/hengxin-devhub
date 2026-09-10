@@ -57,9 +57,9 @@ test('验收主责显式完成归档，刷新保持，管理员重开保留历�
   await expect.poll(async () => (await read(page)).database.projects[0]!.status).toBe('active')
   expect((await read(page)).database.lifecycleEvents.map((e) => e.action)).toEqual(['reopen', 'complete'])
 })
-test('取消原因校验不写库，有历史不可删除，无历史误建可删除并恢复需求', async ({ page }) => {
+test('取消原因校验不写库，管理人员可删除任意项目并同步删除原需求', async ({ page }) => {
   await open(page)
-  await expect(detail(page).getByRole('button', { name: '删除误建项目' })).toHaveCount(0)
+  await expect(detail(page).getByRole('button', { name: '删除项目', exact: true })).toBeVisible()
   const before = await read(page)
   await detail(page).getByRole('button', { name: '取消项目', exact: true }).click()
   await expect(page.locator('.el-message-box__message')).toContainText('客户数据治理一期')
@@ -74,14 +74,15 @@ test('取消原因校验不写库，有历史不可删除，无历史误建可�
   expect((await read(page)).database.progressUpdates).toEqual(before.database.progressUpdates)
   await detail(page).getByRole('button', { name: '关闭', exact: true }).click()
   await open(page, 'P-2026-004')
-  await detail(page).getByRole('button', { name: '删除误建项目' }).click()
+  await detail(page).getByRole('button', { name: '删除项目', exact: true }).click()
   await expect(page.locator('.el-message-box__message')).toContainText('经营分析指标统一')
   await page.locator('.el-message-box textarea').fill('重复立项误建')
-  await page.getByRole('button', { name: '确认删除误建项目' }).click()
+  await expect(page.locator('.el-message-box__message')).toContainText('原需求')
+  await page.getByRole('button', { name: '确认删除项目', exact: true }).click()
   await expect(detail(page)).toContainText('项目不存在或已移除')
   const saved = await read(page)
   expect(saved.database.projects.some((p) => p.id === 'P-2026-004')).toBe(false)
-  expect(saved.database.demands.find((d) => d.id === 'D-2026-004')!.status).toBe('pending')
+  expect(saved.database.demands.some((d) => d.id === 'D-2026-004')).toBe(false)
 })
 test('本人需求撤回重提保持原单，删除带确认且他人不能维护', async ({ page }) => {
   const name = '营销活动预算协同平台'

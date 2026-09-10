@@ -15,7 +15,7 @@
     />
     <ElAlert v-if="failure" :title="failure" type="error" :closable="false" class="mb-5" />
     <PrototypeSaveRecovery v-if="failure && runtimeConfig.isPrototype" />
-    <ElForm ref="formRef" :model="form" label-position="top" :disabled="busy" scroll-to-error>
+    <ElForm ref="formRef" :model="form" label-position="top" :disabled="saving" scroll-to-error>
       <ElFormItem label="项目名称" prop="name" :error="errors.name" required>
         <ElInput v-model="form.name" maxlength="100" show-word-limit />
       </ElFormItem>
@@ -56,22 +56,13 @@
           :disabled-date="pastDate"
         />
       </ElFormItem>
-      <ElFormItem label="PRD 文档（正式提交必填）" prop="prd" :error="errors.prd">
+      <ElFormItem label="需求附件" prop="attachments" :error="errors.attachments" required>
         <MaterialField
-          v-model="form.prd"
-          type="prd"
-          :disabled="busy"
+          ref="materialField"
+          v-model="form.attachments"
+          :disabled="saving"
           :ensure-demand="ensureDraft"
-          @busy="uploading.prd = $event"
-        />
-      </ElFormItem>
-      <ElFormItem label="HTML 原型（正式提交必填）" prop="prototype" :error="errors.prototype">
-        <MaterialField
-          v-model="form.prototype"
-          type="prototype"
-          :disabled="busy"
-          :ensure-demand="ensureDraft"
-          @busy="uploading.prototype = $event"
+          @busy="uploading = $event"
         />
       </ElFormItem>
     </ElForm>
@@ -98,7 +89,9 @@
   import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
   import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
   import type { DemoAttachment, DemoDemand } from '@/domain/prototype'
-  import { saveDemand, validateAttachment } from '@/services/workflow-service'
+  import { saveDemand } from '@/services/workflow-service'
+  import { validateMaterials } from '@/services/workflow-validation'
+  import { demandMaterials } from '@/services/demand-materials'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { currentDate } from '@/utils/project-display'
   import { ApiError } from '@/services/api-client'
@@ -112,21 +105,25 @@
   const emit = defineEmits<{ close: []; saved: [] }>()
   const store = usePrototypeStore()
   const formRef = ref<FormInstance>()
+  const materialField = ref<{ releaseCleanup: () => void }>()
   const form = reactive({
     name: props.demand?.name || '',
     description: props.demand?.description || '',
     expectedLaunchDate: props.demand?.expectedLaunchDate || '',
-    prd: (props.demand?.prd ? { ...props.demand.prd } : null) as DemoAttachment | null,
-    prototype: (props.demand?.prototype
-      ? { ...props.demand.prototype }
-      : null) as DemoAttachment | null
+    attachments: demandMaterials(props.demand).map(file => ({ ...file }))
   })
+  function input(): LiveDemandInput {
+    const legacyLink = (file?: DemoAttachment | null) =>
+      file?.kind === 'link' && form.attachments.some(item => item.kind === 'link' && item.url === file.url)
+        ? { ...file } : null
+    return { ...form, prd: legacyLink(props.demand?.prd), prototype: legacyLink(props.demand?.prototype) }
+  }
   const baseline = JSON.stringify(form)
   const dirty = computed(() => JSON.stringify(form) !== baseline)
   const errors = reactive<Record<string, string>>({})
   const saving = ref(false)
-  const uploading = reactive({ prd: false, prototype: false })
-  const busy = computed(() => saving.value || uploading.prd || uploading.prototype)
+  const uploading = ref(false)
+  const busy = computed(() => saving.value || uploading.value)
   const liveId = ref(props.demand?.id)
   const liveVersion = ref(props.demand?.version)
   const operationKey = liveOperationKey()
@@ -145,7 +142,7 @@
   async function ensureDraft(): Promise<string> {
     if (liveId.value) return liveId.value
     if (!draftPromise) {
-      draftInput ??= { ...form, prd: null, prototype: null }
+      draftInput ??= { ...input(), attachments: [], prd: null, prototype: null }
       draftPromise = store
         .runLiveCommand(() => saveLiveDemand(draftInput!, requestId, false))
         .then((result) => {
@@ -181,16 +178,11 @@
     if (submit && !form.description.trim()) errors.description = '请说明要解决的问题'
     if (submit && (!form.expectedLaunchDate || form.expectedLaunchDate < currentDate()))
       errors.expectedLaunchDate = '期望上线日期不能早于今天'
-    for (const type of ['prd', 'prototype'] as const) {
-      try {
-        validateAttachment(form[type], type, submit)
-      } catch (cause) {
-        const message = cause instanceof Error ? cause.message : '材料校验失败'
-        errors[type] = runtimeConfig.isPrototype ? message : message.replace('模拟上传', '上传')
-      }
+    try {
+      validateMaterials(form.attachments, submit || props.demand?.status === 'pending')
+    } catch (cause) {
+      errors.attachments = cause instanceof Error ? cause.message : '附件校验失败'
     }
-    if ((form.prd?.size || 0) + (form.prototype?.size || 0) > 50 * 1024 * 1024)
-      errors.prototype = '单需求文件合计不得超过 50 MB'
     const firstError = Object.keys(errors)[0]
     if (firstError) {
       formRef.value?.scrollToField(firstError)
@@ -210,7 +202,7 @@
           version: liveVersion.value
         })
         const result = await store.runLiveCommand(() =>
-          saveLiveDemand(form, requestKey, submit, liveId.value, liveVersion.value)
+          saveLiveDemand(input(), requestKey, submit, liveId.value, liveVersion.value)
         )
         demandId = result.id
         liveId.value = result.id
@@ -218,15 +210,15 @@
       } else
         await store.runCommand((snapshot) => {
           demandId = saveDemand(snapshot, {
-            ...form,
-            prd: form.prd ? { ...form.prd } : null,
-            prototype: form.prototype ? { ...form.prototype } : null,
+            ...input(),
+            attachments: form.attachments.map(file => ({ ...file })),
             id: props.demand?.id,
             requestId,
             submit
           }).id
         })
       store.setDirty('demand-form', false)
+      materialField.value?.releaseCleanup()
       ElMessage.success(
         submit
           ? `${demandId} 已提交，等待管理人员评估`

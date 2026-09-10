@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { actionDemand, actionProject } from './lifecycle-service'
 import { createProject, reviewDemand, saveDemand, updateProgress } from './workflow-service'
 import { fresh, demandInput, projectInput, now } from './workflow-fixtures'
-import { PROJECT_STAGES } from '@/domain/prototype'
+import { PROJECT_STAGES, type DemoProject } from '@/domain/prototype'
 
 function projectFixture() {
   const snapshot = fresh()
@@ -25,25 +25,29 @@ describe('需求生命周期', () => {
     saveDemand(snapshot, { ...demandInput, id: demand.id })
     expect(demand.status).toBe('pending')
   })
-  it.each(['draft', 'pending', 'returned'] as const)('本人可删除%s；其他身份无权', (status) => {
+  it.each(['draft', 'pending', 'returned', 'rejected', 'established', 'withdrawn'] as const)(
+    '本人业务人员可删除%s；工程师无权',
+    (status) => {
+      const snapshot = fresh()
+      const demand = saveDemand(snapshot, demandInput)
+      demand.status = status
+      snapshot.activeUserId = 'user-engineer-wang'
+      const before = structuredClone(snapshot)
+      expect(() => actionDemand(snapshot, { demandId: demand.id, action: 'delete' })).toThrow(
+        '管理人员'
+      )
+      expect(snapshot).toEqual(before)
+      snapshot.activeUserId = demand.submitterId
+      actionDemand(snapshot, { demandId: demand.id, action: 'delete' })
+      expect(snapshot.database.demands.some((row) => row.id === demand.id)).toBe(false)
+    }
+  )
+  it('管理员可删除他人需求', () => {
     const snapshot = fresh()
     const demand = saveDemand(snapshot, demandInput)
-    demand.status = status
     snapshot.activeUserId = 'user-manager-chen'
-    const before = structuredClone(snapshot)
-    expect(() => actionDemand(snapshot, { demandId: demand.id, action: 'delete' })).toThrow('本人')
-    expect(snapshot).toEqual(before)
-    snapshot.activeUserId = demand.submitterId
     actionDemand(snapshot, { demandId: demand.id, action: 'delete' })
     expect(snapshot.database.demands.some((row) => row.id === demand.id)).toBe(false)
-  })
-  it.each(['rejected', 'established', 'withdrawn'] as const)('%s需求不可删除', (status) => {
-    const snapshot = fresh()
-    const demand = saveDemand(snapshot, demandInput)
-    demand.status = status
-    const before = structuredClone(snapshot)
-    expect(() => actionDemand(snapshot, { demandId: demand.id, action: 'delete' })).toThrow('状态')
-    expect(snapshot).toEqual(before)
   })
 })
 describe('项目生命周期', () => {
@@ -125,11 +129,12 @@ describe('项目生命周期', () => {
     })
     expect(project.overallProgress).toBe(5)
   })
-  it('有个人进度也禁止删除；无进度误建删除后关联需求回到待评估', () => {
+  it('有个人进度仍能删除；本人删除已归档关联项目时整组清除且保留审计', () => {
     const { snapshot, project } = projectFixture()
     updateProgress(snapshot, { projectId: project.id, kind: 'personal', summary: '个人记录', now })
-    expect(() => actionProject(snapshot, { projectId: project.id, action: 'delete' })).toThrow(
-      '取消或归档'
+    actionProject(snapshot, { projectId: project.id, action: 'delete' })
+    expect(snapshot.database.progressUpdates.some((row) => row.projectId === project.id)).toBe(
+      false
     )
     snapshot.activeUserId = 'user-business-li'
     const demand = saveDemand(snapshot, demandInput)
@@ -138,11 +143,36 @@ describe('项目生命周期', () => {
       demandId: demand.id,
       decision: 'establish',
       project: { ...projectInput, requestId: 'linked' }
-    })
+    }) as DemoProject
+    linked.archived = true
+    snapshot.activeUserId = linked.primaryOwnerId
+    expect(() => actionProject(snapshot, { projectId: linked.id, action: 'delete' })).toThrow(
+      '管理人员'
+    )
+    snapshot.activeUserId = demand.submitterId
     actionProject(snapshot, { projectId: linked.id, action: 'delete' })
-    expect(demand.status).toBe('pending')
+    expect(snapshot.database.demands.some((row) => row.id === demand.id)).toBe(false)
     expect(snapshot.database.projects.some((row) => row.id === linked.id)).toBe(false)
     expect(snapshot.database.stageHistories.some((row) => row.projectId === linked.id)).toBe(false)
+    expect(
+      snapshot.database.lifecycleEvents.filter(
+        (row) => row.action === 'delete' && [linked.id, demand.id].includes(row.entityId)
+      )
+    ).toHaveLength(2)
+  })
+  it('删除已立项需求同步删除关联项目且不影响其他项目', () => {
+    const { snapshot, project } = projectFixture()
+    snapshot.activeUserId = 'user-business-li'
+    const demand = saveDemand(snapshot, demandInput)
+    snapshot.activeUserId = 'user-manager-chen'
+    const linked = reviewDemand(snapshot, {
+      demandId: demand.id,
+      decision: 'establish',
+      project: { ...projectInput, requestId: 'delete-demand-linked' }
+    })
+    actionDemand(snapshot, { demandId: demand.id, action: 'delete' })
+    expect(snapshot.database.projects.some((row) => row.id === linked.id)).toBe(false)
+    expect(snapshot.database.projects.some((row) => row.id === project.id)).toBe(true)
   })
   it.each(['save-error', 'forbidden'] as const)('场景%s不写入', (scenario) => {
     const { snapshot, project } = projectFixture()

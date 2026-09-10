@@ -10,6 +10,7 @@ ENV VITE_APP_MODE=production VITE_API_URL=/api VITE_BASE_URL=/
 RUN pnpm --filter @it-project-console/web build
 
 FROM nginx:1.27-alpine AS runtime
+RUN apk upgrade --no-cache
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /workspace/web/dist /usr/share/nginx/html
 EXPOSE 8080

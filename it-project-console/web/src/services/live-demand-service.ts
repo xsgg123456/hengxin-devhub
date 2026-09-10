@@ -3,6 +3,7 @@ import type { ProjectInput } from './workflow-service'
 import { apiRequest } from './api-client'
 
 export interface LiveDemandInput {
+  attachments?: DemoAttachment[]
   name: string
   description: string
   expectedLaunchDate: string
@@ -27,10 +28,17 @@ export function saveLiveDemand(
   id?: string,
   version?: number
 ) {
+  const { attachments, ...fields } = input
+  const attachmentIds = attachments?.filter(file => file.kind === 'file').map(file => {
+    const value = materialDto(file)
+    if (!value || !('attachmentId' in value)) throw new Error('请等待文件上传完成')
+    return value.attachmentId
+  })
   return apiRequest<LiveWriteResult>(id ? `/demands/${id}` : '/demands', {
     method: id ? 'PATCH' : 'POST',
     body: {
-      ...input,
+      ...fields,
+      ...(attachmentIds ? { attachmentIds } : {}),
       name: input.name.trim(),
       description: input.description.trim(),
       expectedLaunchDate: input.expectedLaunchDate || null,

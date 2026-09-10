@@ -4,6 +4,7 @@ import ast
 import json
 from pathlib import Path
 import re
+import subprocess
 import sys
 import tempfile
 import tomllib
@@ -16,10 +17,18 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import bootstrap_harness
 
 
+def repository_python_files(root: Path) -> list[Path]:
+    output = subprocess.check_output(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+        cwd=root,
+    ).decode("utf-8")
+    return sorted({root / name for name in output.split("\0") if name.endswith(".py")})
+
+
 class HarnessConfigurationTests(unittest.TestCase):
     def test_all_python_json_toml_and_shell_entrypoints_are_valid(self) -> None:
-        for path in ROOT.rglob("*.py"):
-            if ".git" not in path.parts:
+        for path in repository_python_files(ROOT):
+            if path.is_file():
                 ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
                 self.assertLessEqual(
                     len(path.read_text(encoding="utf-8").splitlines()),
@@ -31,6 +40,20 @@ class HarnessConfigurationTests(unittest.TestCase):
         for path in (ROOT / ".codex/agents").glob("*.toml"):
             tomllib.loads(path.read_text(encoding="utf-8"))
         bootstrap_harness.validate_configuration()
+
+    def test_python_scope_includes_sources_and_excludes_ignored_downloads(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            (root / ".gitignore").write_text("output/\n", encoding="utf-8")
+            (root / "output").mkdir()
+            for name in ("tracked.py", "new.py", "output/vendor.py", "output/tracked.py"):
+                (root / name).write_text("pass\n", encoding="utf-8")
+            subprocess.run(["git", "add", "-f", "tracked.py", "output/tracked.py"], cwd=root, check=True)
+            self.assertEqual(
+                {path.relative_to(root).as_posix() for path in repository_python_files(root)},
+                {"tracked.py", "new.py", "output/tracked.py"},
+            )
 
     def test_hook_config_has_no_implicit_push_or_port_kill(self) -> None:
         hooks = (ROOT / ".codex/hooks.json").read_text(encoding="utf-8")

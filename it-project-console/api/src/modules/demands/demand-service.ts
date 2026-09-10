@@ -31,14 +31,14 @@ export class DemandService {
       const old = await lockedDemand(tx, id, input.version)
       assertOwner(actor, old)
       if (old.project) throw new AppError(409, 'READ_ONLY', '已关联项目的需求不可编辑')
-      const data = await demandData(tx, id, { ...input, submit: input.submit || old.status === 'PENDING' })
+      const data = await demandData(tx, id, { ...input, submit: input.submit || old.status === 'PENDING' }, old)
       const row = await tx.demand.update({ where: { id }, data: {
         ...data, status: input.submit ? 'PENDING' : old.status === 'PENDING' ? 'PENDING' : old.status,
         submittedAt: input.submit ? new Date() : old.submittedAt,
         reviewReason: input.submit ? null : old.reviewReason, version: { increment: 1 }
       } })
-      const kept = [data.prdAttachmentId, data.prototypeAttachmentId]
-      const removed = [old.prdAttachmentId, old.prototypeAttachmentId].filter((item): item is string => !!item && !kept.includes(item))
+      const kept = data.attachmentIds
+      const removed = [...new Set([...old.attachmentIds, old.prdAttachmentId, old.prototypeAttachmentId])].filter((item): item is string => !!item && !kept.includes(item))
       await queueAttachmentDeletion(tx, removed)
       return { id: row.id, version: row.version, status: row.status }
     })
@@ -52,21 +52,6 @@ export class DemandService {
         throw new AppError(409, 'INVALID_STATE', '仅待评估或退回补充需求可撤回')
       const row = await tx.demand.update({ where: { id }, data: { status: 'WITHDRAWN', version: { increment: 1 } } })
       return { id: row.id, version: row.version, status: row.status }
-    })
-  }
-  async delete(actor: Actor, id: string, body: unknown) {
-    const input = commandSchema.parse(body)
-    return command(this.db, actor, input.requestId, { operation: 'delete-demand', id, input }, async tx => {
-      const old = await lockedDemand(tx, id, input.version)
-      assertOwner(actor, old)
-      if (!['DRAFT', 'PENDING', 'RETURNED'].includes(old.status) || old.project)
-        throw new AppError(409, 'INVALID_STATE', '该需求不能删除')
-      const attachments = await tx.attachment.findMany({ where: { demandId: id }, select: { id: true } })
-      await queueAttachmentDeletion(tx, attachments.map(row => row.id))
-      // Retain historical notification payloads while removing their live demand reference.
-      await tx.notificationOutbox.updateMany({ where: { demandId: id }, data: { demandId: null } })
-      await tx.demand.delete({ where: { id } })
-      return { id, version: old.version + 1, deleted: true }
     })
   }
 }

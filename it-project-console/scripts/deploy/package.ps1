@@ -48,9 +48,11 @@ function New-ReleasePackage {
   Invoke-Checked node @('scripts/deploy/audit-payload.mjs',$auditRoot)
   New-Item -ItemType Directory -Path (Join-Path $bundle 'scripts/server') -Force | Out-Null
   Copy-Item -LiteralPath (Join-Path $ProjectRoot 'compose.production.yaml') -Destination $bundle
+  New-Item -ItemType Directory -Path (Join-Path $bundle 'deploy') -Force | Out-Null
+  Write-Utf8 (Join-Path $bundle 'deploy/public.nginx.conf') ([IO.File]::ReadAllText((Join-Path $ProjectRoot 'deploy/public.nginx.conf')))
   Write-Utf8 (Join-Path $bundle 'dependency-audit.json') $audit
   foreach ($file in (Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'scripts/server') -File)) {
-    if ($file.Extension -notin @('.sh','.mjs')) { continue }
+    if ($file.Extension -notin @('.sh','.mjs','.sql')) { continue }
     Write-Utf8 (Join-Path $bundle "scripts/server/$($file.Name)") ([IO.File]::ReadAllText($file.FullName))
   }
   $migrationHash = Get-MigrationHash $ProjectRoot

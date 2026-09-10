@@ -39,6 +39,7 @@ export interface DemoAttachment {
   status: 'ready' | 'failed' | 'uploading'
 }
 export interface DemoDemand {
+  attachments?: DemoAttachment[]
   version?: number
   id: string
   requestId: string

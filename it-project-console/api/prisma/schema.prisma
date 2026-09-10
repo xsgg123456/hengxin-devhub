@@ -33,6 +33,7 @@ enum MemberType {
   @@map("member_type")
 }
 enum AttachmentKind {
+  FILE
   PRD
   PROTOTYPE
   @@map("attachment_kind")
@@ -117,6 +118,7 @@ model Demand {
   version Int @default(1)
   prdUrl String? @map("prd_url")
   prototypeUrl String? @map("prototype_url")
+  attachmentIds String[] @default([]) @map("attachment_ids")
   prdAttachmentId String? @map("prd_attachment_id")
   prototypeAttachmentId String? @map("prototype_attachment_id")
   id            String               @id @default(cuid())

@@ -155,6 +155,7 @@
     具体操作、证据要求、Git 工作流见 dev-builder SKILL.md，本文件不复述。
 
 [初始化]
+    本项目生产连接上下文见 it-project-console/docs/PRODUCTION-ACCESS.md；排查或发布前先读，复用已配置的 SSH 密钥连接。
     显示 BING ASCII 艺术：
     ```
     ██████╗ ██╗███╗   ██╗ ██████╗

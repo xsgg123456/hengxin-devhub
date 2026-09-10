@@ -1,9 +1,10 @@
+import { deleteProjectGroup } from '../demands/demand-deletion.js'
 import { randomUUID } from 'node:crypto'
 import { afterAll, expect, it, vi } from 'vitest'
 import { parseEnv } from '../../config/env.js'
 import { createPrisma } from '../../plugins/prisma.js'
 import { DingTalkError } from '../dingtalk/dingtalk-client.js'
-import { NotificationService } from './notification-service.js'
+import { NotificationService, notificationContent } from './notification-service.js'
 import { flushNotifications } from './notification-job.js'
 
 const env = parseEnv(process.env)
@@ -130,4 +131,139 @@ it('已受理任务只轮询，空回执不标成功，确认失败才重试', a
   await service.flush(new Date(instant.getTime() + 25 * 60 * 60_000))
   expect((await log(item.id)).state).toBe('UNKNOWN')
   expect(legacy.mock.calls.filter(([path]) => path.endsWith('asyncsend_v2'))).toHaveLength(2)
+})
+
+function gate() {
+  let release!: () => void
+  const promise = new Promise<void>(resolve => { release = resolve })
+  return { promise, release }
+}
+function pauseAfterClaim(service: NotificationService) {
+  const reached = gate(), resume = gate()
+  const target = service as unknown as { claim: (now: Date) => Promise<Array<Parameters<typeof notificationContent>[0]>> }
+  const claim = target.claim.bind(service)
+  const spy = vi.spyOn(target, 'claim').mockImplementation(async instant => {
+    const items = await claim(instant)
+    reached.release()
+    await resume.promise
+    return items
+  })
+  return { reached: reached.promise, resume: resume.release, restore: () => spy.mockRestore() }
+}
+async function deleteFixtureProject(id: string, version: number) {
+  const actor = await db.user.findUniqueOrThrow({ where: { id: 'user-manager-chen' } })
+  return db.$transaction(tx => deleteProjectGroup(tx, actor, id, version), { timeout: 10_000 })
+}
+
+it('认领后删除先完成，不发送缓存通知且不覆盖SKIPPED', async () => {
+  const { item, project, user } = await fixture('PROJECT_ASSIGNED')
+  const legacy = vi.fn().mockResolvedValue({ task_id: 201 })
+  const service = new NotificationService(db, { legacy }, options)
+  const pause = pauseAfterClaim(service)
+  const flushing = service.flush(now)
+  try {
+    await pause.reached
+    expect((await log(item.id)).state).toBe('CLAIMED')
+    await deleteFixtureProject(project.id, project.version)
+    expect((await log(item.id)).state).toBe('SKIPPED')
+  } finally { pause.resume(); pause.restore() }
+  await flushing
+  expect(legacy.mock.calls.filter(([, body]) => body.userid_list === user.dingUserId)).toHaveLength(0)
+  expect((await log(item.id)).state).toBe('SKIPPED')
+  expect(await db.notificationOutbox.findUniqueOrThrow({ where: { id: item.id } })).toMatchObject({ status: 'FAILED', attempts: 0 })
+})
+
+it('认领后摘要删除项目，发送前重新读取裁剪后的payload', async () => {
+  const { item, project, user } = await fixture('MANAGER_RISK_DIGEST')
+  await db.user.update({ where: { id: user.id }, data: { role: 'MANAGER' } })
+  await db.notificationOutbox.update({ where: { id: item.id }, data: { projectId: null, payload: { projects: [
+    { projectId: project.id, name: '必须移除的项目', owner: '测试', risks: ['延期'] },
+    { projectId: 'retained-project', name: '必须保留的项目', owner: '测试', risks: ['阻塞'] }
+  ] } } })
+  const legacy = vi.fn().mockResolvedValue({ task_id: 202 })
+  const service = new NotificationService(db, { legacy }, options)
+  const pause = pauseAfterClaim(service)
+  const flushing = service.flush(now)
+  try { await pause.reached; await deleteFixtureProject(project.id, project.version) }
+  finally { pause.resume(); pause.restore() }
+  await flushing
+  const calls = legacy.mock.calls.filter(([, body]) => body.userid_list === user.dingUserId)
+  expect(calls).toHaveLength(1)
+  expect(calls[0]![1].msg.text.content).toContain('必须保留的项目')
+  expect(calls[0]![1].msg.text.content).not.toContain('必须移除的项目')
+  expect(calls[0]![1].msg.text.content).not.toContain(project.id)
+  expect((await log(item.id)).state).toBe('ACCEPTED')
+})
+
+it('发送先持锁，删除等待受理落库并保留外部已受理事实', async () => {
+  const { item, project, user } = await fixture('PROJECT_ASSIGNED')
+  const sending = gate(), receipt = gate()
+  const legacy = vi.fn().mockImplementation(async (_path: string, body: { userid_list?: string }) => {
+    if (body.userid_list === user.dingUserId) { sending.release(); await receipt.promise }
+    return { task_id: 203 }
+  })
+  const service = new NotificationService(db, { legacy }, options)
+  const flushing = service.flush(now)
+  await sending.promise
+  const deleting = deleteFixtureProject(project.id, project.version)
+  receipt.release()
+  await Promise.all([flushing, deleting])
+  expect((await log(item.id))).toMatchObject({ state: 'ACCEPTED', taskId: '203' })
+  expect(await db.project.findUnique({ where: { id: project.id } })).toBeNull()
+  await due(item.id)
+  legacy.mockResolvedValue({ send_result: { unread_user_id_list: [user.dingUserId] } })
+  await service.flush(now)
+  expect((await log(item.id)).state).toBe('SENT')
+  expect(legacy.mock.calls.filter(([, body]) => body.userid_list === user.dingUserId)).toHaveLength(1)
+})
+
+it('外部受理后事务失败仍持久保留SENDING且不自动重发', async () => {
+  const { item, user } = await fixture('PROJECT_ASSIGNED')
+  const legacy = vi.fn().mockResolvedValue({ task_id: 204 })
+  const service = new NotificationService(db, { legacy }, options)
+  const target = service as unknown as { record: (...args: unknown[]) => Promise<void> }
+  const record = target.record.bind(service)
+  const spy = vi.spyOn(target, 'record').mockImplementation(async (...args) => {
+    if (args[2] === 'ACCEPTED') throw new Error('模拟受理后回执落库失败')
+    await record(...args)
+  })
+  try { await expect(service.flush(now)).rejects.toThrow('模拟受理后回执落库失败') }
+  finally { spy.mockRestore() }
+  expect((await log(item.id)).state).toBe('SENDING')
+  expect(await db.notificationOutbox.findUniqueOrThrow({ where: { id: item.id } })).toMatchObject({ attempts: 1 })
+  await due(item.id)
+  await service.flush(now)
+  expect((await log(item.id)).state).toBe('UNKNOWN')
+  expect(legacy.mock.calls.filter(([, body]) => body.userid_list === user.dingUserId)).toHaveLength(1)
+})
+
+it('过期CLAIMED尚未发送可恢复投递', async () => {
+  const { item, user } = await fixture('PROJECT_ASSIGNED')
+  await db.notificationLog.create({ data: { outboxId: item.id, state: 'CLAIMED' } })
+  const legacy = vi.fn().mockResolvedValue({ task_id: 205 })
+  await new NotificationService(db, { legacy }, options).flush(now)
+  expect((await log(item.id))).toMatchObject({ state: 'ACCEPTED', taskId: '205' })
+  expect(legacy.mock.calls.filter(([, body]) => body.userid_list === user.dingUserId)).toHaveLength(1)
+})
+
+it('已受理摘要删除唯一项目保留受理状态，确认失败后不重发空摘要', async () => {
+  const { item, project, user } = await fixture('MANAGER_RISK_DIGEST')
+  await db.user.update({ where: { id: user.id }, data: { role: 'MANAGER' } })
+  await db.notificationOutbox.update({ where: { id: item.id }, data: { projectId: null, payload: { projects: [
+    { projectId: project.id, name: '已删项目', owner: '测试', risks: ['延期'] }
+  ] } } })
+  const legacy = vi.fn().mockResolvedValue({ task_id: 206 })
+  const service = new NotificationService(db, { legacy }, options)
+  await service.flush(now)
+  await deleteFixtureProject(project.id, project.version)
+  expect((await log(item.id))).toMatchObject({ state: 'ACCEPTED', taskId: '206' })
+  expect((await db.notificationOutbox.findUniqueOrThrow({ where: { id: item.id } })).payload).toEqual({ projects: [] })
+  await due(item.id)
+  legacy.mockResolvedValue({ send_result: { failed_user_id_list: [user.dingUserId] } })
+  await service.flush(now)
+  expect((await log(item.id)).state).toBe('RETRY')
+  await due(item.id)
+  await service.flush(now)
+  expect((await log(item.id)).state).toBe('SKIPPED')
+  expect(legacy.mock.calls.filter(([, body]) => body.userid_list === user.dingUserId)).toHaveLength(1)
 })

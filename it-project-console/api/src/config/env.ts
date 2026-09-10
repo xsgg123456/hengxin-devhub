@@ -36,14 +36,14 @@ const schema = z
       .number()
       .int()
       .positive()
-      .max(20 * 1024 * 1024)
-      .default(20 * 1024 * 1024),
+      .max(100 * 1024 * 1024)
+      .default(100 * 1024 * 1024),
     MAX_DEMAND_BYTES: z.coerce
       .number()
       .int()
       .positive()
-      .max(50 * 1024 * 1024)
-      .default(50 * 1024 * 1024)
+      .max(500 * 1024 * 1024)
+      .default(500 * 1024 * 1024)
   })
   .superRefine((v, context) => {
     if (v.DINGTALK_NOTIFICATIONS_ENABLED && (!v.DINGTALK_CLIENT_ID || !v.DINGTALK_CLIENT_SECRET || !v.DINGTALK_CORP_ID || !/^\d+$/.test(v.DINGTALK_AGENT_ID) || Number(v.DINGTALK_AGENT_ID) <= 0))

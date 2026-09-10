@@ -19,6 +19,7 @@ export const loginDingTalkH5 = (code: string, signal: AbortSignal) =>
 
 export function safeReturnTo(hash: string): string {
   const path = hash.replace(/^#/, '')
+  if (/^\/auth\/login(?:[/?#]|$)/i.test(path)) return '/#/'
   return /^\/(?!\/)/.test(path) && !/[\\\r\n]/.test(path) ? `/#${path}` : '/#/'
 }
 export function dingTalkStartUrl(hash: string): string {

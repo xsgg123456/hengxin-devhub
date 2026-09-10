@@ -4,18 +4,24 @@ import { demandData } from './demand-materials.js'
 import type { DemandInput } from './demand-schemas.js'
 const base: DemandInput = {
   requestId: 'one', name: '项目', description: '说明', submit: true,
-  expectedLaunchDate: '2099-12-31',
+  expectedLaunchDate: '2099-12-31', attachmentIds: ['a1'],
   prd: { kind: 'link', url: 'https://example.com/prd' },
   prototype: { kind: 'link', url: 'https://example.com/demo' }
 }
-function transaction(attachment: unknown = null) {
+function transaction(attachment: unknown = { demandId: 'd1', kind: 'PRD', status: 'READY' }) {
   return { attachment: { findUnique: vi.fn().mockResolvedValue(attachment) } } as unknown as Prisma.TransactionClient
 }
 describe('需求材料业务验证', () => {
   it('正式提交拒绝任何一项缺失，草稿允许全部留空', async () => {
-    for (const key of ['name', 'description', 'expectedLaunchDate', 'prd', 'prototype'])
+    for (const key of ['name', 'description', 'expectedLaunchDate'])
       await expect(demandData(transaction(), 'd1', { ...base, [key]: null })).rejects.toMatchObject({ code: 'MISSING_FIELDS' })
-    await expect(demandData(transaction(), 'd1', { ...base, name: '', description: '', expectedLaunchDate: null, prd: null, prototype: null, submit: false })).resolves.toMatchObject({ name: '', prdAttachmentId: null })
+    await expect(demandData(transaction(), 'd1', { ...base, name: '', description: '', expectedLaunchDate: null, prd: null, prototype: null, attachmentIds: [], submit: false })).resolves.toMatchObject({ name: '', prdAttachmentId: null })
+  })
+  it('旧链接不能替代文件，重复ID及显式空列表拒绝提交', async () => {
+    for (const attachmentIds of [[], ['a1', 'a1']])
+      await expect(demandData(transaction(), 'd1', { ...base, attachmentIds })).rejects.toMatchObject({ statusCode: 400 })
+    await expect(demandData(transaction(), 'd1', { ...base, attachmentIds: undefined })).rejects.toMatchObject({ code: 'MISSING_FIELDS' })
+    await expect(demandData(transaction({ demandId: 'd1', kind: 'FILE', status: 'READY' }), 'd1', base)).resolves.toMatchObject({ attachmentIds: ['a1'] })
   })
   it('提交日期按上海日界验证', async () => {
     vi.useFakeTimers()

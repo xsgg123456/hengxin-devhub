@@ -96,3 +96,9 @@ it('返回路径仅接受站内hash', () => {
   for (const path of ['https://evil.test', '//evil.test', '/\\evil.test'])
     expect(safeReturnTo(path)).toBe('/#/')
 })
+
+it('登录页扫码重试返回首页，不携带旧授权失败提示', () => {
+  for (const path of ['#/auth/login', '#/auth/login?dingError=authorization_failed', '#/auth/login/'])
+    expect(safeReturnTo(path)).toBe('/#/')
+  expect(safeReturnTo('#/project-overview?projectId=fixture')).toBe('/#/project-overview?projectId=fixture')
+})

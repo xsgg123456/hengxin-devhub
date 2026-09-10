@@ -6,8 +6,8 @@ describe('需求与立项事务', () => {
   it('草稿容许缺材料，正式提交校验必交材料、日期和说明', () => {
     const snapshot = fresh()
     expect(saveDemand(snapshot, { ...demandInput, submit: false, prd: null }).status).toBe('draft')
-    expect(() => saveDemand(snapshot, { ...demandInput, requestId: 'other', prd: null })).toThrow(
-      'PRD'
+    expect(() => saveDemand(snapshot, { ...demandInput, requestId: 'other', attachments: [] })).toThrow(
+      '至少上传一个文件'
     )
     expect(() =>
       saveDemand(snapshot, { ...demandInput, requestId: 'other', expectedLaunchDate: '2026-09-07' })
@@ -27,16 +27,16 @@ describe('需求与立项事务', () => {
       expect(first.submitterId).toBe(id)
     }
   })
-  it('材料文件格式、大小、HTTPS及失败上传真实校验', () => {
+  it('文件格式不限，大小、HTTPS及失败上传仍校验', () => {
     expect(() =>
       validateAttachment({ kind: 'file', name: 'virus.exe', size: 20, status: 'ready' }, 'prd')
-    ).toThrow('格式')
+    ).not.toThrow()
     expect(() =>
       validateAttachment(
-        { kind: 'file', name: 'file.pdf', size: 21 * 1024 * 1024, status: 'ready' },
+        { kind: 'file', name: 'file.pdf', size: 101 * 1024 * 1024, status: 'ready' },
         'prd'
       )
-    ).toThrow('20 MB')
+    ).toThrow('100 MB')
     expect(() =>
       validateAttachment(
         { kind: 'link', name: 'x', url: 'javascript:alert(1)', status: 'ready' },
