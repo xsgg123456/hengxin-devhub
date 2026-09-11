@@ -12,6 +12,7 @@ test('统一部门、提出时间及完成筛选同步指标、图表和清单�
     snapshot.database.demands = [
       {
         ...source,
+        code: undefined,
         id: 'filter-early',
         name: '正常完成样例',
         department: '客服组',
@@ -20,6 +21,7 @@ test('统一部门、提出时间及完成筛选同步指标、图表和清单�
       },
       {
         ...source,
+        code: undefined,
         id: 'filter-late',
         name: '延期完成样例',
         department: '客服组',
@@ -28,6 +30,7 @@ test('统一部门、提出时间及完成筛选同步指标、图表和清单�
       },
       {
         ...source,
+        code: undefined,
         id: 'filter-pending',
         name: '尚未评估样例',
         department: '设计部',

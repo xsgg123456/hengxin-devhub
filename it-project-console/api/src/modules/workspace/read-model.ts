@@ -35,6 +35,8 @@ export const mapDemand = (demand: Demand & { attachments: Attachment[] }) => {
   }
   return {
     id: demand.id,
+    code: demand.code,
+    createdAt: demand.createdAt.toISOString(),
     requestId: demand.requestId ?? demand.id,
     version: demand.version,
     name: demand.name,

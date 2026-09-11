@@ -1,4 +1,5 @@
 import { backfillProjectCodes } from '@/utils/project-code'
+import { backfillDemandCodes } from '@/utils/demand-code'
 import { PROJECT_STAGES, type PrototypeSnapshot } from '@/domain/prototype'
 import { DEMO_USERS } from '@/mocks/auth-context'
 export function migratePrototypeSnapshot(value: unknown): PrototypeSnapshot {
@@ -137,5 +138,6 @@ export function migratePrototypeSnapshot(value: unknown): PrototypeSnapshot {
     }
   }
   backfillProjectCodes(snapshot.database)
+  backfillDemandCodes(snapshot.database)
   return snapshot
 }

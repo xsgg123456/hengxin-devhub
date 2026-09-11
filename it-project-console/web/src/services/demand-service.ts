@@ -1,4 +1,5 @@
 import type { DemoAttachment, PrototypeSnapshot } from '@/domain/prototype'
+import { nextDemandCode } from '@/utils/demand-code'
 import {
   assertWrite,
   dateValue,
@@ -48,6 +49,8 @@ export function saveDemand(snapshot: PrototypeSnapshot, input: DemandInput) {
   const materials = input.attachments ?? demandMaterials(input)
   validateMaterials(materials, input.submit || existing?.status === 'pending')
   const demand = {
+    code: existing?.code ?? nextDemandCode(snapshot.database, existing?.createdAt || existing?.submittedAt || now),
+    createdAt: existing?.createdAt || existing?.submittedAt || now,
     id:
       existing?.id ??
       nextId(

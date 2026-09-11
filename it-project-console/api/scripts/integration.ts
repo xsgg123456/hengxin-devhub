@@ -6,6 +6,7 @@ await isolatedIntegration(async ({ run }) => {
     'src/attachments.integration.test.ts',
     'src/db/schema.integration.test.ts',
     'src/modules/demands/workflow.integration.test.ts',
+    'src/modules/demands/demand-code.integration.test.ts',
     'src/modules/demands/deletion.integration.test.ts',
     'src/modules/progress/progress.integration.test.ts',
     'src/modules/projects/project-code.integration.test.ts',

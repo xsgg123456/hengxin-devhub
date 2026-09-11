@@ -7,7 +7,7 @@
     @close="emit('close')"
   >
     <ElDescriptions :column="2" border class="mb-5">
-      <ElDescriptionsItem label="需求编号">{{ demand.id }}</ElDescriptionsItem>
+      <ElDescriptionsItem label="需求编号">{{ demandCode(demand) }}</ElDescriptionsItem>
       <ElDescriptionsItem label="需求部门">{{ demand.department }}</ElDescriptionsItem>
       <ElDescriptionsItem label="提出人">{{ submitter }}</ElDescriptionsItem>
       <ElDescriptionsItem label="期望上线">{{
@@ -33,6 +33,7 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
+  import { demandCode } from '@/utils/demand-code'
   import { computed } from 'vue'
   import type { DemoDemand } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'

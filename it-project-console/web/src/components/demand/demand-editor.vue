@@ -84,6 +84,7 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
+  import { demandCode } from '@/utils/demand-code'
   import { runtimeConfig } from '@/config/runtime'
   import PrototypeSaveRecovery from '@/components/system/prototype-save-recovery.vue'
   import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
@@ -219,12 +220,13 @@
         })
       store.setDirty('demand-form', false)
       materialField.value?.releaseCleanup()
+      const code = demandCode(store.database?.demands.find(demand => demand.id === demandId) ?? {})
       ElMessage.success(
         submit
-          ? `${demandId} 已提交，等待管理人员评估`
+          ? `${code} 已提交，等待管理人员评估`
           : !runtimeConfig.isPrototype && props.demand?.status === 'pending'
-            ? `${demandId} 修改已保存，仍待评估`
-            : `${demandId} 草稿已保存`
+            ? `${code} 修改已保存，仍待评估`
+            : `${code} 草稿已保存`
       )
       emit('saved')
     } catch (cause) {

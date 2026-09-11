@@ -108,6 +108,7 @@ model Session {
   @@map("sessions")
 }
 model Demand {
+  code String @unique @default(dbgenerated())
   requestId String? @map("request_id")
   description String @default("")
   department String @default("")
@@ -134,6 +135,13 @@ model Demand {
   updatedAt     DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
   @@index([ownerId, status])
   @@map("demands")
+}
+model DemandCodeCounter {
+  year Int @id
+  lastValue BigInt @map("last_value")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@map("demand_code_counters")
 }
 model ProjectCodeCounter {
   year Int @id

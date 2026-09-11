@@ -40,6 +40,8 @@ export interface DemoAttachment {
   status: 'ready' | 'failed' | 'uploading'
 }
 export interface DemoDemand {
+  code?: string
+  createdAt?: string
   attachments?: DemoAttachment[]
   version?: number
   id: string
@@ -133,6 +135,7 @@ export interface DemoScheduleChange {
   createdAt: string
 }
 export interface PrototypeDatabase {
+  demandCodeCounters?: Record<string, number>
   projectCodeCounters?: Record<string, number>
   schemaVersion: 2
   users: DemoUser[]

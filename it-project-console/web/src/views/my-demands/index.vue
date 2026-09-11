@@ -125,7 +125,7 @@
             ><template #default="{ row }"
               ><div class="leading-5"
                 ><p class="font-medium text-g-900">{{ row.name }}</p
-                ><span class="text-xs text-g-500">{{ row.id }}</span></div
+                ><span class="text-xs text-g-500">{{ demandCode(row) }}</span></div
               ></template
             ></ElTableColumn
           >
@@ -226,6 +226,7 @@
 </template>
 
 <script setup lang="ts">
+  import { demandCode } from '@/utils/demand-code'
   import { dateRangeShortcuts } from '@/utils/date-range-shortcuts'
   import BusinessPageState from '@/components/system/business-page-state.vue'
   import DemandEditor from '@/components/demand/demand-editor.vue'

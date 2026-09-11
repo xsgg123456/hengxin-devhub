@@ -1,0 +1,36 @@
+import { expect, test } from '@playwright/test'
+import { date, identity, reset, row, snapshot } from './review-helpers'
+
+test('旧需求补号，新需求创建后列表与详情一致，刷新编辑保持编号', async ({ page }) => {
+  await page.goto('/')
+  await reset(page)
+  await identity(page, '李思敏')
+  const name = '需求编号回归验证'
+  await page.getByRole('button', { name: '提交正式项目需求' }).click()
+  const editor = page.getByRole('dialog', { name: '提交正式项目需求' })
+  await editor.getByLabel('项目名称', { exact: true }).fill(name)
+  await editor.getByLabel('这次要解决什么问题（一句话）').fill('新建需求显示便于识别的编号')
+  await date(editor, '期望上线日期', '2099-10-20')
+  await editor.locator('input[type=file]').setInputFiles({ name: '需求.txt', mimeType: 'text/plain', buffer: Buffer.from('编号验证') })
+  await editor.getByRole('button', { name: '提交评估' }).click()
+  await expect(row(page, name)).toContainText('待评估')
+  const demand = (await snapshot(page)).database.demands.find(d => d.name === name)!
+  expect(demand.code).toMatch(/^XQ-\d{4}-\d{4,}$/)
+  await expect(page.locator('.el-message--success').filter({ hasText: '已提交，等待管理人员评估' })).toContainText(demand.code!)
+  await expect(row(page, name)).toContainText(demand.code!)
+  await expect(row(page, name)).not.toContainText(demand.id)
+  await row(page, name).getByRole('button', { name: '查看', exact: true }).click()
+  const detail = page.getByRole('dialog', { name: `需求详情 · ${name}` })
+  await expect(detail).toContainText(demand.code!)
+  await detail.getByRole('button', { name: '关闭', exact: true }).click()
+  await row(page, name).getByRole('button', { name: '编辑', exact: true }).click()
+  const edit = page.getByRole('dialog', { name: '编辑本人需求' })
+  await edit.getByLabel('这次要解决什么问题（一句话）').fill('编辑后保持原有需求编号')
+  await edit.getByRole('button', { name: '重新提交', exact: true }).click()
+  await expect(edit).not.toBeVisible()
+  await page.reload()
+  await expect(row(page, name)).toContainText(demand.code!)
+  expect((await snapshot(page)).database.demands.every(d => /^XQ-\d{4}-\d{4,}$/.test(d.code!))).toBe(true)
+  await row(page, name).scrollIntoViewIfNeeded()
+  await page.screenshot({ path: '../output/playwright/demand-code-list.png' })
+})
