@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { createServer, type Server } from 'node:http'
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve, extname } from 'node:path'
-import { key, snapshot, identity, card } from './review-helpers'
+import { key, snapshot, identity, card, planProject } from './review-helpers'
 
 async function scenario(page: import('@playwright/test').Page, label: string) {
   await page.getByRole('button', { name: '切换演示身份' }).click()
@@ -37,28 +37,28 @@ test('菜单场景切换与恢复不破坏已保存业务数据', async ({ page 
 test('保存失败保持输入，恢复正常后仅提交一次并更新共享数据', async ({ page }) => {
   await page.goto('/')
   await identity(page, '王浩然')
+  await planProject(page, '客户数据治理一期')
   await scenario(page, '保存失败')
   const before = (await snapshot(page)).database
-  await card(page, '客户数据治理一期').getByRole('button', { name: '更新进度' }).click()
-  const drawer = page.getByRole('dialog', { name: '更新项目进度' })
-  await drawer.getByLabel('进展说明', { exact: true }).fill('失败后继续编辑并恢复成功')
-  await drawer.getByRole('spinbutton', { name: '整体进度（%）' }).fill('68')
-  const submit = drawer.getByRole('button', { name: '保存进度' })
+  await card(page, '客户数据治理一期').getByRole('button', { name: '更新环节' }).click()
+  const drawer = page.getByRole('dialog', { name: '更新环节' })
+  await drawer.getByLabel('补充说明（选填）', { exact: true }).fill('失败后继续编辑并恢复成功')
+  const submit = drawer.getByRole('button', { name: '保存更新' })
   await submit.click()
   await expect(drawer.getByRole('alert')).toContainText('失败')
-  await expect(drawer.getByLabel('进展说明', { exact: true })).toHaveValue(
+  await expect(drawer.getByLabel('补充说明（选填）', { exact: true })).toHaveValue(
     '失败后继续编辑并恢复成功'
   )
   expect((await snapshot(page)).database).toEqual(before)
   await drawer.getByRole('button', { name: '恢复正常并保留输入', exact: true }).click()
-  await expect(drawer.getByLabel('进展说明', { exact: true })).toHaveValue(
+  await expect(drawer.getByLabel('补充说明（选填）', { exact: true })).toHaveValue(
     '失败后继续编辑并恢复成功'
   )
   await submit.click()
   await expect(submit).toBeDisabled()
   await expect(drawer).not.toBeVisible()
   const after = (await snapshot(page)).database
-  expect(after.projects.find((p) => p.name === '客户数据治理一期')?.overallProgress).toBe(68)
+  expect(after.projects.find((p) => p.name === '客户数据治理一期')?.simpleStatus).toBe('in-progress')
   expect(after.progressUpdates.length).toBe(before.progressUpdates.length + 1)
 })
 

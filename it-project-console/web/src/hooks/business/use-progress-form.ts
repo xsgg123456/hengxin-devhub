@@ -1,3 +1,4 @@
+import { needsPlan } from '@/services/stage-plan-service'
 import { runtimeConfig } from '@/config/runtime'
 import { ApiError } from '@/services/api-client'
 import { liveOperationKey } from '@/services/live-demand-service'
@@ -27,11 +28,14 @@ export function useProgressForm(
   const form = ref<ProgressInput>({ projectId: '', kind: 'overall', summary: '' })
   const correctionStage = ref<ProjectStage>('方案设计')
   const correctionStages = computed(() =>
-    PROJECT_STAGES.filter(
+    PROJECT_STAGES.slice(2).filter(
       (s) =>
         s === props.project?.stage ||
         store.database?.stageHistories.some(
-          (h) => h.projectId === props.project?.id && h.stage === s
+          (h) =>
+            h.projectId === props.project?.id &&
+            h.stage === s &&
+            Boolean(h.startedAt || h.completedAt || h.interruptedAt)
         )
     )
   )
@@ -53,29 +57,17 @@ export function useProgressForm(
       ? PROJECT_STAGES[PROJECT_STAGES.indexOf(props.project.stage) + 1]
       : undefined
   )
-  const datesChanged = computed(
-    () =>
-      overall.value &&
-      props.project &&
-      (['stageExpectedDate', 'expectedLaunchDate', 'expectedDeliveryDate'] as const).some(
-        (field) => props.project![field] !== form.value[field]
-      )
+  const unplanned = computed(() => (props.project ? needsPlan(props.project) : true))
+  const currentPlan = computed(() =>
+    props.project?.stagePlans?.find((p) => p.stage === props.project?.stage)
   )
   const required = { required: true, message: '请填写此项', trigger: 'change' }
   const rules = computed<FormRules>(() => ({
-    summary: [required, { whitespace: true, message: '请填写进展说明', trigger: 'blur' }],
-    ...(overall.value
-      ? {
-          overallProgress: [required],
-          status: [required],
-          stageExpectedDate: [required],
-          expectedLaunchDate: [required],
-          expectedDeliveryDate: [required]
-        }
+    ...(!overall.value || props.correction
+      ? { summary: [required, { whitespace: true, message: '请填写说明', trigger: 'blur' }] }
       : {}),
-    ...(nextStage.value ? { nextStageExpectedDate: [required] } : {}),
-    ...(datesChanged.value ? { changeReason: [required], changeDescription: [required] } : {}),
-    ...(blocked.value || form.value.status === 'blocked' ? { blocker: [required] } : {})
+    ...(overall.value ? { status: [required] } : {}),
+    ...(blocked.value ? { blocker: [required] } : {})
   }))
   watch(
     () => props.modelValue,
@@ -93,11 +85,7 @@ export function useProgressForm(
         blocker: overall.value ? p.blocker : '',
         ...(overall.value
           ? {
-              overallProgress: p.overallProgress,
-              status: p.simpleStatus,
-              stageExpectedDate: p.stageExpectedDate,
-              expectedLaunchDate: p.expectedLaunchDate,
-              expectedDeliveryDate: p.expectedDeliveryDate
+              status: 'in-progress'
             }
           : {})
       }
@@ -107,6 +95,10 @@ export function useProgressForm(
   )
   async function save(): Promise<void> {
     if (busy.value || !(await formRef.value?.validate().catch(() => false))) return
+    if (overall.value && !props.correction && unplanned.value) {
+      error.value = '请先完整制定当前及后续环节计划'
+      return
+    }
     busy.value = true
     error.value = ''
     try {
@@ -134,7 +126,6 @@ export function useProgressForm(
             correctProject(draft, {
               ...input,
               stage: correctionStage.value,
-              overallProgress: input.overallProgress ?? 0,
               reason: input.summary
             })
           else updateProgress(draft, input)
@@ -170,7 +161,8 @@ export function useProgressForm(
     formRef,
     beforeClose,
     nextStage,
-    datesChanged,
+    unplanned,
+    currentPlan,
     rules,
     save
   }

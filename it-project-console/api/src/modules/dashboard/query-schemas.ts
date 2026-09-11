@@ -41,10 +41,14 @@ export const demandQuery = z
     department: text,
     keyword: text,
     submitterId: text,
+    from: dateSchema.optional(),
+    to: dateSchema.optional(),
+    completion: z.enum(['', 'normal', 'late']).default(''),
     status: z
       .enum(['', 'all', 'draft', 'pending', 'returned', 'rejected', 'established', 'withdrawn'])
       .default('')
   })
   .strict()
+  .refine(dateOrder, '起始日期不得晚于结束日期')
 export type DashboardQuery = z.infer<typeof dashboardQuery>
 export type DemandQuery = z.infer<typeof demandQuery>

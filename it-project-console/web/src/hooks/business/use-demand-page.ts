@@ -2,6 +2,8 @@ import { runtimeConfig } from '@/config/runtime'
 import { useLiveQuery } from './use-live-query'
 import { useDemandDeepLink } from './use-demand-deep-link'
 import type { DemandStatistics } from '@/services/live-dashboard-types'
+import { demandCompletion, completionLabels } from '@/services/demand-completion'
+import { shanghaiDay } from '@/services/workflow-validation'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { displayTime } from '@/utils/project-display'
@@ -13,7 +15,8 @@ export function useDemandPage() {
   const router = useRouter()
   const route = useRoute()
   const scope = ref(prototypeStore.currentUser.role === 'business' ? 'mine' : 'all')
-  const keyword = ref('')
+  const dateRange = ref<[string, string] | null>(null)
+  const completion = ref('')
   const status = ref('')
   const department = ref('')
   watch(
@@ -47,7 +50,8 @@ export function useDemandPage() {
     () => prototypeStore.currentUser.id,
     () => {
       scope.value = prototypeStore.currentUser.role === 'business' ? 'mine' : 'all'
-      keyword.value = ''
+      dateRange.value = null
+      completion.value = ''
       status.value = ''
       department.value = ''
       editing.value = false
@@ -61,13 +65,17 @@ export function useDemandPage() {
   ])
   const prototypeDemands = computed(() =>
     (prototypeStore.database?.demands || [])
+      .map((d) => ({ ...d, ...demandCompletion(linkedProject(d.id)) }))
       .filter(
         (d) =>
           (scope.value === 'all' || d.submitterId === prototypeStore.currentUser.id) &&
           (!status.value || d.status === status.value) &&
           (!department.value || d.department === department.value) &&
-          (!keyword.value.trim() ||
-            `${d.name} ${d.id}`.toLowerCase().includes(keyword.value.trim().toLowerCase()))
+          (!dateRange.value?.length ||
+            (!!d.submittedAt &&
+              shanghaiDay(d.submittedAt) >= dateRange.value[0] &&
+              shanghaiDay(d.submittedAt) <= dateRange.value[1])) &&
+          (!completion.value || d.completionStatus === completion.value)
       )
       .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
   )
@@ -78,13 +86,24 @@ export function useDemandPage() {
     retry
   } = useLiveQuery<DemandStatistics>('/demand-statistics', () => ({
     scope: scope.value,
-    keyword: keyword.value,
+    from: dateRange.value?.[0],
+    to: dateRange.value?.[1],
+    completion: completion.value,
     status: status.value,
     department: department.value
   }))
   const demands = computed(() =>
     runtimeConfig.isPrototype ? prototypeDemands.value : (statistics.value?.demands ?? [])
   )
+  const hasFilters = computed(
+    () => !!(status.value || department.value || completion.value || dateRange.value?.length)
+  )
+  function resetFilters() {
+    status.value = ''
+    department.value = ''
+    completion.value = ''
+    dateRange.value = null
+  }
   const userName = (id: string) =>
     prototypeStore.database?.users.find((user) => user.id === id)?.name || id
   const canEdit = (demand: DemoDemand) =>
@@ -110,10 +129,12 @@ export function useDemandPage() {
     { label: '已立项', value: establishedCount.value, icon: 'ri:checkbox-circle-line' },
     {
       label: '关联在途项目',
-      value: demands.value.filter((d) => {
-        const p = linkedProject(d.id)
-        return p?.status === 'active' && !p.archived
-      }).length,
+      value: !runtimeConfig.isPrototype
+        ? (statistics.value?.activeProjectCount ?? 0)
+        : demands.value.filter((d) => {
+            const p = linkedProject(d.id)
+            return p?.status === 'active' && !p.archived
+          }).length,
       icon: 'ri:git-branch-line'
     }
   ])
@@ -141,7 +162,11 @@ export function useDemandPage() {
   return {
     prototypeStore,
     scope,
-    keyword,
+    dateRange,
+    completion,
+    completionLabels,
+    resetFilters,
+    hasFilters,
     status,
     department,
     departments,

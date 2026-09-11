@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { card, date, identity, reset, row, select, snapshot } from './review-helpers'
+import { card, date, identity, reset, row, select, snapshot, planProject } from './review-helpers'
 
 test('领导评审从UI重置开始，四账号连续操作共享同一项目并回到初始场景', async ({ page }) => {
   test.setTimeout(90000)
@@ -26,30 +26,26 @@ test('领导评审从UI重置开始，四账号连续操作共享同一项目并
   await select(page, drawer, '主负责人', '王浩然')
   await select(page, drawer, '协作人员', '赵清越')
   await drawer.getByRole('combobox', { name: '协作人员', exact: true }).press('Escape')
-  await date(drawer, '最初计划上线日期', '2099-10-20')
-  await date(drawer, '最初计划交付日期', '2099-10-30')
-  await date(drawer, '方案设计预计完成日期', '2099-10-10')
   await drawer.getByRole('button', { name: '通过并立项' }).click()
   await expect(row(page, name)).toContainText('已立项')
   const project = (await snapshot(page)).database.projects.find((p) => p.demandId === demand.id)!
   await identity(page, '王浩然')
-  await card(page, name).getByRole('button', { name: '更新进度' }).click()
-  drawer = page.getByRole('dialog', { name: '更新项目进度' })
-  await drawer.getByRole('spinbutton', { name: '整体进度（%）' }).fill('63')
-  await select(page, drawer, '当前阶段状态', '已阻塞')
-  await drawer.getByLabel('阻塞说明').fill('等待预算接口联调窗口开放')
-  await drawer.getByLabel('进展说明', { exact: true }).fill('等待预算接口联调窗口')
-  await drawer.getByRole('button', { name: '保存进度' }).click()
+  await planProject(page, name)
+  await card(page, name).getByRole('button', { name: '更新环节' }).click()
+  drawer = page.getByRole('dialog', { name: '更新环节' })
+  await drawer.getByRole('radio', { name: '尚未完成', exact: true }).check()
+  await drawer.getByLabel('补充说明（选填）', { exact: true }).fill('等待预算接口联调窗口')
+  await drawer.getByRole('button', { name: '保存更新' }).click()
   await expect(drawer).not.toBeVisible()
-  await expect(card(page, name)).toContainText('63%')
+  await expect(card(page, name)).toContainText('方案设计')
   const overall = (await snapshot(page)).database.projects.find((p) => p.id === project.id)!
   await identity(page, '赵清越')
   await expect(card(page, name)).toContainText('协作')
-  await expect(card(page, name).getByRole('button', { name: '更新进度' })).toHaveCount(0)
+  await expect(card(page, name).getByRole('button', { name: '更新环节' })).toHaveCount(0)
   await card(page, name).getByRole('button', { name: '填写协作进展' }).click()
   drawer = page.getByRole('dialog', { name: '填写协作进展' })
   await drawer.getByLabel('进展说明', { exact: true }).fill('预算联调样例已准备')
-  await drawer.getByRole('button', { name: '保存进度' }).click()
+  await drawer.getByRole('button', { name: '保存更新' }).click()
   await expect(drawer).not.toBeVisible()
   const afterCollaboration = (await snapshot(page)).database.projects.find(
     (p) => p.id === project.id
@@ -58,12 +54,12 @@ test('领导评审从UI重置开始，四账号连续操作共享同一项目并
   await identity(page, '陈立峰')
   await page.getByPlaceholder('项目名称、编号、负责人或部门').fill(name)
   await expect(page.locator('[data-project-id]')).toHaveCount(1)
-  await expect(card(page, name)).toContainText('已阻塞')
+  await expect(card(page, name)).toContainText('进行中')
   await page.getByRole('button', { name: '在手项目 1', exact: true }).click()
   await page.getByRole('button', { name: `${name} · 王浩然`, exact: true }).click()
   drawer = page.getByRole('dialog', { name: '项目详情', exact: true })
   await expect(drawer).toContainText('预算联调样例已准备')
-  await expect(drawer).toContainText('63%')
+  await expect(drawer).toContainText('方案设计')
   await drawer.getByRole('button', { name: '关闭', exact: true }).click()
   const workload = page.locator('section').filter({ hasText: '月度人员负载' })
   await workload
@@ -78,9 +74,9 @@ test('领导评审从UI重置开始，四账号连续操作共享同一项目并
   await expect(page).not.toHaveURL(/projectId=/)
   await page.getByRole('menuitem', { name: '甘特图', exact: true }).click()
   await expect(page.getByRole('button', { name: `查看${name}详情`, exact: true })).toContainText(
-    '63%'
+    '正常推进'
   )
-  await expect(page.locator('.project-cell').filter({ hasText: name })).toContainText('阻塞')
+  await expect(page.locator('.project-cell').filter({ hasText: name })).toContainText('方案设计')
   await page.getByRole('button', { name: `查看${name}详情`, exact: true }).click()
   await expect(drawer).toContainText('预算联调样例已准备')
   const saved = await snapshot(page)

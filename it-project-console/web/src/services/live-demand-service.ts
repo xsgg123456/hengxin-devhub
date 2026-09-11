@@ -29,11 +29,13 @@ export function saveLiveDemand(
   version?: number
 ) {
   const { attachments, ...fields } = input
-  const attachmentIds = attachments?.filter(file => file.kind === 'file').map(file => {
-    const value = materialDto(file)
-    if (!value || !('attachmentId' in value)) throw new Error('请等待文件上传完成')
-    return value.attachmentId
-  })
+  const attachmentIds = attachments
+    ?.filter((file) => file.kind === 'file')
+    .map((file) => {
+      const value = materialDto(file)
+      if (!value || !('attachmentId' in value)) throw new Error('请等待文件上传完成')
+      return value.attachmentId
+    })
   return apiRequest<LiveWriteResult>(id ? `/demands/${id}` : '/demands', {
     method: id ? 'PATCH' : 'POST',
     body: {
@@ -57,10 +59,7 @@ export function projectDto(input: ProjectInput) {
     department: input.department,
     priority: input.priority,
     primaryOwnerId: input.primaryOwnerId,
-    collaboratorIds: input.collaboratorIds,
-    originalLaunchDate: input.expectedLaunchDate,
-    originalDeliveryDate: input.expectedDeliveryDate,
-    stageExpectedDate: input.stageExpectedDate || undefined
+    collaboratorIds: input.collaboratorIds
   }
 }
 export function createLiveProject(input: ProjectInput) {
@@ -81,10 +80,7 @@ export function reviewLiveDemand(
         ? {
             priority: project.priority,
             primaryOwnerId: project.primaryOwnerId,
-            collaboratorIds: project.collaboratorIds,
-            originalLaunchDate: project.expectedLaunchDate,
-            originalDeliveryDate: project.expectedDeliveryDate,
-            stageExpectedDate: project.stageExpectedDate || undefined
+            collaboratorIds: project.collaboratorIds
           }
         : {}),
       version,

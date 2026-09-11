@@ -31,10 +31,10 @@ async function open(page: Page, id: string) {
   await expect(detail(page)).toBeVisible()
 }
 async function edit(page: Page) {
-  await detail(page).getByRole('button', { name: '更新进度', exact: true }).click()
-  return page.getByRole('dialog', { name: '更新项目进度', exact: true })
+  await detail(page).getByRole('button', { name: '更新环节', exact: true }).click()
+  return page.getByRole('dialog', { name: '更新环节', exact: true })
 }
-test('真实整体更新与协作隔离→风险与历史→100%显式归档→管理重开', async ({ page }) => {
+test('真实排期与协作隔离→风险与留痕→验收自动完成→管理重开', async ({ page }) => {
   test.setTimeout(150_000)
   await mkdir(resolve('../output'), { recursive: true })
   await page.setViewportSize({ width: 1440, height: 1000 })
@@ -48,9 +48,6 @@ test('真实整体更新与协作隔离→风险与历史→100%显式归档→�
   await select(page, drawer, '主负责人', '王浩然')
   await select(page, drawer, '协作人员', '赵清越')
   await drawer.getByLabel('需求部门', { exact: true }).click()
-  await date(drawer, '最初计划上线日期', '2099-11-01')
-  await date(drawer, '最初计划交付日期', '2099-12-01')
-  await date(drawer, '方案设计预计完成日期', '2099-10-01')
   await drawer.getByRole('button', { name: '创建项目', exact: true }).click()
   await expect(drawer).not.toBeVisible()
   const created = (await read(page)).database.projects.find((p) => p.name === name)!
@@ -58,14 +55,26 @@ test('真实整体更新与协作隔离→风险与历史→100%显式归档→�
   await detail(page).getByRole('button', { name: '关闭', exact: true }).click()
   await switchUser(page, '王浩然')
   await open(page, created.id)
-  drawer = await edit(page)
-  await drawer.getByLabel('整体进度（%）', { exact: true }).fill('100')
-  await drawer.getByLabel('进展说明', { exact: true }).fill('接口整体已完成，验收仍需显式关闭')
-  await date(drawer, '当前阶段预计完成日期', '2020-01-01')
-  await date(drawer, '当前预计交付日期', '2020-02-01')
+  await detail(page).getByRole('button', { name: '制定计划', exact: true }).click()
+  drawer = page.getByRole('dialog', { name: '制定项目计划', exact: true })
+  const stages = ['方案设计', '开发编码', '联调测试', '上线部署', '验收交付']
+  for (const stage of stages) {
+    await date(drawer, `${stage}计划开始日期`, '2099-10-01')
+    await date(drawer, `${stage}计划结束日期`, '2099-10-01')
+  }
+  await drawer.getByRole('button', { name: '保存计划' }).click()
+  await expect(drawer).not.toBeVisible()
+  await expect(detail(page)).toContainText('保存项目计划 · 首次排期')
+  await expect(detail(page)).not.toContainText('[object Object]')
+  await detail(page).getByRole('button', { name: '调整计划', exact: true }).click()
+  drawer = page.getByRole('dialog', { name: '调整项目计划', exact: true })
+  for (const stage of stages) {
+    await date(drawer, `${stage}计划开始日期`, '2020-01-01')
+    await date(drawer, `${stage}计划结束日期`, '2020-01-01')
+  }
   await select(page, drawer, '日期调整原因', '业务新增或变更需求')
   await drawer.getByLabel('日期调整说明', { exact: true }).fill('真实日期调整保留最初承诺')
-  await drawer.getByRole('button', { name: '保存进度', exact: true }).click()
+  await drawer.getByRole('button', { name: '保存计划' }).click()
   await expect(drawer).not.toBeVisible()
   await expect(detail(page)).toContainText('环节延期')
   await expect(detail(page)).toContainText('项目延期')
@@ -75,8 +84,7 @@ test('真实整体更新与协作隔离→风险与历史→100%显式归档→�
   expect(overall).toMatchObject({
     status: 'active',
     archived: false,
-    overallProgress: 100,
-    originalDeliveryDate: '2099-12-01'
+    originalDeliveryDate: '2099-10-01'
   })
   await page.screenshot({
     path: resolve('../output/phase7-live-progress-risk.png'),
@@ -89,7 +97,7 @@ test('真实整体更新与协作隔离→风险与历史→100%显式归档→�
   drawer = page.getByRole('dialog', { name: '填写协作进展', exact: true })
   await expect(drawer.getByLabel('整体进度（%）')).toHaveCount(0)
   await drawer.getByLabel('进展说明', { exact: true }).fill('协作接口测试通过')
-  await drawer.getByRole('button', { name: '保存进度', exact: true }).click()
+  await drawer.getByRole('button', { name: '保存更新', exact: true }).click()
   await expect(drawer).not.toBeVisible()
   snapshot = await read(page)
   expect(snapshot.database.projects.find((p) => p.id === created.id)?.lastOverallUpdatedAt).toBe(
@@ -100,30 +108,29 @@ test('真实整体更新与协作隔离→风险与历史→100%显式归档→�
   await open(page, created.id)
   await expect(detail(page)).toContainText('协作接口测试通过')
   await expect(
-    detail(page).getByRole('button', { name: /更新进度|填写协作进展|管理纠正|取消项目/ })
+    detail(page).getByRole('button', { name: /更新环节|制定计划|填写协作进展|管理纠正|取消项目/ })
   ).toHaveCount(0)
   await detail(page).getByRole('button', { name: '关闭', exact: true }).click()
   await switchUser(page, '王浩然')
   await open(page, created.id)
   for (const stage of ['方案设计', '开发编码', '联调测试', '上线部署', '验收交付']) {
     drawer = await edit(page)
-    await select(page, drawer, '当前阶段状态', '已完成')
-    if (stage !== '验收交付') await date(drawer, '下一阶段预计完成日期', '2099-10-01')
-    await drawer.getByLabel('进展说明', { exact: true }).fill(`${stage}真实完成记录`)
-    await drawer.getByRole('button', { name: '保存进度', exact: true }).click()
+    await drawer.getByText('已完成', { exact: true }).click()
+    await expect(drawer.locator('.el-date-editor')).toHaveCount(0)
+    await drawer.getByLabel('补充说明（选填）', { exact: true }).fill(`${stage}真实完成记录`)
+    await drawer.getByRole('button', { name: '保存更新', exact: true }).click()
     await expect(drawer).not.toBeVisible()
   }
-  await detail(page).getByRole('button', { name: '完成并归档', exact: true }).click()
-  await expect(page.locator('.el-message-box__message')).toContainText(name)
-  await page.getByRole('button', { name: '确认完成并归档', exact: true }).click()
-  await expect(detail(page)).toContainText('已完成 · 已归档')
+  await expect(detail(page)).toContainText('已完成')
+  await expect(detail(page).getByRole('button', { name: '完成并归档' })).toHaveCount(0)
   await page.reload()
   await expect(detail(page)).toContainText('验收交付真实完成记录')
   snapshot = await read(page)
   expect(snapshot.database.projects.find((p) => p.id === created.id)).toMatchObject({
     status: 'completed',
-    archived: true
+    archived: false
   })
+  expect(snapshot.database.projects.find(p => p.id === created.id)?.actualCompletedAt).toBeTruthy()
   const updateCount = snapshot.database.progressUpdates.filter(
     (p) => p.projectId === created.id
   ).length
@@ -135,11 +142,12 @@ test('真实整体更新与协作隔离→风险与历史→100%显式归档→�
   await detail(page).getByRole('button', { name: '重新打开', exact: true }).click()
   await expect(page.locator('.el-message-box__message')).toContainText(name)
   await page.getByRole('button', { name: '确认重新打开', exact: true }).click()
-  await expect(detail(page).getByRole('button', { name: '更新进度', exact: true })).toBeVisible()
+  await expect(detail(page).getByRole('button', { name: '更新环节', exact: true })).toBeVisible()
   snapshot = await read(page)
   expect(snapshot.database.projects.find((p) => p.id === created.id)).toMatchObject({
     status: 'active',
-    archived: false
+    archived: false,
+    actualCompletedAt: null
   })
   expect(snapshot.database.progressUpdates.filter((p) => p.projectId === created.id)).toHaveLength(
     updateCount

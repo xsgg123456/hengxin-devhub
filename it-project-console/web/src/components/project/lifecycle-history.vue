@@ -22,6 +22,7 @@
   const props = defineProps<{ projectId: string }>()
   const store = usePrototypeStore()
   const actions: Record<DemoLifecycleEvent['action'], string> = {
+    plan: '保存项目计划',
     complete: '完成项目',
     cancel: '取消项目',
     archive: '归档项目',
@@ -33,11 +34,12 @@
     revoke: '移除管理权限'
   }
   const labels: Record<string, string> = {
+    stagePlans: '环节计划',
     status: '状态',
     archived: '归档',
     stage: '阶段',
     simpleStatus: '阶段状态',
-    overallProgress: '整体进度',
+    actualCompletedAt: '实际完成时间',
     deleted: '已删除'
   }
   const values: Record<string, string> = {
@@ -53,6 +55,7 @@
   }
   function describe(data: DemoLifecycleEvent['before']) {
     return Object.entries(data)
+      .filter(([key]) => key !== 'overallProgress')
       .map(
         ([key, value]) =>
           `${labels[key] ?? key}：${values[String(value)] ?? value}${key === 'overallProgress' ? '%' : ''}`

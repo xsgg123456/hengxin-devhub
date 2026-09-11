@@ -100,5 +100,37 @@ export function migratePrototypeSnapshot(value: unknown): PrototypeSnapshot {
     )
       throw new Error('项目记录无效')
   }
+  for (const project of snapshot.database.projects) {
+    project.stagePlans ??= []
+    if (project.actualCompletedAt == null) {
+      const events = snapshot.database.lifecycleEvents.filter(
+        (e) => e.entityType === 'project' && e.entityId === project.id
+      )
+      const validEvidence = (at: string) =>
+        Number.isFinite(Date.parse(at)) &&
+        !events.some((e) => e.action === 'reopen' && Date.parse(e.createdAt) > Date.parse(at))
+      const latest = (times: string[]) =>
+        times
+          .filter(validEvidence)
+          .sort((a, b) => Date.parse(a) - Date.parse(b))
+          .at(-1)
+      const stageTime = latest(
+        snapshot.database.stageHistories
+          .filter((h) => h.projectId === project.id && h.stage === '验收交付' && h.completedAt)
+          .map((h) => h.completedAt!)
+      )
+      const eventTime = latest(
+        events.filter((e) => e.action === 'complete').map((e) => e.createdAt)
+      )
+      const completedAt = stageTime ?? eventTime
+      const complete =
+        project.status === 'completed' ||
+        (project.status === 'active' &&
+          project.stage === '验收交付' &&
+          project.simpleStatus === 'completed')
+      project.actualCompletedAt = complete && completedAt ? completedAt : null
+      if (complete && completedAt) project.status = 'completed'
+    }
+  }
   return snapshot
 }

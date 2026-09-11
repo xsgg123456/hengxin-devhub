@@ -118,7 +118,7 @@ it('AC019/020：主责2协作1，多人项目只有唯一主责且项目明细�
   expect(data.reduce((n, r) => n + r.primary.length, 0)).toBe(3)
   expect(row.delayed.map((p) => p.id)).toEqual([ids[0]])
 })
-it('AC021/022：跨月整体比例裁剪，原交付标记与持久风险文字保留', async () => {
+it('AC021/022：跨月计划裁剪，无人工百分比，原交付标记与持久风险文字保留', async () => {
   const data = await get<ReturnType<typeof buildGanttRows>>(
     `/api/gantt?${query('&month=2026-09&risk=delayed')}`
   )
@@ -126,7 +126,7 @@ it('AC021/022：跨月整体比例裁剪，原交付标记与持久风险文字�
   expect(data[0]).toMatchObject({
     left: 0,
     width: 30,
-    progressWidth: 14,
+    progressWidth: 0,
     originalMarker: 19.5,
     clipped: true,
     outside: false,
@@ -140,7 +140,7 @@ it('AC021/022：跨月整体比例裁剪，原交付标记与持久风险文字�
 })
 it('需求统计筛选与明细一致，中间空月份补零', async () => {
   const data = await get<Awaited<ReturnType<typeof demandStatistics>>>(
-    `/api/demand-statistics?${query('&scope=mine&status=pending')}`
+    `/api/demand-statistics?${query('&scope=mine&status=pending&from=2026-08-01&to=2026-10-31')}`
   )
   expect(data.demands).toHaveLength(2)
   expect(data.submitters[0]?.value).toBe(data.demands.length)
@@ -152,11 +152,12 @@ it('需求统计筛选与明细一致，中间空月份补零', async () => {
   const empty = await get<Awaited<ReturnType<typeof demandStatistics>>>(
     `/api/demand-statistics?${query('&keyword=不存在')}`
   )
-  expect(empty).toEqual({
+  expect(empty).toMatchObject({
     demands: [],
     submitters: [],
     departments: [],
-    trend: { months: [], departments: [] }
+    activeProjectCount: 0,
+    trend: { departments: [] }
   })
 })
 it('逾期项目仍计入当前月主责时间重叠', async () => {
@@ -284,4 +285,38 @@ it('未登录被拒；非法日期、月份、分页、枚举和未知参数严�
       (await runtime.app.inject({ url, headers: { cookie: cookies[business] } })).statusCode,
       url
     ).toBe(400)
+})
+
+
+it('需求完成筛选按最新验收计划与上海日期，首尾日期和指标图表同源', async () => {
+  const tag = '完成筛选-' + randomUUID()
+  for (const [suffix, submittedAt, actual, status] of [
+    ['early', '2026-09-01T00:00:00+08:00', '2026-09-20T15:59:59Z', 'COMPLETED'],
+    ['late', '2026-09-30T23:59:59+08:00', '2026-09-20T16:00:00Z', 'COMPLETED'],
+    ['unknown', '2026-09-10T09:00:00+08:00', '', 'COMPLETED'],
+    ['active', '2026-09-11T09:00:00+08:00', '', 'ACTIVE']
+  ] as const) {
+    await db.demand.create({data:{name:suffix, department:tag, ownerId:business, status:'APPROVED',
+      submittedAt:new Date(submittedAt), expectedLaunchDate:new Date('2026-09-01'),
+      project:{create:{name:suffix,primaryOwnerId:owner,department:tag,status,
+        currentDeliveryDate:new Date('2026-09-20'), actualCompletedAt:actual ? new Date(actual) : null}}}})
+  }
+  const base='/api/demand-statistics?department='+encodeURIComponent(tag)+'&from=2026-09-01&to=2026-09-30'
+  const all=await get<Awaited<ReturnType<typeof demandStatistics>>>(base)
+  expect(all.demands).toHaveLength(4)
+  expect(all.activeProjectCount).toBe(1)
+  const late=await get<Awaited<ReturnType<typeof demandStatistics>>>(base+'&completion=late')
+  expect(late.demands.map(d=>d.name)).toEqual(['late'])
+  expect(late.submitters[0]?.value).toBe(1)
+  expect(late.departments[0]?.value).toBe(1)
+  expect(late.trend).toEqual({months:['2026-09'],departments:[{name:tag,data:[1]}]})
+  expect(late.activeProjectCount).toBe(0)
+  const normal=await get<Awaited<ReturnType<typeof demandStatistics>>>(base+'&completion=normal')
+  expect(normal.demands.map(d=>d.name)).toEqual(['early'])
+  await db.project.updateMany({where:{department:tag,name:'late'},data:{currentDeliveryDate:new Date('2026-09-25')}})
+  const adjusted=await get<Awaited<ReturnType<typeof demandStatistics>>>(base+'&completion=normal')
+  expect(adjusted.demands).toHaveLength(2)
+  const empty=await get<Awaited<ReturnType<typeof demandStatistics>>>(base+'&completion=normal&status=pending')
+  expect(empty.demands).toEqual([])
+  expect(empty.departments).toEqual([])
 })

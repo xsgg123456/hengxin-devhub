@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { actionDemand, actionProject } from './lifecycle-service'
 import { createProject, reviewDemand, saveDemand, updateProgress } from './workflow-service'
-import { fresh, demandInput, projectInput, now } from './workflow-fixtures'
+import { fresh, demandInput, projectInput, now, planFixture } from './workflow-fixtures'
 import { PROJECT_STAGES, type DemoProject } from '@/domain/prototype'
 
 function projectFixture() {
   const snapshot = fresh()
   snapshot.activeUserId = 'user-manager-chen'
   const project = createProject(snapshot, projectInput)
+  planFixture(snapshot, project)
   return { snapshot, project }
 }
 describe('需求生命周期', () => {
@@ -51,49 +52,22 @@ describe('需求生命周期', () => {
   })
 })
 describe('项目生命周期', () => {
-  it('100%不自动完成，末阶段完成后仅主负责人显式完成自动归档', () => {
+  it('验收完成自动完成项目但不归档，重开清除当前完成时间并保留历史', () => {
     const { snapshot, project } = projectFixture()
     snapshot.activeUserId = project.primaryOwnerId
-    updateProgress(snapshot, {
-      projectId: project.id,
-      kind: 'overall',
-      overallProgress: 100,
-      summary: '进度达到100%',
-      status: 'in-progress',
-      now
+    for (const _stage of PROJECT_STAGES.slice(2)) updateProgress(snapshot, {
+      projectId: project.id, kind: 'overall', summary: '', status: 'completed', now
     })
-    expect(project).toMatchObject({ status: 'active', archived: false })
-    expect(() => actionProject(snapshot, { projectId: project.id, action: 'complete' })).toThrow(
-      '验收'
-    )
-    for (const _stage of PROJECT_STAGES.slice(2)) {
-      updateProgress(snapshot, {
-        projectId: project.id,
-        kind: 'overall',
-        overallProgress: 100,
-        summary: '阶段完成',
-        status: 'completed',
-        nextStageExpectedDate: '2026-09-20',
-        now
-      })
-    }
-    expect(project).toMatchObject({
-      stage: '验收交付',
-      simpleStatus: 'completed',
-      status: 'active'
-    })
+    expect(project).toMatchObject({ status: 'completed', archived: false, actualCompletedAt: now })
+    expect(snapshot.database.lifecycleEvents[0]).toMatchObject({ action: 'complete', authorId: project.primaryOwnerId, createdAt: now })
+    expect(() => actionProject(snapshot, { projectId: project.id, action: 'complete' })).toThrow('自动完成')
     snapshot.activeUserId = 'user-manager-chen'
-    expect(() => actionProject(snapshot, { projectId: project.id, action: 'complete' })).toThrow(
-      '主负责人'
-    )
-    snapshot.activeUserId = project.primaryOwnerId
-    actionProject(snapshot, { projectId: project.id, action: 'complete', now })
-    expect(project).toMatchObject({ status: 'completed', archived: true })
-    expect(snapshot.database.lifecycleEvents[0]).toMatchObject({
-      action: 'complete',
-      authorId: project.primaryOwnerId,
-      createdAt: now
-    })
+    actionProject(snapshot, { projectId: project.id, action: 'reopen', now })
+    expect(project.actualCompletedAt).toBeNull()
+    const again = '2026-09-09T09:00:00+08:00'
+    updateProgress(snapshot, { projectId: project.id, kind: 'overall', summary: '', status: 'completed', now: again })
+    expect(project.actualCompletedAt).toBe(again)
+    expect(snapshot.database.lifecycleEvents.filter(e => e.entityId === project.id && e.action === 'complete')).toHaveLength(2)
   })
   it('取消必须填写原因；取消/归档只读，重开保留历史并恢复更新', () => {
     const { snapshot, project } = projectFixture()
@@ -123,11 +97,11 @@ describe('项目生命周期', () => {
     updateProgress(snapshot, {
       projectId: project.id,
       kind: 'overall',
-      overallProgress: 5,
+      status: 'in-progress',
       summary: '恢复执行',
       now
     })
-    expect(project.overallProgress).toBe(5)
+    expect(project.simpleStatus).toBe('in-progress')
   })
   it('有个人进度仍能删除；本人删除已归档关联项目时整组清除且保留审计', () => {
     const { snapshot, project } = projectFixture()

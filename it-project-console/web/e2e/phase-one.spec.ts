@@ -35,7 +35,7 @@ test('业务身份默认本人需求，可只读访问全部项目', async ({ pa
   await expect(page).toHaveURL(/#\/project-overview$/)
   await expect(page.locator('[data-project-id]').first()).toBeVisible()
   await expect(page.getByRole('button', { name: '直接创建项目' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '更新进度' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '更新环节' })).toHaveCount(0)
 })
 
 test('重置演示数据会恢复固定业务数据并保留当前身份', async ({ page }) => {

@@ -1,3 +1,4 @@
+import { saveProjectPlan, remainingStages } from './stage-plan-service'
 import { createInitialPrototypeSnapshot } from '@/mocks/seed'
 import type { DemandInput, ProjectInput } from './workflow-service'
 export const now = '2026-09-08T09:00:00+08:00'
@@ -27,4 +28,8 @@ export function fresh() {
   const snapshot = createInitialPrototypeSnapshot()
   snapshot.activeUserId = 'user-business-li'
   return snapshot
+}
+
+export function planFixture(snapshot: import('@/domain/prototype').PrototypeSnapshot, project: import('@/domain/prototype').DemoProject) {
+  return saveProjectPlan(snapshot, { projectId: project.id, plans: remainingStages(project).map((stage, index) => ({ stage, startDate: `2026-09-${String(9 + index * 3).padStart(2, '0')}`, endDate: `2026-09-${String(11 + index * 3).padStart(2, '0')}` })), now })
 }

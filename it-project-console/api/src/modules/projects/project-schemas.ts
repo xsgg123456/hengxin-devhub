@@ -3,7 +3,7 @@ import { dateSchema, idSchema } from '../demands/demand-schemas.js'
 export const projectFields = {
   priority: z.enum(['P0', 'P1', 'P2']), primaryOwnerId: idSchema,
   collaboratorIds: z.array(idSchema).max(100).default([]),
-  originalLaunchDate: dateSchema, originalDeliveryDate: dateSchema,
+  originalLaunchDate: dateSchema.optional(), originalDeliveryDate: dateSchema.optional(),
   stageExpectedDate: dateSchema.optional()
 }
 export const projectSchema = z.object({

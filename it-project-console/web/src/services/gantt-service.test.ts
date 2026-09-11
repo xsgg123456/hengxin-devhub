@@ -23,18 +23,18 @@ describe('月度甘特', () => {
     expect(row.originalMarker).toBe(4.5)
     expect(row.clipped).toBe(true)
   })
-  it('0及100进度和不相交月份', () => {
+  it('历史百分比不影响时间条，保留不相交月份过滤', () => {
     expect(
       buildGanttRows([{ ...project(), overallProgress: 100 }], '2026-09')[0].progressWidth
-    ).toBe(9)
+    ).toBe(0)
     expect(buildGanttRows([{ ...project(), overallProgress: 0 }], '2026-09')[0].progressWidth).toBe(
       0
     )
     expect(buildGanttRows([project()], '2026-10')).toEqual([])
   })
-  it('跨月进度按完整20天计算后裁剪；月末单日仍展示', () => {
+  it('跨月计划裁剪，历史百分比不生成进度条；月末单日仍展示', () => {
     const [row] = buildGanttRows([{ ...project(), overallProgress: 75 }], '2026-09')
-    expect(row.progressWidth).toBe(4)
+    expect(row.progressWidth).toBe(0)
     const [single] = buildGanttRows(
       [
         { ...project(), createdAt: '2026-09-30T00:00:00+08:00', expectedDeliveryDate: '2026-09-30' }

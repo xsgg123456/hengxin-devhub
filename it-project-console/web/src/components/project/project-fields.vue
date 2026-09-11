@@ -39,29 +39,7 @@
         />
       </ElSelect>
     </ElFormItem>
-    <div class="dates">
-      <ElFormItem label="最初计划上线日期" prop="expectedLaunchDate"
-        ><ElDatePicker
-          v-model="model.expectedLaunchDate"
-          type="date"
-          value-format="YYYY-MM-DD"
-          aria-label="最初计划上线日期"
-      /></ElFormItem>
-      <ElFormItem label="最初计划交付日期" prop="expectedDeliveryDate"
-        ><ElDatePicker
-          v-model="model.expectedDeliveryDate"
-          type="date"
-          value-format="YYYY-MM-DD"
-          aria-label="最初计划交付日期"
-      /></ElFormItem>
-    </div>
-    <ElFormItem label="方案设计预计完成日期" prop="stageExpectedDate"
-      ><ElDatePicker
-        v-model="model.stageExpectedDate"
-        type="date"
-        value-format="YYYY-MM-DD"
-        aria-label="方案设计预计完成日期"
-    /></ElFormItem>
+    <p class="text-sm text-g-600">立项后，由主负责人制定后续五个环节的计划。</p>
   </ElForm>
 </template>
 
@@ -79,15 +57,10 @@
   )
   const formRef = ref<FormInstance>()
   const rules: FormRules = Object.fromEntries(
-    [
-      'name',
-      'department',
-      'primaryOwnerId',
-      'priority',
-      'expectedLaunchDate',
-      'expectedDeliveryDate',
-      'stageExpectedDate'
-    ].map((field) => [field, [{ required: true, message: '请填写此项', trigger: 'change' }]])
+    ['name', 'department', 'primaryOwnerId', 'priority'].map((field) => [
+      field,
+      [{ required: true, message: '请填写此项', trigger: 'change' }]
+    ])
   )
   function removeOwnerFromCollaborators(): void {
     model.value.collaboratorIds = model.value.collaboratorIds.filter(

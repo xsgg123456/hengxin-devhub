@@ -17,16 +17,13 @@ export async function createProject(tx: Prisma.TransactionClient, input: Project
     requestId: input.requestId, name: input.name, department: input.department,
     demandId, source: demandId ? 'demand' : 'direct', priority: input.priority,
     primaryOwnerId: input.primaryOwnerId, stage: '方案设计', simpleStatus: 'not-started',
-    originalLaunchDate: new Date(input.originalLaunchDate), currentLaunchDate: new Date(input.originalLaunchDate),
-    originalDeliveryDate: new Date(input.originalDeliveryDate), currentDeliveryDate: new Date(input.originalDeliveryDate),
-    stageExpectedDate: input.stageExpectedDate ? new Date(input.stageExpectedDate) : null,
     lastOverallUpdatedAt: now,
     members: { create: input.collaboratorIds.map(userId => ({ userId })) },
     stageHistories: { create: ['需求受理', '立项评审', '方案设计', '开发编码', '联调测试', '上线部署', '验收交付'].map((stage, index) => ({
       stage, status: index < 2 ? 'completed' : index === 2 ? 'current' : 'future',
       enteredAt: index < 3 ? now : null, completedAt: index < 2 ? now : null,
       progress: index < 2 ? 100 : 0,
-      expectedDate: index === 2 && input.stageExpectedDate ? new Date(input.stageExpectedDate) : null
+      expectedDate: null
     })) }
   } })
   await refreshProjectRisks(tx, project.id, now)

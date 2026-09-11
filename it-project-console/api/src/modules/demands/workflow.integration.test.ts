@@ -19,8 +19,7 @@ const valid = () => ({ requestId: key(), name: '集成需求', description: '真
   expectedLaunchDate: '2099-12-31', prd: { kind: 'link', url: 'https://example.com/prd' },
   prototype: { kind: 'link', url: 'https://example.com/html' }, submit: true })
 const project = () => ({ requestId: key(), name: '直接项目', department: '财务部', priority: 'P1',
-  primaryOwnerId: engineer, collaboratorIds: ['user-engineer-zhao'],
-  originalLaunchDate: '2099-11-01', originalDeliveryDate: '2099-12-01', stageExpectedDate: '2099-10-01' })
+  primaryOwnerId: engineer, collaboratorIds: ['user-engineer-zhao'] })
 function call(method: HTTPMethods, url: string, payload?: Record<string, unknown>, user = business) {
   return runtime.app.inject({ method, url, payload, headers: { cookie: cookies[user], origin: env.WEB_ORIGIN } })
 }
@@ -156,7 +155,7 @@ describe('真实需求与立项事务', () => {
       .toEqual([business, engineer, 'user-engineer-zhao'].sort())
     expect((await call('DELETE', `/api/demands/${id}`, { requestId: key(), version: 2 })).statusCode).toBe(200)
   })
-  it('无效人员不落半成品，直接创建不伪造需求、日期初始化且可幂等重试', async () => {
+  it('无效人员不落半成品，直接创建不伪造需求或排期且可幂等重试', async () => {
     const count = await db.demand.count()
     expect((await call('POST', '/api/projects', project(), engineer)).statusCode).toBe(403)
     expect((await call('POST', '/api/projects', { ...project(), collaboratorIds: [engineer] }, manager)).statusCode).toBe(400)
@@ -167,8 +166,8 @@ describe('真实需求与立项事务', () => {
     expect((await call('POST', '/api/projects', input, manager)).json()).toEqual(a.json())
     const row = await db.project.findUniqueOrThrow({ where: { id: a.json<{ data: { id: string } }>().data.id } })
     expect(row.source).toBe('direct'); expect(row.demandId).toBeNull()
-    expect(row.currentLaunchDate).toEqual(row.originalLaunchDate)
-    expect(row.currentDeliveryDate).toEqual(row.originalDeliveryDate)
+    expect(row).toMatchObject({ stagePlans: [], currentLaunchDate: null, originalLaunchDate: null,
+      currentDeliveryDate: null, originalDeliveryDate: null, stageExpectedDate: null })
     expect(await db.demand.count()).toBe(count)
   })
   it('真实上传材料只能绑定对应需求并保护已立项文件', async () => {

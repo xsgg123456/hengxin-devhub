@@ -1,3 +1,4 @@
+import { planProject } from './review-helpers'
 import { expect, test, type Page } from '@playwright/test'
 import type { PrototypeSnapshot } from '../src/domain/prototype'
 const key = 'it-project-console.prototype.v1'
@@ -23,30 +24,27 @@ test.beforeEach(async ({ page }) => {
   await page.reload()
   await expect(page.getByRole('button', { name: '直接创建项目' })).toBeVisible({ timeout: 15000 })
 })
-test('验收主责显式完成归档，刷新保持，管理员重开保留历史', async ({ page }) => {
+test('验收完成自动完成项目不归档，刷新保持，管理员重开保留历史', async ({ page }) => {
   await page.evaluate((k) => {
     const data: PrototypeSnapshot = JSON.parse(localStorage.getItem(k)!)
     const p = data.database.projects[0]!
-    p.stage = '验收交付'; p.simpleStatus = 'in-progress'; p.overallProgress = 100
+    p.stage = '验收交付'; p.simpleStatus = 'in-progress'; p.stagePlans = [{ stage: '验收交付', startDate: '2099-10-01', endDate: '2099-10-30', originalStartDate: '2099-10-01', originalEndDate: '2099-10-30' }]
     localStorage.setItem(k, JSON.stringify(data))
   }, key)
   await page.reload()
   await identity(page, '王浩然')
   await open(page)
   await expect(detail(page).getByRole('button', { name: '完成并归档', exact: true })).toHaveCount(0)
-  await detail(page).getByRole('button', { name: '更新进度', exact: true }).click()
-  const update = page.getByRole('dialog', { name: '更新项目进度', exact: true })
-  await select(page, '当前阶段状态', '已完成')
-  await update.getByLabel('进展说明', { exact: true }).fill('验收签字已全部完成')
-  await update.getByRole('button', { name: '保存进度' }).click()
+  await detail(page).getByRole('button', { name: '更新环节', exact: true }).click()
+  const update = page.getByRole('dialog', { name: '更新环节', exact: true })
+  await update.getByText('已完成', { exact: true }).click()
+  await update.getByLabel('补充说明（选填）', { exact: true }).fill('验收签字已全部完成')
+  await update.getByRole('button', { name: '保存更新' }).click()
   await expect(update).not.toBeVisible()
-  expect((await read(page)).database.projects[0]).toMatchObject({ status: 'active', archived: false })
-  await detail(page).getByRole('button', { name: '完成并归档', exact: true }).click()
-  await expect(page.locator('.el-message-box__message')).toContainText('客户数据治理一期')
-  await page.getByRole('button', { name: '确认完成并归档', exact: true }).click()
   await expect.poll(async () => (await read(page)).database.projects[0]!.status).toBe('completed')
+  await expect(detail(page).getByRole('button', { name: '完成并归档', exact: true })).toHaveCount(0)
   await page.reload()
-  expect((await read(page)).database.projects[0]).toMatchObject({ archived: true, overallProgress: 100 })
+  expect((await read(page)).database.projects[0]).toMatchObject({ archived: false, status: 'completed' })
   await detail(page).getByRole('button', { name: '关闭', exact: true }).click()
   await identity(page, '陈立峰')
   await open(page)
@@ -138,9 +136,9 @@ test('甘特跨月同源进度，月份切换，冻结左栏与三档桌面截�
   const heading = page.getByRole('heading', { name: /\d{4}-\d{2} 甘特图/ })
   const month = await heading.textContent()
   const track = page.getByRole('button', { name: '查看客户数据治理一期详情' })
-  await expect(track).toContainText(`${(await read(page)).database.projects[0]!.overallProgress}%`)
+  await expect(track).toContainText('正常推进')
   await track.hover()
-  await expect(page.locator('.gantt-tip').filter({ hasText: '客户数据治理一期' })).toContainText('整体进度')
+  await expect(page.locator('.gantt-tip').filter({ hasText: '客户数据治理一期' })).toContainText('预计交付')
   await page.getByRole('button', { name: '下一月', exact: true }).click()
   await expect(heading).not.toHaveText(month!)
   await expect(track).toBeVisible()
@@ -158,7 +156,7 @@ test('甘特跨月同源进度，月份切换，冻结左栏与三档桌面截�
     await page.locator('.gantt-scroll').evaluate((el) => { el.scrollLeft = 0 })
   }
   await track.click()
-  await expect(detail(page)).toContainText(`${(await read(page)).database.projects[0]!.overallProgress}%`)
+  await expect(detail(page)).toContainText('七环节计划与执行')
 })
 test('职责待办评估退回到本人补充，重提后消失', async ({ page }) => {
   await page.goto('/#/today-tasks')
@@ -182,6 +180,7 @@ test('职责待办评估退回到本人补充，重提后消失', async ({ page 
 })
 
 test('主责停更更新后任务消失，协作记录不代替整体更新', async ({ page }) => {
+  await planProject(page, '客户数据治理一期')
   await page.evaluate((k) => {
     const data: PrototypeSnapshot = JSON.parse(localStorage.getItem(k)!)
     const p = data.database.projects[0]!
@@ -200,16 +199,16 @@ test('主责停更更新后任务消失，协作记录不代替整体更新', as
   await task.getByRole('button', { name: '填写协作进展' }).click()
   let editor = page.getByRole('dialog', { name: '填写协作进展' })
   await editor.getByLabel('进展说明', { exact: true }).fill('协作准备完成')
-  await editor.getByRole('button', { name: '保存进度' }).click()
+  await editor.getByRole('button', { name: '保存更新' }).click()
   await expect(editor).not.toBeVisible()
   expect((await read(page)).database.projects[0]!.lastOverallUpdatedAt).toBe(before)
   await expect(task).toContainText('未更新')
   await identity(page, '王浩然')
   await page.goto('/#/today-tasks')
-  await task.getByRole('button', { name: '更新进度' }).click()
-  editor = page.getByRole('dialog', { name: '更新项目进度' })
-  await editor.getByLabel('进展说明', { exact: true }).fill('主责确认进度，风险已处理')
-  await editor.getByRole('button', { name: '保存进度' }).click()
+  await task.getByRole('button', { name: '更新环节' }).click()
+  editor = page.getByRole('dialog', { name: '更新环节' })
+  await editor.getByLabel('补充说明（选填）', { exact: true }).fill('主责确认进度，风险已处理')
+  await editor.getByRole('button', { name: '保存更新' }).click()
   await expect(editor).not.toBeVisible()
   await expect(task).toHaveCount(0)
   await page.reload()
@@ -220,18 +219,18 @@ test('管理纠正必填原因，纠正后详情显示操作者及审计前后�
   await detail(page).getByRole('button', { name: '管理纠正', exact: true }).click()
   const editor = page.getByRole('dialog', { name: '管理纠正', exact: true })
   const before = (await read(page)).database
-  await editor.getByRole('spinbutton', { name: '整体进度（%）' }).fill('72')
+  await expect(editor.getByRole('option', { name: '需求受理', exact: true })).toHaveCount(0)
   await editor.getByRole('button', { name: '保存纠正' }).click()
   await expect(editor.getByText('请填写此项', { exact: true })).toBeVisible()
   expect((await read(page)).database).toEqual(before)
   await editor.getByLabel('纠正原因', { exact: true }).fill('对照交付清单纠正为实际进度')
   await editor.getByRole('button', { name: '保存纠正' }).click()
   await expect(editor).not.toBeVisible()
-  await expect(detail(page)).toContainText('72%')
+  await expect(detail(page)).toContainText('开发编码')
   await expect(detail(page)).toContainText('对照交付清单纠正为实际进度')
   await expect(detail(page)).toContainText('陈立峰')
   const event = (await read(page)).database.lifecycleEvents[0]!
-  expect(event).toMatchObject({ action: 'correct', authorId: 'user-manager-chen', after: { overallProgress: 72 }, before: { overallProgress: before.projects[0]!.overallProgress } })
+  expect(event).toMatchObject({ action: 'correct', authorId: 'user-manager-chen', after: { stage: '开发编码' }, before: { stage: before.projects[0]!.stage } })
   await page.reload()
-  await expect(detail(page)).toContainText('72%')
+  await expect(detail(page)).toContainText('开发编码')
 })

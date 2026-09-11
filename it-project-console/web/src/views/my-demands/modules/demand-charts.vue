@@ -48,15 +48,17 @@
         ><div class="title"><h4>按月需求趋势</h4></div
         ><span class="text-xs text-g-500">每月需求数量 · 按部门堆叠</span></div
       >
-      <ElEmpty v-if="!trend.months.length" description="当前范围暂无已提交需求趋势" />
+      <ElEmpty v-if="!demands.length" description="当前范围暂无已提交需求趋势" />
       <div
-        v-show="trend.months.length"
+        v-show="demands.length"
         ref="trendChartRef"
         style="height: 270px"
         aria-label="月度部门需求堆叠柱形图"
       />
       <p class="text-xs text-g-500 mt-3"
-        >全部图表与需求表格共用范围；月度以提交时间统计，无提交时间的草稿不计入趋势。</p
+        >{{
+          dateRange?.length ? '趋势按所选提出时间区间展示' : '趋势展示近六个月'
+        }}；全部图表与需求清单共用筛选结果，无提交时间的草稿不计入趋势。</p
       >
     </section>
     <ElDialog
@@ -89,6 +91,7 @@
     demands: DemoDemand[]
     users: DemoUser[]
     statistics?: DemandStatistics
+    dateRange?: [string, string] | null
   }>()
   const emit = defineEmits<{ detail: [demandId: string] }>()
   const selected = ref<DemoDemand[]>([])
@@ -113,13 +116,19 @@
   )
   const trend = computed(() =>
     runtimeConfig.isPrototype
-      ? demandMonthlyTrend(props.demands)
+      ? demandMonthlyTrend(props.demands, { from: props.dateRange?.[0], to: props.dateRange?.[1] })
       : (props.statistics?.trend ?? { months: [], departments: [] })
   )
   const panels = computed(() => [
     { title: '需求提出人分布', items: submitters.value },
     { title: '需求部门分布', items: departments.value }
   ])
+  watch(
+    () => props.demands,
+    () => {
+      selected.value = []
+    }
+  )
   function detailTooltip(title: string, demands: DemoDemand[]) {
     const root = document.createElement('div')
     root.style.cssText = 'max-height:280px;max-width:340px;overflow:auto;white-space:normal'
@@ -196,8 +205,8 @@
     getChartInstance
   } = useChartComponent({
     props: { height: '270px' },
-    checkEmpty: () => !trend.value.months.length,
-    watchSources: [() => props.demands, () => props.users],
+    checkEmpty: () => !props.demands.length,
+    watchSources: [() => props.demands, () => props.users, () => props.dateRange],
     generateOptions: (): EChartsOption => {
       getChartInstance()?.clear()
       return {

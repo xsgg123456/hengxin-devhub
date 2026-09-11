@@ -34,3 +34,19 @@ export async function select(page: Page, drawer: Locator, label: string, option:
     .getAttribute('aria-controls')
   await page.locator(`[id="${listId}"]`).getByRole('option', { name: option, exact: true }).click()
 }
+
+export async function planProject(page: Page, name: string) {
+  await card(page, name).getByRole('button', { name: '制定计划' }).click()
+  const drawer = page.getByRole('dialog', { name: '制定项目计划', exact: true })
+  const inputs = drawer.locator('input[aria-label$="计划开始日期"]')
+  const labels = await inputs.evaluateAll(elements => elements.map(el => el.getAttribute('aria-label')!))
+  for (const label of labels) {
+    await date(drawer, label, '2099-10-10')
+    await date(drawer, label.replace('开始', '结束'), '2099-10-10')
+  }
+  await date(drawer, '上线部署计划结束日期', '2099-10-20')
+  await date(drawer, '验收交付计划开始日期', '2099-10-20')
+  await date(drawer, '验收交付计划结束日期', '2099-10-30')
+  await drawer.getByRole('button', { name: '保存计划' }).click()
+  await expect(drawer).not.toBeVisible()
+}

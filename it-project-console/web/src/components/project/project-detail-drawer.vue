@@ -26,28 +26,29 @@
         <ElDescriptionsItem label="协作人员">{{
           project.collaboratorIds.map(userName).join('、') || '无'
         }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="整体进度">{{ project.overallProgress }}%</ElDescriptionsItem>
+        <ElDescriptionsItem label="当前环节">{{ project.stage }}</ElDescriptionsItem>
         <ElDescriptionsItem label="阶段状态">{{
           statusLabel[project.simpleStatus]
         }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="原计划上线">{{ project.originalLaunchDate }}</ElDescriptionsItem>
+        <ElDescriptionsItem label="原计划上线">{{
+          project.originalLaunchDate || '—'
+        }}</ElDescriptionsItem>
         <ElDescriptionsItem label="当前预计上线">{{
-          project.expectedLaunchDate
+          project.expectedLaunchDate || '—'
         }}</ElDescriptionsItem>
         <ElDescriptionsItem label="原计划交付">{{
-          project.originalDeliveryDate
+          project.originalDeliveryDate || '—'
         }}</ElDescriptionsItem>
         <ElDescriptionsItem label="当前预计交付">{{
-          project.expectedDeliveryDate
+          project.expectedDeliveryDate || '—'
         }}</ElDescriptionsItem>
         <ElDescriptionsItem label="阶段预计完成">{{
-          project.stageExpectedDate
+          project.stageExpectedDate || '—'
         }}</ElDescriptionsItem>
         <ElDescriptionsItem label="最近整体更新">{{
           displayTime(project.lastOverallUpdatedAt)
         }}</ElDescriptionsItem>
       </ElDescriptions>
-      <StageProgress :stage="project.stage" :status="project.simpleStatus" />
       <StageHistory :project-id="project.id" />
       <LifecycleActions :project="project" />
       <LifecycleHistory :project-id="project.id" />
@@ -71,7 +72,7 @@
       <h4 class="mt-6 mb-4 font-medium">日期调整记录</h4>
       <p v-if="!changes.length" class="text-sm text-g-600">暂无日期调整</p>
       <div v-for="change in changes" :key="change.id" class="history-row"
-        ><p>{{ fieldLabels[change.field] }}：{{ change.oldValue }} → {{ change.newValue }}</p
+        ><p>{{ fieldLabel(change.field) }}：{{ change.oldValue }} → {{ change.newValue }}</p
         ><p>{{ change.reason }} · {{ change.description }}</p
         ><small>{{ userName(change.authorId) }} · {{ displayTime(change.createdAt) }}</small></div
       >
@@ -84,19 +85,28 @@
     </template>
     <template #footer
       ><ElButton @click="$emit('update:modelValue', false)">关闭</ElButton
-      ><ElButton v-if="canUpdate" type="primary" @click="$emit('edit', project!.id)">{{
-        isOverall ? '更新进度' : '填写协作进展'
-      }}</ElButton></template
+      ><ElButton v-if="canUpdate && isOverall" @click="planOpen = true">{{
+        needsPlan(project!) ? '制定计划' : '调整计划'
+      }}</ElButton
+      ><ElButton
+        v-if="canUpdate && (!isOverall || !needsPlan(project!))"
+        type="primary"
+        @click="$emit('edit', project!.id)"
+        >{{ isOverall ? '更新环节' : '填写协作进展' }}</ElButton
+      ></template
     >
+    <ProjectPlanDrawer v-model="planOpen" :project="project" />
   </ElDrawer>
 </template>
 <script setup lang="ts">
-  import { computed } from 'vue'
+  import { computed, ref } from 'vue'
   import type { DemoProject } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { computeProjectRisks } from '@/services/risk-service'
   import { displayTime, statusLabel } from '@/utils/project-display'
-  import StageProgress from './stage-progress.vue'
+  import ProjectPlanDrawer from './project-plan-drawer.vue'
+  import { needsPlan } from '@/services/stage-plan-service'
+  const planOpen = ref(false)
   import StageHistory from './stage-history.vue'
   import RiskTag from './risk-tag.vue'
   import MaterialSummary from '@/components/demand/material-summary.vue'
@@ -132,11 +142,17 @@
         : computeProjectRisks(project.value, store.database?.scheduleChanges ?? [])
       : []
   )
-  const fieldLabels = {
+  const fieldLabels: Record<string, string> = {
     stageExpectedDate: '阶段预计完成',
     expectedLaunchDate: '预计上线',
     expectedDeliveryDate: '预计交付'
   }
+  const fieldLabel = (field: string) =>
+    fieldLabels[field] ??
+    field
+      .replace(/^stage:/, '')
+      .replace(':startDate', '计划开始')
+      .replace(':endDate', '计划结束')
   const isOverall = computed(
     () =>
       store.currentUser.role === 'manager' || store.currentUser.id === project.value?.primaryOwnerId

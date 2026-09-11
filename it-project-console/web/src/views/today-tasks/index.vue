@@ -91,7 +91,7 @@
   const actionLabels = {
     review: '评估需求',
     supplement: '补充重提',
-    overall: '更新进度',
+    overall: '更新环节',
     personal: '填写协作进展',
     coordinate: '查看并协调'
   }

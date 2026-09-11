@@ -5,6 +5,7 @@ import type {
   Project,
   ProjectMember
 } from '../../generated/prisma/client.js'
+import { readStagePlans } from '../projects/project-plan-state.js'
 const date = (value: Date | null) => value?.toISOString().slice(0, 10) ?? ''
 export const mapUser = (user: User) => ({
   id: user.id,
@@ -64,6 +65,8 @@ export const mapProject = (project: Project & { members: ProjectMember[] }) => (
   stage: project.stage,
   simpleStatus: project.simpleStatus,
   overallProgress: project.overallProgress,
+  stagePlans: readStagePlans(project.stagePlans),
+  actualCompletedAt: project.actualCompletedAt?.toISOString() ?? null,
   stageExpectedDate: date(project.stageExpectedDate),
   originalLaunchDate: date(project.originalLaunchDate),
   expectedLaunchDate: date(project.currentLaunchDate),

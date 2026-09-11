@@ -1,10 +1,9 @@
-import { PROJECT_STAGES, type PrototypeSnapshot } from '@/domain/prototype'
+import { PROJECT_STAGES, type DemoProject, type PrototypeSnapshot } from '@/domain/prototype'
 import { isItDepartment } from '@/utils/it-department'
 import { computeProjectRisks } from './risk-service'
 import { demandMaterials } from './demand-materials'
 import {
   assertWrite,
-  dateValue,
   nextId,
   textValue,
   validateMaterials,
@@ -17,9 +16,9 @@ export interface ProjectInput {
   primaryOwnerId: string
   collaboratorIds: string[]
   priority: 'P0' | 'P1' | 'P2'
-  expectedLaunchDate: string
-  expectedDeliveryDate: string
-  stageExpectedDate: string
+  expectedLaunchDate?: string
+  expectedDeliveryDate?: string
+  stageExpectedDate?: string
   now?: string
 }
 export interface ReviewInput {
@@ -56,11 +55,8 @@ export function createProject(
   if (!['P0', 'P1', 'P2'].includes(input.priority)) throw new WorkflowError('请选择项目优先级')
   const name = textValue(input.name, '项目名称', 100)
   const department = textValue(input.department, '需求部门', 100)
-  dateValue(input.expectedLaunchDate, '预计上线日期')
-  dateValue(input.expectedDeliveryDate, '预计交付日期')
-  dateValue(input.stageExpectedDate, '阶段预计完成日期')
   const now = input.now ?? new Date().toISOString()
-  const project = {
+  const project: DemoProject = {
     id: nextId(
       'P',
       snapshot.database.projects,
@@ -79,11 +75,13 @@ export function createProject(
     stage: '方案设计' as const,
     simpleStatus: 'not-started' as const,
     overallProgress: 0,
-    stageExpectedDate: input.stageExpectedDate,
-    originalLaunchDate: input.expectedLaunchDate,
-    expectedLaunchDate: input.expectedLaunchDate,
-    originalDeliveryDate: input.expectedDeliveryDate,
-    expectedDeliveryDate: input.expectedDeliveryDate,
+    stagePlans: [],
+    actualCompletedAt: null,
+    stageExpectedDate: '',
+    originalLaunchDate: '',
+    expectedLaunchDate: '',
+    originalDeliveryDate: '',
+    expectedDeliveryDate: '',
     status: 'active' as const,
     archived: false,
     risks: [] as string[],

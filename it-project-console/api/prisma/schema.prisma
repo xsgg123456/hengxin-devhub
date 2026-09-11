@@ -147,6 +147,8 @@ model Project {
   originalDeliveryDate DateTime? @map("original_delivery_date") @db.Date
   currentDeliveryDate DateTime? @map("current_delivery_date") @db.Date
   stageExpectedDate DateTime? @map("stage_expected_date") @db.Date
+  stagePlans Json @default("[]") @map("stage_plans")
+  actualCompletedAt DateTime? @map("actual_completed_at") @db.Timestamptz(3)
   lastOverallUpdatedAt DateTime @default(now()) @map("last_overall_updated_at") @db.Timestamptz(3)
   version Int @default(1)
   blocker String @default("")

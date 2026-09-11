@@ -42,8 +42,7 @@ describe('真实项目命令', () => {
         projectId: 'p1',
         kind: 'overall',
         summary: '修正阶段',
-        overallProgress: 30,
-        nextStageExpectedDate: '2027-01-01'
+          nextStageExpectedDate: '2027-01-01'
       },
       '方案设计'
     )
@@ -52,7 +51,6 @@ describe('真实项目命令', () => {
     expect(body).toMatchObject({
       stage: '方案设计',
       reason: '修正阶段',
-      overallProgress: 30,
       version: 4,
       requestId: 'correction-key'
     })

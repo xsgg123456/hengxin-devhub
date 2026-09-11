@@ -52,7 +52,6 @@ describe('管理纠正', () => {
     const input = {
       projectId: project.id,
       stage: project.stage,
-      overallProgress: 20,
       reason: '修正误填',
       now
     }
@@ -63,35 +62,27 @@ describe('管理纠正', () => {
     expect(() => correctProject(snapshot, { ...input, stage: '验收交付' })).toThrow('跳过')
     expect(() => correctProject(snapshot, { ...input, stage: '联调测试' })).toThrow('完成当前')
     expect(() => correctProject(snapshot, { ...input, expectedLaunchDate: '2026-11-01' })).toThrow(
-      '日期调整原因'
+      '独立计划入口'
     )
     expect(snapshot).toEqual(before)
   })
-  it('回退保留原历史；日期与纠正记录含旧新值、人员和时间；有纠正不可删除', () => {
+  it('回退保留原历史与日期，记录人员时间且后续可管理删除', () => {
     const snapshot = fresh()
     snapshot.activeUserId = 'user-manager-chen'
     const project = snapshot.database.projects[0]
+    snapshot.database.stageHistories.find(h => h.projectId === project.id && h.stage === '方案设计')!.startedAt = '2026-08-01T00:00:00Z'
     const oldHistoryLength = snapshot.database.stageHistories.length
     const original = project.originalLaunchDate
     correctProject(snapshot, {
       projectId: project.id,
       stage: '方案设计',
-      overallProgress: 25,
       reason: '阶段填错',
-      expectedLaunchDate: '2026-11-01',
-      changeReason: '技术问题',
-      changeDescription: '补充验证',
       now
     })
     expect(project.stage).toBe('方案设计')
     expect(project.originalLaunchDate).toBe(original)
     expect(snapshot.database.stageHistories.length).toBe(oldHistoryLength + 1)
-    expect(snapshot.database.scheduleChanges.at(-1)).toMatchObject({
-      oldValue: '2026-10-30',
-      newValue: '2026-11-01',
-      authorId: snapshot.activeUserId,
-      createdAt: now
-    })
+    expect(snapshot.database.scheduleChanges).toHaveLength(0)
     expect(snapshot.database.lifecycleEvents[0]).toMatchObject({
       action: 'correct',
       reason: '阶段填错',
@@ -103,8 +94,7 @@ describe('管理纠正', () => {
       correctProject(snapshot, {
         projectId: project.id,
         stage: '方案设计',
-        overallProgress: 20,
-        reason: '纠正'
+          reason: '纠正'
       })
     ).toThrow('重新打开')
     actionProject(snapshot, { projectId: project.id, action: 'delete' })
@@ -135,10 +125,21 @@ describe('管理纠正', () => {
       correctProject(snapshot, {
         projectId: snapshot.database.projects[0].id,
         stage: '方案设计',
-        overallProgress: 20,
-        reason: '纠正'
+          reason: '纠正'
       })
     ).toThrow()
     expect(snapshot).toEqual(before)
   })
+})
+
+it('纠正拒绝系统阶段和空占位历史，真实完成但进入未知的环节可回退', () => {
+  const snapshot = fresh()
+  snapshot.activeUserId = 'user-manager-chen'
+  const p = snapshot.database.projects[0]
+  const command = { projectId: p.id, stage: '方案设计' as const, reason: '修复误操作', now }
+  expect(() => correctProject(snapshot, { ...command, stage: '需求受理' })).toThrow('固定阶段')
+  expect(() => correctProject(snapshot, command)).toThrow('已走过')
+  snapshot.database.stageHistories.find(h => h.projectId === p.id && h.stage === '方案设计')!.completedAt = '2026-09-01T00:00:00Z'
+  correctProject(snapshot, command)
+  expect(p.stage).toBe('方案设计')
 })

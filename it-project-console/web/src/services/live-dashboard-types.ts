@@ -1,4 +1,5 @@
 import type { DemoDemand, DemoProject } from '@/domain/prototype'
+import type { DemandRow } from './demand-completion'
 import type {
   demandDistribution,
   demandMonthlyTrend,
@@ -15,7 +16,8 @@ export interface DashboardResult {
   attentionDays: Record<string, number>
 }
 export interface DemandStatistics {
-  demands: DemoDemand[]
+  demands: DemandRow[]
+  activeProjectCount: number
   submitters: ReturnType<typeof demandDistribution>
   departments: ReturnType<typeof demandDistribution>
   trend: ReturnType<typeof demandMonthlyTrend>

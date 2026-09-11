@@ -2,7 +2,10 @@
   <div class="gantt-scroll" tabindex="0" aria-label="月度项目时间轴，可横向和纵向滚动">
     <div class="gantt-grid" :style="{ '--days': days, minWidth: `${230 + days * 36}px` }">
       <div class="frozen header">项目 / 主负责人 / 当前环节</div>
-      <div class="track header day-grid" :style="{ gridTemplateColumns: `repeat(${days}, minmax(0, 1fr))` }">
+      <div
+        class="track header day-grid"
+        :style="{ gridTemplateColumns: `repeat(${days}, minmax(0, 1fr))` }"
+      >
         <span v-for="day in days" :key="day" :class="{ weekend: isWeekend(day) }">{{ day }}</span>
       </div>
       <template v-for="row in rows" :key="row.project.id">
@@ -23,11 +26,7 @@
                 >原计划交付 {{ row.project.originalDeliveryDate
                 }}{{ row.outside ? '（超出本月显示范围）' : '' }}</p
               >
-              <p
-                >整体进度 {{ row.project.overallProgress }}%{{
-                  row.clipped ? ' · 跨月区间已裁剪' : ''
-                }}</p
-              >
+              <p>{{ row.clipped ? '跨月区间已裁剪' : '' }}</p>
               <p>{{ row.risks.join('；') || statusText(row) }}</p>
             </div>
           </template>
@@ -37,27 +36,19 @@
             @click="emit('detail', row.project.id)"
           >
             <span class="plan-bar" :style="barStyle(row.left, row.width)"></span>
-            <span
-              class="progress-bar"
-              :class="{
-                completed: row.project.status === 'completed',
-                stale: row.risks.some((r) => r.includes('未更新'))
-              }"
-              :style="barStyle(row.left, row.progressWidth)"
-            ></span>
             <span class="progress-label"
-              >{{ row.project.overallProgress }}%{{ row.clipped ? ' · 跨月' : '' }}</span
+              >{{ statusText(row) }}{{ row.clipped ? ' · 跨月' : '' }}</span
             >
             <span
               v-if="row.originalMarker !== null"
               class="original-marker"
-              :style="{ left: `${row.originalMarker / days * 100}%` }"
+              :style="{ left: `${(row.originalMarker / days) * 100}%` }"
               aria-label="原计划交付"
             ></span>
             <span
               v-if="todayIndex >= 0"
               class="today-line"
-              :style="{ left: `${(todayIndex + 0.5) / days * 100}%` }"
+              :style="{ left: `${((todayIndex + 0.5) / days) * 100}%` }"
             ></span>
           </button>
         </ElTooltip>
@@ -65,8 +56,8 @@
     </div>
   </div>
   <div class="gantt-legend"
-    ><span>灰条：计划区间</span><span>彩条：整体完成度</span><span>竖标：原计划交付</span
-    ><span>蓝线：今天</span><span>悬停查看明细，点击打开详情</span></div
+    ><span>灰条：计划区间</span><span>竖标：原计划交付</span><span>蓝线：今天</span
+    ><span>悬停查看明细，点击打开详情</span></div
   >
 </template>
 <script setup lang="ts">
@@ -81,8 +72,8 @@
   )
   const ownerName = (id: string) => props.users.find((user) => user.id === id)?.name ?? '未分配'
   const barStyle = (left: number, width: number) => ({
-    left: `${left / days.value * 100}%`,
-    width: `${width / days.value * 100}%`
+    left: `${(left / days.value) * 100}%`,
+    width: `${(width / days.value) * 100}%`
   })
   const statusText = (row: GanttRow) =>
     row.project.status === 'completed'

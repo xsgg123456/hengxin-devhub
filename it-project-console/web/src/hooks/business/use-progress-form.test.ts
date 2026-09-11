@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, nextTick, reactive } from 'vue'
 import type { FormInstance } from 'element-plus'
 import { ApiError } from '@/services/api-client'
-import type { DemoProject } from '@/domain/prototype'
+import { PROJECT_STAGES, type DemoProject } from '@/domain/prototype'
 import { useProgressForm } from './use-progress-form'
 const mocks = vi.hoisted(() => ({
   update: vi.fn(),
@@ -46,6 +46,7 @@ const project: DemoProject = {
   priority: 'P1',
   status: 'active',
   stage: '方案设计',
+  stagePlans: PROJECT_STAGES.slice(2).map(stage => ({ stage, startDate: '2026-09-10', endDate: '2026-09-10' })),
   simpleStatus: 'in-progress',
   overallProgress: 20,
   archived: false,

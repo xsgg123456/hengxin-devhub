@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { fresh, projectInput, demandInput, now } from './workflow-fixtures'
+import { fresh, projectInput, demandInput, now, planFixture } from './workflow-fixtures'
 import { correctProject } from './management-service'
 import { createProject, saveDemand, updateProgress } from './workflow-service'
 import { actionProject, actionDemand } from './lifecycle-service'
@@ -8,13 +8,13 @@ it('纠正离开不伪造完成时间，也不补造旧数据的未知时间，�
   const snapshot = fresh()
   snapshot.activeUserId = 'user-manager-chen'
   const p = snapshot.database.projects[0]
+  snapshot.database.stageHistories.find(h => h.projectId === p.id && h.stage === '方案设计')!.startedAt = '2026-08-01T00:00:00Z'
   const original = structuredClone(
     snapshot.database.stageHistories.filter((h) => h.projectId === p.id)
   )
   correctProject(snapshot, {
     projectId: p.id,
     stage: '方案设计',
-    overallProgress: 20,
     reason: '需要重新设计',
     now
   })
@@ -30,22 +30,19 @@ it('纠正离开不伪造完成时间，也不补造旧数据的未知时间，�
     completedAt: null,
     interruptedAt: now
   })
+  planFixture(snapshot, p)
   updateProgress(snapshot, {
     projectId: p.id,
     kind: 'overall',
-    overallProgress: 25,
     status: 'completed',
     summary: '重新设计完成',
-    nextStageExpectedDate: '2026-12-01',
     now
   })
   updateProgress(snapshot, {
     projectId: p.id,
     kind: 'overall',
-    overallProgress: 60,
     status: 'completed',
     summary: '重新开发完成',
-    nextStageExpectedDate: '2026-12-05',
     now
   })
   expect(after.find((h) => h.stage === '开发编码' && h.interruptedAt)?.completedAt).toBeNull()

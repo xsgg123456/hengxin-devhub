@@ -3,13 +3,6 @@
     <h4 class="font-medium mb-3">项目状态与管理</h4>
     <p class="text-sm mb-3">{{ stateLabel }}{{ project.archived ? ' · 已归档' : '' }}</p>
     <div class="actions">
-      <ElButton
-        v-if="canComplete"
-        type="success"
-        :disabled="store.saving || confirming"
-        @click="act('complete')"
-        >完成并归档</ElButton
-      >
       <template v-if="manager">
         <ElButton
           v-if="active"
@@ -73,13 +66,6 @@
   const stateLabel = computed(
     () => ({ active: '进行中', completed: '已完成', cancelled: '已取消' })[props.project.status]
   )
-  const canComplete = computed(
-    () =>
-      active.value &&
-      props.project.primaryOwnerId === store.currentUser.id &&
-      props.project.stage === '验收交付' &&
-      props.project.simpleStatus === 'completed'
-  )
   const canDelete = computed(
     () =>
       manager.value ||
@@ -90,7 +76,6 @@
         ))
   )
   const labels = {
-    complete: '完成并归档',
     cancel: '取消项目',
     archive: '归档项目',
     reopen: '重新打开',

@@ -1,3 +1,4 @@
+> 2026-09-11 本轮已确认并开始实施：[先排期后执行与需求池统一筛选](it-project-console/docs/STAGE-PLAN-ITERATION.md)。该文逐条为当前验收标准，覆盖旧人工百分比、滚动填日期、验收后二次完成与自动归档规则。保留旧章节作历史参照，实施以本轮为准；正式部署另需明确授权。
 # Development Plan — IT 项目管理台
 
 2026-09-10发布授权：用户已要求提交 Git、打包并部署生产。按已审查变更提交、完整备份、构建审计、迁移升级、同步100/500 MB限制及公网代理、线上核验依次执行。提交门禁发现Python检查误扫Git忽略的第三方审计下载目录；改为检查Git已跟踪及未忽略的新文件，并以隔离仓库验证忽略边界，再执行全部门禁。
@@ -710,3 +711,12 @@ MinIO补丁初验完成：两个原tag源码副本经Go1.27.1/grpc1.79.3/crypto0
 2026-09-10 09:43实际收尾：统一包20260910-go-live-v2已校验、部署健康，正式域名已切换。136前端＋55后端＋72真实集成＋6发布＋7浏览器流程通过，有界审查及回退故障分支通过；部署前新完整备份和SQL备份均成功。业务表摘要保持，通讯录正常同步已核验；18项目/2需求、两名管理人员及关闭通知保留。正式TLS健康/资源/权限边界/钉钉入口和预签名附件上传下载、摘要及清理通过。当前仅等待切换后真人扫码及其登录页面核验，不将此等待误标完成。详见GO-LIVE-CHECK最新结果。
 
 2026-09-10 09:53最终验收：Chrome真人钉钉登录张帅/IT部/ENGINEER通过，me/workspace200，工程师管理接口403；本人3项目、全部18项目、需求2条、需求分布及项目图表、9月9项目甘特/切月/详情/进度表单取消通过。写入流程由72项集成和7条隔离真实浏览器回归证明，正式数据未为测试而改写。既定发布收尾完成，正式通知仍关闭；已知迁移占位与底层限制保留。
+
+
+## 2026-09-11 迭代实施计划（本地验收通过，未部署）
+1. 数据与服务：api/prisma、modules/projects、progress、workspace、risk；支持无日期立项、完整排期/历史、阶段自动流转、验收自动完成及旧数据兼容。验收：权限、缺计划、日期顺序、版本冲突、重复提交、改期、重开、迁移集成通过。
+2. 项目UI与原型：web/components/project、hooks/business/use-progress-form、services/progress/management/workflow、repositories/migration、甘特图；原位实现已确认四张预览。验收：五阶段排期与完成闭环、旧数据只补剩余、百分比退出、历史可查。
+3. 需求池：api/modules/dashboard/demand-statistics-service/query-schemas，web/views/my-demands、use-demand-page、analytics-service；一次筛选带动全部结果。验收：日期、正常/延期完成、空态、重置、月份范围和指标/清单一致。
+4. 交付验证：pnpm typecheck、pnpm test、pnpm build、API test:integration、web test:e2e、真实API test:browser，code-reviewer两阶段审查修复；本地提交前运行项目门禁，不部署。
+
+执行结果及用例证据见 [本轮验收记录](it-project-console/docs/STAGE-PLAN-VERIFICATION.md)：Web 153、API 65、集成 96、原型浏览器 42、真实浏览器 7、发布配置 6、Harness 20 条通过，前后端构建和独立两阶段审查通过。

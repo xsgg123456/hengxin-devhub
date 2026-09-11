@@ -13,6 +13,70 @@
           <ElRadioButton value="all">全部需求</ElRadioButton>
         </ElRadioGroup>
       </div>
+      <div class="art-card p-5 mb-5">
+        <h3 class="font-medium mb-3">需求提交通道</h3>
+        <ElAlert
+          title="填写业务目标与材料，提交后进入待评估；管理人员立项后将生成正式项目。"
+          type="info"
+          :closable="false"
+          class="mb-4"
+        />
+        <ElButton class="mt-4" type="primary" @click="openEditor()">提交正式项目需求</ElButton>
+      </div>
+      <div class="art-card p-5 mb-5">
+        <div class="art-card-header mb-4"
+          ><div class="title"><h4>需求池</h4><p>筛选条件统一作用于统计、图表和需求清单</p></div
+          ><ElTag effect="plain" round>共 {{ demands.length }} 条</ElTag></div
+        >
+        <ElForm inline label-position="top" class="mb-3">
+          <ElFormItem label="需求部门"
+            ><ElSelect
+              v-model="department"
+              clearable
+              placeholder="全部部门"
+              style="width: 190px"
+              aria-label="需求部门"
+              ><ElOption
+                v-for="item in departments"
+                :key="item"
+                :value="item"
+                :label="item" /></ElSelect
+          ></ElFormItem>
+          <ElFormItem label="提出时间"
+            ><ElDatePicker
+              v-model="dateRange"
+              type="daterange"
+              value-format="YYYY-MM-DD"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+              range-separator="至"
+              style="width: 300px"
+          /></ElFormItem>
+          <ElFormItem label="需求状态"
+            ><ElSelect v-model="status" clearable placeholder="全部状态" style="width: 190px"
+              ><ElOption
+                v-for="(label, value) in demandStatusLabel"
+                :key="value"
+                :label="label"
+                :value="value" /></ElSelect
+          ></ElFormItem>
+          <ElFormItem label="完成情况"
+            ><ElSelect
+              v-model="completion"
+              clearable
+              placeholder="全部完成情况"
+              style="width: 190px"
+              aria-label="完成情况"
+              ><ElOption label="正常完成" value="normal" /><ElOption
+                label="延期完成"
+                value="late" /></ElSelect
+          ></ElFormItem>
+          <ElFormItem label="　"><ElButton @click="resetFilters">重置筛选</ElButton></ElFormItem>
+        </ElForm>
+        <p class="text-xs text-g-500"
+          >完成情况按“验收交付实际完成日”和“验收交付计划结束日”比较；未完成不归入正常或延期完成。</p
+        >
+      </div>
       <ElRow :gutter="20">
         <ElCol v-for="metric in metrics" :key="metric.label" :span="6">
           <div class="art-card relative flex flex-col justify-center h-30 px-5 mb-5">
@@ -25,16 +89,6 @@
           </div>
         </ElCol>
       </ElRow>
-      <div class="art-card p-5 mb-5">
-        <h3 class="font-medium mb-3">需求提交通道</h3>
-        <ElAlert
-          title="填写业务目标与材料，提交后进入待评估；管理人员立项后将生成正式项目。"
-          type="info"
-          :closable="false"
-          class="mb-4"
-        />
-        <ElButton class="mt-4" type="primary" @click="openEditor()">提交正式项目需求</ElButton>
-      </div>
       <ElAlert v-if="error" :title="error" type="error" :closable="false" class="mb-5"
         ><ElButton @click="retry">重新加载</ElButton></ElAlert
       >
@@ -49,6 +103,7 @@
       <DemandCharts
         v-if="!loading && !error"
         :statistics="statistics"
+        :date-range="dateRange"
         :demands="demands"
         :users="prototypeStore.database?.users ?? []"
         @detail="showDemand"
@@ -58,39 +113,12 @@
           ><div class="title"><h4>需求清单</h4><p>按提交时间从新到旧排列</p></div
           ><ElTag effect="plain" round>{{ demands.length }} 条记录</ElTag></div
         >
-        <ElForm inline label-position="top" class="mb-3">
-          <ElFormItem label="搜索需求"
-            ><ElInput v-model="keyword" placeholder="名称或编号" clearable
-          /></ElFormItem>
-          <ElFormItem label="需求状态"
-            ><ElSelect v-model="status" clearable placeholder="全部状态" style="width: 170px">
-              <ElOption
-                v-for="(label, value) in demandStatusLabel"
-                :key="value"
-                :value="value"
-                :label="label"
-              /> </ElSelect
-          ></ElFormItem>
-          <ElFormItem label="需求部门"
-            ><ElSelect v-model="department" clearable placeholder="全部部门" style="width: 170px">
-              <ElOption
-                v-for="item in departments"
-                :key="item"
-                :value="item"
-                :label="item"
-              /> </ElSelect
-          ></ElFormItem>
-        </ElForm>
         <ElTable
           v-if="!loading && !error"
           :data="demands"
           row-key="id"
           stripe
-          :empty-text="
-            keyword || status || department
-              ? '没有符合筛选条件的需求'
-              : '还没有需求，可点击上方按钮提交'
-          "
+          :empty-text="hasFilters ? '没有符合筛选条件的需求' : '还没有需求，可点击上方按钮提交'"
         >
           <ElTableColumn label="需求名称" min-width="190"
             ><template #default="{ row }"
@@ -120,6 +148,32 @@
             ><template #default="{ row }">{{
               formatDateTime(row.submittedAt)
             }}</template></ElTableColumn
+          >
+          <ElTableColumn label="验收交付计划结束" min-width="145"
+            ><template #default="{ row }">{{
+              row.plannedCompletionDate || '—'
+            }}</template></ElTableColumn
+          >
+          <ElTableColumn label="实际完成日" min-width="115"
+            ><template #default="{ row }">{{
+              row.actualCompletedAt ? formatDateTime(row.actualCompletedAt).slice(0, 10) : '—'
+            }}</template></ElTableColumn
+          >
+          <ElTableColumn label="完成情况" min-width="105"
+            ><template #default="{ row }"
+              ><ElTag
+                :type="
+                  row.completionStatus === 'late'
+                    ? 'danger'
+                    : row.completionStatus === 'normal'
+                      ? 'success'
+                      : 'info'
+                "
+                >{{
+                  completionLabels[row.completionStatus as keyof typeof completionLabels]
+                }}</ElTag
+              ></template
+            ></ElTableColumn
           >
           <ElTableColumn label="推进结果" min-width="140"
             ><template #default="{ row }"
@@ -181,7 +235,11 @@
   const {
     prototypeStore,
     scope,
-    keyword,
+    dateRange,
+    completion,
+    completionLabels,
+    resetFilters,
+    hasFilters,
     status,
     department,
     departments,

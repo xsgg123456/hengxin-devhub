@@ -144,7 +144,7 @@
       store.setDirty('demand-review', false)
       ElMessage.success(
         decision.value === 'establish'
-          ? '已立项，项目进入方案设计'
+          ? '已立项，等待主负责人制定计划'
           : decision.value === 'return'
             ? '已退回补充，提交人可以重新提交'
             : '已记录不予立项决定及原因'

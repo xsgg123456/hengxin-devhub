@@ -47,13 +47,13 @@ export function buildGanttRows(
     if (filters.risk === 'delayed' && !risks.some((risk) => risk.includes('延期'))) return []
     if (filters.risk === 'stale' && !risks.some((risk) => risk.includes('未更新'))) return []
     if (filters.risk === 'blocked' && project.simpleStatus !== 'blocked') return []
+    if (!project.expectedDeliveryDate) return []
     const start = shanghaiDay(project.createdAt)
     const begin = Date.parse(start) / DAY
     const end = Date.parse(project.expectedDeliveryDate) / DAY + 1
     if (begin >= last || end <= first) return []
     const visibleStart = Math.max(begin, first)
     const visibleEnd = Math.min(end, last)
-    const completeEnd = begin + ((end - begin) * project.overallProgress) / 100
     const original = Date.parse(project.originalDeliveryDate) / DAY + 0.5 - first
     return [
       {
@@ -62,7 +62,7 @@ export function buildGanttRows(
         start,
         left: visibleStart - first,
         width: visibleEnd - visibleStart,
-        progressWidth: Math.max(0, Math.min(completeEnd, visibleEnd) - visibleStart),
+        progressWidth: 0,
         originalMarker: original >= 0 && original < last - first ? original : null,
         clipped: begin < first || end > last,
         outside: original < 0 || original >= last - first

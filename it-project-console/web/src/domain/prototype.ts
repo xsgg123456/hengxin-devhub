@@ -56,7 +56,16 @@ export interface DemoDemand {
   reviewedAt?: string
   submittedAt: string
 }
+export interface StagePlan {
+  stage: ProjectStage
+  startDate: string
+  endDate: string
+  originalStartDate?: string
+  originalEndDate?: string
+}
 export interface DemoProject {
+  stagePlans?: StagePlan[]
+  actualCompletedAt?: string | null
   riskVersion?: number
   version?: number
   id: string
@@ -106,7 +115,12 @@ export interface DemoStageHistory {
 export interface DemoScheduleChange {
   id: string
   projectId: string
-  field: 'stageExpectedDate' | 'expectedLaunchDate' | 'expectedDeliveryDate'
+  field:
+    | 'stageExpectedDate'
+    | 'expectedLaunchDate'
+    | 'expectedDeliveryDate'
+    | `stage:${ProjectStage}:startDate`
+    | `stage:${ProjectStage}:endDate`
   oldValue: string
   newValue: string
   reason: string
@@ -129,6 +143,7 @@ export interface DemoLifecycleEvent {
   entityType: 'project' | 'demand' | 'user'
   entityId: string
   action:
+    | 'plan'
     | 'complete'
     | 'cancel'
     | 'archive'

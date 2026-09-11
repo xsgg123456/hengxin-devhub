@@ -1,3 +1,4 @@
+import { migratePrototypeSnapshot } from './prototype-migration'
 import { describe, expect, it } from 'vitest'
 import { createInitialPrototypeSnapshot } from '@/mocks/seed'
 import {
@@ -87,4 +88,21 @@ describe('Phase 2 持久化迁移', () => {
     ).toThrow('quota exceeded')
     expect(repo.load().database.demands[0].name).toBe(initial.database.demands[0].name)
   })
+})
+
+it('完成迁移优先验收证据、事件兜底，重开排除旧完成且不伪造更新时间', () => {
+  const snapshot = createInitialPrototypeSnapshot()
+  const p = snapshot.database.projects[0]
+  p.stage = '验收交付'; p.simpleStatus = 'completed'; p.actualCompletedAt = null
+  const event = { id: 'complete-test', entityType: 'project' as const, entityId: p.id, action: 'complete' as const, authorId: snapshot.activeUserId, createdAt: '2026-09-10T00:00:00Z', reason: '', before: {}, after: {} }
+  snapshot.database.lifecycleEvents.push(event)
+  snapshot.database.stageHistories.push({ projectId: p.id, stage: '验收交付', startedAt: '', completedAt: '2026-09-09T00:00:00Z' })
+  const migrated = migratePrototypeSnapshot(snapshot)
+  expect(migrated.database.projects[0]).toMatchObject({ status: 'completed', actualCompletedAt: '2026-09-09T00:00:00Z', archived: false })
+  snapshot.database.stageHistories = snapshot.database.stageHistories.filter(h => h.stage !== '验收交付')
+  expect(migratePrototypeSnapshot(snapshot).database.projects[0].actualCompletedAt).toBe(event.createdAt)
+  snapshot.database.lifecycleEvents.push({ ...event, id: 'reopen-test', action: 'reopen', createdAt: '2026-09-11T00:00:00Z' })
+  expect(migratePrototypeSnapshot(snapshot).database.projects[0].actualCompletedAt).toBeNull()
+  p.status = 'completed'
+  expect(migratePrototypeSnapshot(snapshot).database.projects[0].actualCompletedAt).toBeNull()
 })

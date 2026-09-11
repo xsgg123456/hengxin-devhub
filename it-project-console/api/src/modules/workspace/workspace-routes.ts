@@ -31,11 +31,11 @@ export function registerWorkspaceRoutes(
           projects: projects.map(mapProject),
           stageHistories: projects.flatMap((project) =>
             project.stageHistories
-              .filter((item) => item.enteredAt)
+              .filter((item) => item.enteredAt || item.completedAt || item.interruptedAt)
               .map((item) => ({
                 projectId: project.id,
                 stage: item.stage,
-                startedAt: item.enteredAt!.toISOString(),
+                startedAt: item.enteredAt?.toISOString() ?? '',
                 completedAt: item.completedAt?.toISOString() ?? null,
                 interruptedAt: item.interruptedAt?.toISOString()
               }))

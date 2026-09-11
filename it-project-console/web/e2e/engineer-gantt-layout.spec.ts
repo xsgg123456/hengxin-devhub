@@ -20,7 +20,7 @@ test('工程师本人范围直接展示原项目卡片，全部范围与管理�
 })
 
 for (const [month, days] of [['2027-02', 28], ['2028-02', 29], ['2026-09', 30], ['2026-10', 31]] as const) {
-  test(`${month}的${days}天网格与计划、进度、交付标记、今日线对齐`, async ({ page }) => {
+  test(`${month}的${days}天网格与计划、交付标记、今日线对齐且无人工进度条`, async ({ page }) => {
     await page.clock.setFixedTime(new Date(`${month}-10T04:00:00Z`))
     await page.goto('/')
     await expect(page.getByRole('button', { name: '直接创建项目' })).toBeVisible()
@@ -40,8 +40,10 @@ for (const [month, days] of [['2027-02', 28], ['2028-02', 29], ['2026-09', 30], 
     await expect(page.locator('.day-grid > span')).toHaveCount(days)
     const track = page.getByRole('button', { name: '查看日期对齐验证详情', exact: true })
     await expect(track).toBeVisible()
+    await expect(track.locator('.progress-bar')).toHaveCount(0)
+    await expect(track).not.toContainText('%')
     for (const [selector, leftDays, widthDays] of [
-      ['.plan-bar', 2, 18], ['.progress-bar', 2, 9],
+      ['.plan-bar', 2, 18],
       ['.original-marker', 17.5, null], ['.today-line', 9.5, null]
     ] as const) {
       const bar = await track.locator(selector).boundingBox()

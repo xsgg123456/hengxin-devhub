@@ -23,6 +23,7 @@ export function projectIntersectsMonth(
   today = shanghaiDay(new Date().toISOString())
 ) {
   const { start, end } = monthBounds(month)
+  if (!project.expectedDeliveryDate) return false
   // 进行中的延期项目仍占用人力，计划终点不能把它从当月负载中抹掉。
   const finish =
     project.status === 'active' && !project.archived && project.expectedDeliveryDate < today

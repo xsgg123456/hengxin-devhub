@@ -108,7 +108,8 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
         (d.submittedAt === '' || timestamp(d.submittedAt)) &&
         attachment(d.prd) &&
         attachment(d.prototype) &&
-        (d.attachments === undefined || (Array.isArray(d.attachments) && d.attachments.every(attachment)))
+        (d.attachments === undefined ||
+          (Array.isArray(d.attachments) && d.attachments.every(attachment)))
     )
   )
     return false
@@ -135,7 +136,24 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
           'expectedLaunchDate',
           'originalDeliveryDate',
           'expectedDeliveryDate'
-        ].every((f) => date(p[f])) &&
+        ].every((f) => p[f] === '' || date(p[f])) &&
+        (p.actualCompletedAt === undefined ||
+          p.actualCompletedAt === null ||
+          timestamp(p.actualCompletedAt)) &&
+        (p.stagePlans === undefined ||
+          (Array.isArray(p.stagePlans) &&
+            new Set(p.stagePlans.map((plan) => (record(plan) ? plan.stage : ''))).size ===
+              p.stagePlans.length &&
+            p.stagePlans.every(
+              (plan) =>
+                record(plan) &&
+                PROJECT_STAGES.slice(2).includes(plan.stage as never) &&
+                date(plan.startDate) &&
+                date(plan.endDate) &&
+                String(plan.startDate) <= String(plan.endDate) &&
+                (plan.originalStartDate === undefined || date(plan.originalStartDate)) &&
+                (plan.originalEndDate === undefined || date(plan.originalEndDate))
+            ))) &&
         ['createdAt', 'updatedAt', 'lastOverallUpdatedAt'].every((f) => timestamp(p[f]))
     )
   )
@@ -170,9 +188,12 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
       (c) =>
         projectIds.has(c.projectId) &&
         userIds.has(c.authorId) &&
-        ['stageExpectedDate', 'expectedLaunchDate', 'expectedDeliveryDate'].includes(
+        (['stageExpectedDate', 'expectedLaunchDate', 'expectedDeliveryDate'].includes(
           String(c.field)
-        ) &&
+        ) ||
+          /^stage:(方案设计|开发编码|联调测试|上线部署|验收交付):(startDate|endDate)$/.test(
+            String(c.field)
+          )) &&
         date(c.oldValue) &&
         date(c.newValue) &&
         strings(c, ['reason', 'description']) &&
@@ -185,6 +206,7 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
       ['project', 'demand', 'user'].includes(String(e.entityType)) &&
       strings(e, ['entityId', 'reason']) &&
       [
+        'plan',
         'complete',
         'cancel',
         'archive',

@@ -1,3 +1,4 @@
+import { planProject } from './review-helpers'
 import { expect, test, type Page, type Locator } from '@playwright/test'
 import type { PrototypeSnapshot } from '../src/domain/prototype'
 
@@ -26,9 +27,6 @@ async function assignment(page: Page, drawer: Locator, collaborators = true) {
     await list.getByRole('option', { name: '赵清越', exact: true }).click()
     await drawer.getByRole('combobox', { name: '协作人员', exact: true }).press('Escape')
   }
-  await date(drawer, '最初计划上线日期', '2099-10-20')
-  await date(drawer, '最初计划交付日期', '2099-10-30')
-  await date(drawer, '方案设计预计完成日期', '2099-10-10')
 }
 
 test.beforeEach(async ({ page }) => {
@@ -71,38 +69,32 @@ test('同一需求经草稿、立项、主责整体更新、协作个人更新�
   expect((await snapshot(page)).database.projects.filter((p) => p.demandId === draft.id)).toHaveLength(1)
   await identity(page, '王浩然')
   await expect(card(page, name)).toContainText('主责')
-  await card(page, name).getByRole('button', { name: '更新进度' }).click()
-  drawer = page.getByRole('dialog', { name: '更新项目进度' })
-  await drawer.getByRole('spinbutton', { name: '整体进度（%）' }).fill('100')
-  await drawer.locator('.el-select').filter({ has: page.getByRole('combobox', { name: '当前阶段状态', exact: true }) }).click()
-  await page.getByRole('option', { name: '已完成', exact: true }).click()
-  await date(drawer, '下一阶段预计完成日期', '2099-10-15')
-  await date(drawer, '当前预计交付日期', '2099-11-05')
-  await drawer.locator('.el-select').filter({ has: page.getByRole('combobox', { name: '日期调整原因' }) }).click()
-  await page.getByRole('option', { name: '等待外部资源', exact: true }).click()
-  await drawer.getByLabel('日期调整说明').fill('等待预算接口联调窗口')
-  await drawer.getByLabel('进展说明', { exact: true }).fill('方案已确认，进入开发编码')
-  await drawer.getByRole('button', { name: '保存进度' }).click()
+  await planProject(page, name)
+  await card(page, name).getByRole('button', { name: '更新环节' }).click()
+  drawer = page.getByRole('dialog', { name: '更新环节' })
+  await drawer.getByText('已完成', { exact: true }).click()
+  await drawer.getByLabel('补充说明（选填）', { exact: true }).fill('方案已确认，进入开发编码')
+  await drawer.getByRole('button', { name: '保存更新' }).click()
   await expect(drawer).not.toBeVisible()
-  await expect(card(page, name)).toContainText('100%')
+  await expect(card(page, name)).not.toContainText('%')
   const overall = (await snapshot(page)).database.projects.find((p) => p.id === project.id)!
-  expect(overall).toMatchObject({ stage: '开发编码', status: 'active', archived: false, overallProgress: 100 })
+  expect(overall).toMatchObject({ stage: '开发编码', status: 'active', archived: false })
   await identity(page, '赵清越')
   await expect(card(page, name)).toContainText('协作')
-  await expect(card(page, name).getByRole('button', { name: '更新进度' })).toHaveCount(0)
+  await expect(card(page, name).getByRole('button', { name: '更新环节' })).toHaveCount(0)
   await card(page, name).getByRole('button', { name: '填写协作进展' }).click()
   drawer = page.getByRole('dialog', { name: '填写协作进展' })
   await expect(drawer.getByRole('spinbutton')).toHaveCount(0)
   await expect(drawer.getByRole('combobox')).toHaveCount(0)
   await drawer.getByLabel('进展说明', { exact: true }).fill('预算接口联调数据已准备')
-  await drawer.getByRole('button', { name: '保存进度' }).click()
+  await drawer.getByRole('button', { name: '保存更新' }).click()
   await expect(drawer).not.toBeVisible()
   const afterPersonal = (await snapshot(page)).database.projects.find((p) => p.id === project.id)!
   expect({ ...afterPersonal, updatedAt: overall.updatedAt }).toEqual(overall)
   await identity(page, '陈立峰')
   await card(page, name).getByRole('button', { name: '详情', exact: true }).click()
   drawer = page.getByRole('dialog', { name: '项目详情', exact: true })
-  for (const text of ['100%', '方案已确认，进入开发编码', '预算接口联调数据已准备', '2099-10-30 → 2099-11-05']) {
+  for (const text of ['七环节计划与执行', '方案已确认，进入开发编码', '预算接口联调数据已准备', '2099-10-30']) {
     await expect(drawer.getByText(text, { exact: false }).first()).toBeVisible()
   }
   await page.reload()
@@ -165,7 +157,7 @@ test('直接创建不伪造需求，无关工程师只能查看，三档桌面�
   await expect(card(page, name)).toHaveCount(0)
   await page.getByText('全部项目', { exact: true }).click()
   await expect(card(page, name)).toContainText('当前项目仅可查看')
-  await expect(card(page, name).getByRole('button', { name: /更新进度|填写协作进展/ })).toHaveCount(0)
+  await expect(card(page, name).getByRole('button', { name: /更新环节|填写协作进展/ })).toHaveCount(0)
   for (const width of [1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 1000 })
     await expect(card(page, name)).toBeVisible()
@@ -174,11 +166,12 @@ test('直接创建不伪造需求，无关工程师只能查看，三档桌面�
   }
   await card(page, name).getByRole('button', { name: '详情', exact: true }).click()
   await expect(page.getByRole('dialog', { name: '项目详情', exact: true })).toContainText('直接创建项目，无关联需求材料')
-  await expect(page.getByRole('dialog').getByRole('button', { name: /更新进度|填写协作进展/ })).toHaveCount(0)
+  await expect(page.getByRole('dialog').getByRole('button', { name: /更新环节|填写协作进展/ })).toHaveCount(0)
 })
 
 test('保存失败保留进度输入且不修改任何已保存数据，重试仍无假成功', async ({ page }) => {
   await identity(page, '王浩然')
+  await planProject(page, '客户数据治理一期')
   await page.evaluate((key) => {
     const data = JSON.parse(localStorage.getItem(key)!)
     data.scenario = 'save-error'
@@ -186,15 +179,15 @@ test('保存失败保留进度输入且不修改任何已保存数据，重试�
   }, key)
   await page.reload()
   const before = await snapshot(page)
-  await card(page, '客户数据治理一期').getByRole('button', { name: '更新进度' }).click()
-  const drawer = page.getByRole('dialog', { name: '更新项目进度' })
-  await drawer.getByLabel('进展说明', { exact: true }).fill('失败后保留的真实输入')
-  await drawer.getByRole('spinbutton', { name: '整体进度（%）' }).fill('63')
+  await card(page, '客户数据治理一期').getByRole('button', { name: '更新环节' }).click()
+  const drawer = page.getByRole('dialog', { name: '更新环节' })
+  await drawer.getByLabel('补充说明（选填）', { exact: true }).fill('失败后保留的真实输入')
+  await drawer.getByRole('radio', { name: '尚未完成', exact: true }).check()
   for (let attempt = 0; attempt < 2; attempt++) {
-    await drawer.getByRole('button', { name: '保存进度' }).click()
+    await drawer.getByRole('button', { name: '保存更新' }).click()
     await expect(drawer.getByRole('alert')).toContainText(/失败/)
-    await expect(drawer.getByLabel('进展说明', { exact: true })).toHaveValue('失败后保留的真实输入')
-    await expect(drawer.getByRole('spinbutton', { name: '整体进度（%）' })).toHaveValue('63')
+    await expect(drawer.getByLabel('补充说明（选填）', { exact: true })).toHaveValue('失败后保留的真实输入')
+    await expect(drawer.getByRole('radio', { name: '尚未完成', exact: true })).toBeChecked()
     expect(await snapshot(page)).toEqual(before)
   }
 })

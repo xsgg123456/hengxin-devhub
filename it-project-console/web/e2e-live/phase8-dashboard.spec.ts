@@ -56,22 +56,21 @@ test('真实看板筛选分页、三角色读取、甘特与需求统计、错�
         department: '看板验收部',
         priority: 'P1',
         primaryOwnerId: 'user-engineer-wang',
-        collaboratorIds: ['user-engineer-zhao'],
-        originalLaunchDate: index === 0 ? monthEnd : '2099-11-01',
-        originalDeliveryDate: index === 0 ? monthEnd : '2099-12-01',
-        stageExpectedDate: index === 0 ? '2020-01-01' : '2099-10-01'
+        collaboratorIds: ['user-engineer-zhao']
       }
     })
     expect(response.ok()).toBeTruthy()
     timings.push(Date.now() - start)
-    if (index === 0) {
-      const project = (await response.json()).data
-      const updated = await page.request.post(`/api/projects/${project.id}/progress`, { headers, data: {
-        requestId: randomUUID(), version: project.version, kind: 'overall', status: 'in-progress',
-        overallProgress: 50, summary: '甘特双条真实验收'
-      } })
-      expect(updated.ok()).toBeTruthy()
-    }
+    const project = (await response.json()).data
+    const stages = ['方案设计', '开发编码', '联调测试', '上线部署', '验收交付']
+    const planned = await page.request.post(`/api/projects/${project.id}/plan`, { headers, data: {
+      requestId: randomUUID(), version: project.version,
+      plans: stages.map((stage, stageIndex) => {
+        const date = index === 0 ? stageIndex === 0 ? '2020-01-01' : monthEnd : '2099-12-01'
+        return { stage, startDate: date, endDate: date }
+      })
+    } })
+    expect(planned.ok()).toBeTruthy()
   }
   await page.reload()
   const search = page.getByPlaceholder('项目名称、编号、负责人或部门')
@@ -152,7 +151,7 @@ test('真实看板筛选分页、三角色读取、甘特与需求统计、错�
   await expect(page.getByText('21 个项目', { exact: true })).toBeVisible()
   const riskTrack = page.getByRole('button', { name: `查看${prefix}-0详情`, exact: true })
   await riskTrack.hover()
-  await expect(page.getByRole('tooltip').filter({ hasText: `${prefix}-0` })).toContainText('整体进度 50%')
+  await expect(page.getByRole('tooltip').filter({ hasText: `${prefix}-0` })).not.toContainText('整体进度')
   await expect(page.locator('.original-marker')).toHaveCount(1)
   await page.screenshot({ path: resolve('../output/phase8-gantt-risk-progress.png'), fullPage: true })
   await page.getByRole('button', { name: '下一月', exact: true }).click()
@@ -180,7 +179,7 @@ test('真实看板筛选分页、三角色读取、甘特与需求统计、错�
   expect(Math.max(...timings)).toBeLessThan(1000)
   expect(Date.now() - start).toBeLessThan(2000)
   await page.goto('/#/my-demands')
-  await page.getByPlaceholder('名称或编号').fill('不存在的需求')
+  await select(page, '完成情况', '延期完成')
   await expect(page.getByText('没有符合筛选条件的需求', { exact: true })).toBeVisible()
   await expect(page.getByText('当前范围暂无需求', { exact: true })).toHaveCount(2)
   expect(apiPaths.some((url) => /mock|prototype/.test(new URL(url).pathname))).toBe(false)

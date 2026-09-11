@@ -25,6 +25,7 @@ export function projectIntersectsMonth(
   today = shanghaiDay(new Date().toISOString())
 ) {
   const { start, end } = monthBounds(month)
+  if (!project.expectedDeliveryDate) return false
   // 进行中的延期项目仍占用人力，计划终点不能把它从当月负载中抹掉。
   const finish =
     project.status === 'active' && !project.archived && project.expectedDeliveryDate < today
@@ -150,14 +151,17 @@ export function demandDistribution(
   return [...groups.values()]
 }
 
-export function demandMonthlyTrend(demands: DemoDemand[]) {
+export function demandMonthlyTrend(
+  demands: DemoDemand[],
+  range: { from?: string; to?: string } = {},
+  now = new Date()
+) {
   const valid = demands.filter((d) => d.submittedAt && Number.isFinite(Date.parse(d.submittedAt)))
-  const dates = valid.map((d) => shanghaiDay(d.submittedAt).slice(0, 7)).sort()
   const months: string[] = []
-  if (dates.length) {
-    for (let month = dates[0]; month <= dates[dates.length - 1]; month = shiftMonth(month, 1))
-      months.push(month)
-  }
+  const current = shanghaiDay(now.toISOString()).slice(0, 7)
+  const from = range.from?.slice(0, 7) ?? shiftMonth(range.to?.slice(0, 7) ?? current, -5)
+  const to = range.to?.slice(0, 7) ?? (from > current ? from : current)
+  for (let month = from; month <= to; month = shiftMonth(month, 1)) months.push(month)
   return {
     months,
     departments: [...new Set(valid.map((d) => d.department))].map((name) => ({

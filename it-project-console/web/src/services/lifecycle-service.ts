@@ -29,7 +29,7 @@ export function projectState(project: DemoProject) {
     archived: project.archived,
     stage: project.stage,
     simpleStatus: project.simpleStatus,
-    overallProgress: project.overallProgress
+    actualCompletedAt: project.actualCompletedAt ?? ''
   }
 }
 function removeGroup(snapshot: PrototypeSnapshot, demandId?: string | null, projectId?: string) {
@@ -90,10 +90,7 @@ export function actionProject(snapshot: PrototypeSnapshot, input: ProjectActionI
   if (!['complete', 'cancel', 'archive', 'reopen', 'delete'].includes(input.action))
     throw new WorkflowError('项目操作无效')
   if (input.action === 'complete') {
-    if (actor.id !== project.primaryOwnerId) throw new WorkflowError('只有主负责人可以完成项目')
-    if (project.status !== 'active' || project.archived) throw new WorkflowError('当前项目只读')
-    if (project.stage !== '验收交付' || project.simpleStatus !== 'completed')
-      throw new WorkflowError('须先完成验收交付阶段')
+    throw new WorkflowError('请通过更新环节完成验收交付，项目会自动完成')
   } else if (input.action === 'delete') {
     const demand = snapshot.database.demands.find((row) => row.id === project.demandId)
     if (
@@ -126,13 +123,10 @@ export function actionProject(snapshot: PrototypeSnapshot, input: ProjectActionI
         after: { deleted: true }
       })
   } else {
-    if (input.action === 'complete') {
-      project.status = 'completed'
-      project.archived = true
-    }
     if (input.action === 'cancel') project.status = 'cancelled'
     if (input.action === 'archive') project.archived = true
     if (input.action === 'reopen') {
+      project.actualCompletedAt = null
       project.status = 'active'
       project.archived = false
       project.simpleStatus = 'in-progress'

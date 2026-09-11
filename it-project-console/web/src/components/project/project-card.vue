@@ -14,7 +14,9 @@
     <div class="tags"
       ><ElTag size="small">{{
         project.status === 'active'
-          ? statusLabel[project.simpleStatus]
+          ? needsPlan(project)
+            ? '待排期'
+            : statusLabel[project.simpleStatus]
           : project.status === 'completed'
             ? '项目已完成'
             : '已取消'
@@ -37,31 +39,34 @@
         ><dd>{{ project.collaboratorIds.map(userName).join('、') || '无' }}</dd></div
       >
       <div
-        ><dt>预计上线</dt><dd>{{ project.expectedLaunchDate }}</dd></div
+        ><dt>预计上线</dt><dd>{{ project.expectedLaunchDate || '—' }}</dd></div
       >
       <div
-        ><dt>预计交付</dt><dd>{{ project.expectedDeliveryDate }}</dd></div
+        ><dt>预计交付</dt><dd>{{ project.expectedDeliveryDate || '—' }}</dd></div
       >
       <div
-        ><dt>原计划上线</dt><dd>{{ project.originalLaunchDate }}</dd></div
+        ><dt>原计划上线</dt><dd>{{ project.originalLaunchDate || '—' }}</dd></div
       >
       <div
-        ><dt>原计划交付</dt><dd>{{ project.originalDeliveryDate }}</dd></div
+        ><dt>原计划交付</dt><dd>{{ project.originalDeliveryDate || '—' }}</dd></div
       >
       <div class="full"
         ><dt>最近整体更新</dt><dd>{{ displayTime(project.lastOverallUpdatedAt) }}</dd></div
       >
     </dl>
     <RiskTag :risks="risks" />
-    <div class="progress-label"
-      ><span>整体进度</span><span>{{ project.overallProgress }}%</span></div
-    >
-    <ElProgress :percentage="project.overallProgress" :show-text="false" :stroke-width="6" />
     <StageProgress class="mt-3" :stage="project.stage" :status="project.simpleStatus" />
     <div class="actions"
-      ><ElButton v-if="canUpdate" type="primary" @click="$emit('update', project.id)">{{
-        isOverall ? '更新进度' : '填写协作进展'
-      }}</ElButton
+      ><ElButton
+        v-if="canUpdate && (!isOverall || !needsPlan(project))"
+        type="primary"
+        @click="$emit('update', project.id)"
+        >{{ isOverall ? '更新环节' : '填写协作进展' }}</ElButton
+      ><ElButton
+        v-if="canUpdate && isOverall"
+        :type="needsPlan(project) ? 'primary' : 'default'"
+        @click="planOpen = true"
+        >{{ needsPlan(project) ? '制定计划' : '调整计划' }}</ElButton
       ><ElButton @click="$emit('detail', project.id)">详情</ElButton></div
     >
     <p class="relation-note">{{
@@ -71,14 +76,18 @@
           : '仅填写个人进展，不改变整体进度'
         : '当前项目仅可查看'
     }}</p>
+    <ProjectPlanDrawer v-model="planOpen" :project="project" />
   </article>
 </template>
 <script setup lang="ts">
-  import { computed } from 'vue'
+  import { computed, ref } from 'vue'
   import type { DemoProject } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { computeProjectRisks } from '@/services/risk-service'
   import { displayTime, statusLabel } from '@/utils/project-display'
+  import ProjectPlanDrawer from './project-plan-drawer.vue'
+  import { needsPlan } from '@/services/stage-plan-service'
+  const planOpen = ref(false)
   import StageProgress from './stage-progress.vue'
   import RiskTag from './risk-tag.vue'
   const props = defineProps<{ project: DemoProject }>()

@@ -142,13 +142,13 @@ describe('管理图表的同源聚合', () => {
     expect(
       demandDistribution(demands, db.users, 'submitter').reduce((n, g) => n + g.demands.length, 0)
     ).toBe(3)
-    expect(demandMonthlyTrend(demands)).toEqual({
+    expect(demandMonthlyTrend(demands, {from:"2026-09-01",to:"2026-11-30"})).toEqual({
       months: ['2026-09', '2026-10', '2026-11'],
       departments: [
         { name: '市场部', data: [1, 0, 0] },
         { name: '财务部', data: [0, 0, 1] }
       ]
     })
-    expect(demandMonthlyTrend([])).toEqual({ months: [], departments: [] })
+    expect(demandMonthlyTrend([], {}, new Date("2026-09-11"))).toEqual({ months: ["2026-04","2026-05","2026-06","2026-07","2026-08","2026-09"], departments: [] })
   })
 })

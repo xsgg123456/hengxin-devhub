@@ -3,6 +3,7 @@ import { mapDemand, mapUser, type ReadDemand, type ReadUser } from '../workspace
 import { shiftMonth } from '../workload/workload-service.js'
 import type { DemandQuery } from './query-schemas.js'
 import { businessDate } from '../calendar/workday.js'
+import { demandCompletion } from './demand-completion.js'
 const shanghaiDay = (value: string) => businessDate(new Date(value))
 export async function demandStatistics(
   tx: Prisma.TransactionClient,
@@ -11,6 +12,7 @@ export async function demandStatistics(
 ) {
   const [rows, userRows] = await Promise.all([
     tx.demand.findMany({
+      include: { project: true },
       orderBy: [{ submittedAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }]
     }),
     tx.user.findMany({ where: { active: true }, orderBy: { name: 'asc' } })
@@ -20,6 +22,9 @@ export async function demandStatistics(
       (q.scope !== 'mine' || d.ownerId === actorId) &&
       (!q.submitterId || d.ownerId === q.submitterId) &&
       (!q.department || d.department === q.department) &&
+      (!q.from || (!!d.submittedAt && businessDate(d.submittedAt) >= q.from)) &&
+      (!q.to || (!!d.submittedAt && businessDate(d.submittedAt) <= q.to)) &&
+      (!q.completion || demandCompletion(d.project).completionStatus === q.completion) &&
       (!q.status ||
         q.status === 'all' ||
         (d.status === 'APPROVED' ? 'established' : d.status.toLowerCase()) === q.status) &&
@@ -31,15 +36,17 @@ export async function demandStatistics(
   const attachments = attachmentIds.length
     ? await tx.attachment.findMany({ where: { id: { in: attachmentIds }, status: 'READY' } })
     : []
-  const demands = filtered.map((d) =>
-    mapDemand({ ...d, attachments: attachments.filter((a) => a.demandId === d.id) })
-  )
+  const demands = filtered.map((d) => ({
+    ...mapDemand({ ...d, attachments: attachments.filter((a) => a.demandId === d.id) }),
+    ...demandCompletion(d.project)
+  }))
   const users = userRows.map(mapUser)
   return {
     demands,
+    activeProjectCount: filtered.filter(d => d.project?.status === 'ACTIVE' && !d.project.archived).length,
     submitters: demandDistribution(demands, users, 'submitter'),
     departments: demandDistribution(demands, users, 'department'),
-    trend: demandMonthlyTrend(demands)
+    trend: demandMonthlyTrend(demands, q)
   }
 }
 export function demandDistribution(
@@ -65,14 +72,13 @@ export function demandDistribution(
   return [...groups.values()]
 }
 
-export function demandMonthlyTrend(demands: ReadDemand[]) {
+export function demandMonthlyTrend(demands: ReadDemand[], range: { from?: string; to?: string } = {}, now = new Date()) {
   const valid = demands.filter((d) => d.submittedAt && Number.isFinite(Date.parse(d.submittedAt)))
-  const dates = valid.map((d) => shanghaiDay(d.submittedAt).slice(0, 7)).sort()
   const months: string[] = []
-  if (dates.length) {
-    for (let month = dates[0]; month <= dates[dates.length - 1]; month = shiftMonth(month, 1))
-      months.push(month)
-  }
+  const current = businessDate(now).slice(0, 7)
+  const from = range.from?.slice(0, 7) ?? shiftMonth(range.to?.slice(0, 7) ?? current, -5)
+  const to = range.to?.slice(0, 7) ?? (from > current ? from : current)
+  for (let month = from; month <= to; month = shiftMonth(month, 1)) months.push(month)
   return {
     months,
     departments: [...new Set(valid.map((d) => d.department))].map((name) => ({

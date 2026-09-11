@@ -7,10 +7,15 @@ import { actionSchema, correctionSchema, progressSchema } from './progress-schem
 import { ProgressService } from './progress-service.js'
 import { ProjectAdminService } from '../projects/project-admin-service.js'
 import type { ProjectChanged } from './progress-state.js'
+import { ProjectPlanService } from '../projects/project-plan-service.js'
+import { planSchema } from '../projects/project-plan-state.js'
 export async function registerProgressRoutes(app: FastifyInstance, db: PrismaClient,
   authenticate: preHandlerHookHandler, onProjectChanged?: ProjectChanged) {
   const api = app.withTypeProvider<ZodTypeProvider>(), params = z.object({ id: idSchema })
   const progress = new ProgressService(db, onProjectChanged), admin = new ProjectAdminService(db, onProjectChanged)
+  const plans = new ProjectPlanService(db, onProjectChanged)
+  api.post('/api/projects/:id/plan', { preHandler: authenticate, schema: { params, body: planSchema } },
+    async request => ({ data: await plans.save(request.actor!, request.params.id, request.body) }))
   api.post('/api/projects/:id/progress', { preHandler: authenticate, schema: { params, body: progressSchema } },
     async request => ({ data: await progress.update(request.actor!, request.params.id, request.body) }))
   api.post('/api/projects/:id/action', { preHandler: authenticate, schema: { params, body: actionSchema } },

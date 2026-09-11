@@ -1,11 +1,10 @@
 import {
   PROJECT_STAGES,
-  SCHEDULE_REASONS,
   type ProjectStage,
   type PrototypeSnapshot,
   type SimpleStatus
 } from '@/domain/prototype'
-import { assertWrite, dateValue, nextId, textValue, WorkflowError } from './workflow-validation'
+import { assertWrite, nextId, textValue, WorkflowError } from './workflow-validation'
 import { projectState, recordLifecycle } from './lifecycle-service'
 import { computeProjectRisks } from './risk-service'
 import { isItDepartment } from '@/utils/it-department'
@@ -18,7 +17,7 @@ export interface ManagerInput {
 export interface CorrectionInput {
   projectId: string
   stage: ProjectStage
-  overallProgress: number
+  overallProgress?: number
   status?: SimpleStatus
   reason: string
   stageExpectedDate?: string
@@ -61,61 +60,36 @@ export function correctProject(snapshot: PrototypeSnapshot, input: CorrectionInp
   if (project.status !== 'active' || project.archived) throw new WorkflowError('请先重新打开项目')
   const index = PROJECT_STAGES.indexOf(input.stage)
   const oldIndex = PROJECT_STAGES.indexOf(project.stage)
-  if (index < 0 || index > oldIndex + 1) throw new WorkflowError('不得跳过固定阶段')
+  if (index < 2 || index > oldIndex + 1) throw new WorkflowError('不得跳过固定阶段')
   if (index > oldIndex && project.simpleStatus !== 'completed')
     throw new WorkflowError('须先完成当前阶段')
   if (
     index < oldIndex &&
     !snapshot.database.stageHistories.some(
-      (row) => row.projectId === project.id && row.stage === input.stage
+      (row) =>
+        row.projectId === project.id &&
+        row.stage === input.stage &&
+        Boolean(row.startedAt || row.completedAt || row.interruptedAt)
     )
   )
     throw new WorkflowError('只能纠正到已走过的阶段')
-  if (
-    !Number.isFinite(input.overallProgress) ||
-    input.overallProgress < 0 ||
-    input.overallProgress > 100
-  )
-    throw new WorkflowError('整体进度须为 0～100%')
   const status = input.status ?? 'in-progress'
   if (!['not-started', 'in-progress', 'nearly-done', 'completed', 'blocked'].includes(status))
     throw new WorkflowError('简单状态无效')
   const blocker = input.blocker?.trim() ?? project.blocker
   if (status === 'blocked' && !blocker) throw new WorkflowError('请填写阻塞说明')
   if (blocker.length > 300) throw new WorkflowError('阻塞说明最多 300 字')
-  if (status === 'completed' && input.stage !== '验收交付')
-    throw new WorkflowError('请通过进度更新完成当前阶段并设置下一阶段日期')
+  if (status === 'completed') throw new WorkflowError('请通过更新环节完成当前阶段')
   const reason = textValue(input.reason, '纠正原因')
-  const fields = ['stageExpectedDate', 'expectedLaunchDate', 'expectedDeliveryDate'] as const
-  const changes = fields.filter(
-    (field) => input[field] !== undefined && input[field] !== project[field]
+  if (
+    ['overallProgress', 'stageExpectedDate', 'expectedLaunchDate', 'expectedDeliveryDate'].some(
+      (key) => input[key as keyof CorrectionInput] !== undefined
+    )
   )
-  fields.forEach((field) => dateValue(input[field] ?? project[field], '预计日期'))
-  if (changes.length) {
-    if (!SCHEDULE_REASONS.some((value) => value === input.changeReason))
-      throw new WorkflowError('请选择日期调整原因')
-    textValue(input.changeDescription ?? '', '日期调整说明')
-  }
+    throw new WorkflowError('纠正不能修改百分比或计划，请使用独立计划入口')
   const now = input.now ?? new Date().toISOString()
   const before = projectState(project)
-  for (const field of changes) {
-    snapshot.database.scheduleChanges.push({
-      id: nextId('S', snapshot.database.scheduleChanges),
-      projectId: project.id,
-      field,
-      oldValue: project[field],
-      newValue: input[field]!,
-      reason: input.changeReason!,
-      description: input.changeDescription!.trim(),
-      authorId: actor.id,
-      createdAt: now
-    })
-    project[field] = input[field]!
-  }
-  if (
-    project.stage !== input.stage ||
-    (project.simpleStatus === 'completed' && status !== 'completed')
-  ) {
+  if (project.stage !== input.stage || project.simpleStatus === 'completed') {
     for (const history of snapshot.database.stageHistories.filter(
       (row) => row.projectId === project.id && row.completedAt === null && !row.interruptedAt
     ))
@@ -124,16 +98,12 @@ export function correctProject(snapshot: PrototypeSnapshot, input: CorrectionInp
       projectId: project.id,
       stage: input.stage,
       startedAt: now,
-      completedAt: status === 'completed' ? now : null
+      completedAt: null
     })
-  } else if (status === 'completed') {
-    for (const history of snapshot.database.stageHistories.filter(
-      (row) => row.projectId === project.id && row.completedAt === null && !row.interruptedAt
-    ))
-      history.completedAt = now
   }
   project.stage = input.stage
-  project.overallProgress = input.overallProgress
+  project.stageExpectedDate =
+    project.stagePlans?.find((p) => p.stage === input.stage)?.endDate ?? ''
   project.simpleStatus = status
   project.blocker = status === 'blocked' ? blocker : ''
   project.updatedAt = now
@@ -147,7 +117,6 @@ export function correctProject(snapshot: PrototypeSnapshot, input: CorrectionInp
     status,
     summary: reason,
     blocker: project.blocker,
-    overallProgress: project.overallProgress,
     createdAt: now
   })
   project.risks = computeProjectRisks(project, snapshot.database.scheduleChanges, now)

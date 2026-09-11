@@ -20,15 +20,9 @@ export function toCorrectionInput(input: ProgressInput, stage: ProjectStage): Co
   return {
     projectId: input.projectId,
     stage,
-    overallProgress: input.overallProgress ?? 0,
     reason: input.summary,
     status: input.status,
-    blocker: input.blocker,
-    stageExpectedDate: input.stageExpectedDate,
-    expectedLaunchDate: input.expectedLaunchDate,
-    expectedDeliveryDate: input.expectedDeliveryDate,
-    changeReason: input.changeReason,
-    changeDescription: input.changeDescription
+    blocker: input.blocker
   }
 }
 export function correctLiveProject(
@@ -50,5 +44,22 @@ export function actionLiveProject(
   return apiRequest<LiveWriteResult>(`/projects/${input.projectId}/action`, {
     method: 'POST',
     body: { action: input.action, reason: input.reason ?? '', version, requestId }
+  })
+}
+
+export function planLiveProject(
+  input: import('./stage-plan-service').PlanInput,
+  version: number | undefined,
+  requestId: string
+) {
+  return apiRequest<LiveWriteResult>(`/projects/${input.projectId}/plan`, {
+    method: 'POST',
+    body: {
+      version,
+      requestId,
+      plans: input.plans.map(({ stage, startDate, endDate }) => ({ stage, startDate, endDate })),
+      changeReason: input.changeReason,
+      changeDescription: input.changeDescription
+    }
   })
 }

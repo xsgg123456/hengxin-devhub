@@ -1,6 +1,5 @@
 import type { Prisma, Project } from '../../generated/prisma/client.js'
 import { AppError } from '../../lib/errors.js'
-import type { ProgressInput } from './progress-schemas.js'
 export type ProjectChanged = (tx: Prisma.TransactionClient, id: string) => Promise<void>
 export const unchanged: ProjectChanged = async () => {}
 export function invalid(message: string): never { throw new AppError(400, 'INVALID_PROGRESS', message) }
@@ -16,24 +15,7 @@ export function writable(project: Project) {
 }
 export function projectState(project: Project) {
   return { status: project.status.toLowerCase(), archived: project.archived, stage: project.stage,
-    simpleStatus: project.simpleStatus, overallProgress: project.overallProgress }
-}
-export async function scheduleChanges(tx: Prisma.TransactionClient, project: Project,
-  input: Pick<ProgressInput, 'stageExpectedDate' | 'expectedLaunchDate' | 'expectedDeliveryDate' | 'changeReason' | 'changeDescription'>,
-  authorId: string) {
-  const fields = { stageExpectedDate: 'stageExpectedDate', expectedLaunchDate: 'currentLaunchDate', expectedDeliveryDate: 'currentDeliveryDate' } as const
-  const data: Prisma.ProjectUpdateInput = {}
-  for (const field of Object.keys(fields) as Array<keyof typeof fields>) {
-    const column = fields[field], oldValue = project[column]?.toISOString().slice(0, 10) ?? ''
-    const newValue = input[field] ?? oldValue
-    if (!newValue) invalid('请填写阶段及计划日期')
-    if (newValue === oldValue) continue
-    if (!input.changeReason || !input.changeDescription) invalid('日期修改须填写调整原因和说明')
-    await tx.scheduleChange.create({ data: { projectId: project.id, authorId, field,
-      oldValue, newValue, reason: input.changeReason, description: input.changeDescription } })
-    data[column] = new Date(newValue)
-  }
-  return data
+    simpleStatus: project.simpleStatus, actualCompletedAt: project.actualCompletedAt?.toISOString() ?? null }
 }
 export async function enterStage(tx: Prisma.TransactionClient, projectId: string, stage: string, now: Date, expectedDate: Date | null) {
   // Future placeholders are not episodes. Consume only untouched placeholders; never overwrite history.
