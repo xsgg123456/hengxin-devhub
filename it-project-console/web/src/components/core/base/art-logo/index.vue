@@ -1,7 +1,7 @@
 <!-- 系统logo -->
 <template>
   <div class="flex-cc">
-    <img :style="logoStyle" src="@imgs/common/logo.webp" alt="logo" class="w-full h-full" />
+    <img :style="logoStyle" src="@imgs/common/hengxin-logo.png" alt="恒鑫 LOGO" class="w-full h-auto object-contain" />
   </div>
 </template>
 

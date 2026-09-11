@@ -730,3 +730,6 @@ MinIO补丁初验完成：两个原tag源码副本经Go1.27.1/grpc1.79.3/crypto0
 3. 综合验证：pnpm typecheck、pnpm test、pnpm build、隔离API集成、Playwright业务流程及独立code-reviewer两阶段审查；通过后本地提交，不自动部署。
 
 验收见 it-project-console/docs/UI-ROUND2-VERIFICATION.md：原型浏览器44个独立用例、真实API浏览器7项、隔离集成99项、类型及构建通过，独立两阶段审查通过。周熹生产启用须随后续明确授权的部署执行，不在本轮改生产。
+# 公司LOGO替换
+
+原位修改ArtLogo图片引用与index.html的favicon，使用同一公司原图；验证比例、实际加载及构建，独立审查后本地提交。本次不包含生产发布。
