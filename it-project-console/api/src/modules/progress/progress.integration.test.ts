@@ -37,6 +37,23 @@ beforeAll(async () => {
 })
 afterAll(async () => { await runtime?.app.close(); await db.$disconnect() })
 describe('先排期后执行的真实事务', () => {
+  it('完成计划冻结，纠正后改期及新一轮完成不改变上一轮结果', async () => {
+    const id = await create(), url = `/api/projects/${id}/progress`
+    expect((await schedule(id)).statusCode).toBe(200)
+    expect((await call(url, overall(2, { status: 'completed' }))).statusCode).toBe(200)
+    const first = await db.stageHistory.findFirstOrThrow({ where: { projectId: id, stage: '方案设计', status: 'completed' } })
+    expect((await call(`/api/projects/${id}/correct`, { requestId: key(), version: 3, stage: '方案设计',
+      status: 'in-progress', reason: '重新核实方案' }, manager)).statusCode).toBe(200)
+    const changed = plans().map((p, i) => i === 0 ? { ...p, startDate: '2099-09-28', endDate: '2099-10-02' } : p)
+    expect((await call(`/api/projects/${id}/plan`, { requestId: key(), version: 4, plans: changed,
+      changeReason: '技术问题', changeDescription: '新一轮调整' })).statusCode).toBe(200)
+    expect((await call(url, overall(5, { status: 'completed' }))).statusCode).toBe(200)
+    const episodes = await db.stageHistory.findMany({ where: { projectId: id, stage: '方案设计', status: 'completed' }, orderBy: { createdAt: 'asc' } })
+    expect(episodes).toHaveLength(2)
+    expect(await db.stageHistory.findUniqueOrThrow({ where: { id: first.id } })).toEqual(first)
+    expect(episodes[1]!.plannedStartDate?.toISOString().slice(0, 10)).toBe('2099-09-28')
+    expect(episodes[1]!.plannedEndDate?.toISOString().slice(0, 10)).toBe('2099-10-02')
+  })
   it('迁移仅回填有证据的完成时间，未知日期与重开项目不伪造，重复迁移不覆写', async () => {
     const actual = new Date('2026-08-10T23:30:00Z')
     const unknownId = await create(), finishedId = await create(), acceptedId = await create(), reopenedId = await create()
@@ -115,6 +132,8 @@ describe('先排期后执行的真实事务', () => {
     expect((await row(id)).stageExpectedDate?.toISOString().slice(0, 10)).toBe('2099-10-05')
     expect((await schedule(id, 3)).statusCode).toBe(400)
     const old = await db.stageHistory.findFirstOrThrow({ where: { projectId: id, stage: '方案设计', status: 'completed' } })
+    expect(old.plannedStartDate?.toISOString().slice(0, 10)).toBe('2099-10-01')
+    expect(old.plannedEndDate?.toISOString().slice(0, 10)).toBe('2099-10-03')
     const correction = { requestId: key(), version: 3, stage: '方案设计', status: 'in-progress', reason: '重新核对方案' }
     expect((await call(`/api/projects/${id}/correct`, correction, owner)).statusCode).toBe(403)
     expect((await call(`/api/projects/${id}/correct`, correction, manager)).statusCode).toBe(200)
@@ -141,7 +160,8 @@ describe('先排期后执行的真实事务', () => {
     const workspace = await runtime.app.inject({ method: 'GET', url: '/api/workspace', headers: { cookie: cookies[owner] } })
     expect(workspace.statusCode).toBe(200)
     expect(workspace.json<{ data: { database: { stageHistories: unknown[] } } }>().data.database.stageHistories)
-      .toContainEqual({ projectId: id, stage: '联调测试', startedAt: '', completedAt: finished.completedAt!.toISOString() })
+      .toContainEqual({ projectId: id, stage: '联调测试', startedAt: '', completedAt: finished.completedAt!.toISOString(),
+        plannedStartDate: '2099-10-05', plannedEndDate: '2099-10-07' })
     const correction = await call(`/api/projects/${id}/correct`, { requestId: key(), version: 3, stage: '联调测试', status: 'in-progress', reason: '联调发现遗漏，回退处理' }, manager)
     expect(correction.statusCode, correction.body).toBe(200)
     expect((await row(id)).stage).toBe('联调测试')

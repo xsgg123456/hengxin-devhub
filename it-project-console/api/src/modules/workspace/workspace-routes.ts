@@ -37,6 +37,8 @@ export function registerWorkspaceRoutes(
                 stage: item.stage,
                 startedAt: item.enteredAt?.toISOString() ?? '',
                 completedAt: item.completedAt?.toISOString() ?? null,
+                plannedStartDate: item.plannedStartDate?.toISOString().slice(0, 10) ?? null,
+                plannedEndDate: item.plannedEndDate?.toISOString().slice(0, 10) ?? null,
                 interruptedAt: item.interruptedAt?.toISOString()
               }))
           ),

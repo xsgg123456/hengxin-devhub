@@ -38,6 +38,7 @@ test('统一部门、提出时间及完成筛选同步指标、图表和清单�
     snapshot.database.projects = [
       {
         ...project,
+        code: undefined,
         id: 'p-filter-early',
         demandId: 'filter-early',
         status: 'completed',
@@ -49,6 +50,7 @@ test('统一部门、提出时间及完成筛选同步指标、图表和清单�
       },
       {
         ...project,
+        code: undefined,
         id: 'p-filter-late',
         demandId: 'filter-late',
         status: 'completed',

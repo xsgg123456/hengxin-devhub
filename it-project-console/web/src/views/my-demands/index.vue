@@ -46,6 +46,7 @@
             ><ElDatePicker
               v-model="dateRange"
               type="daterange"
+              :shortcuts="dateRangeShortcuts"
               value-format="YYYY-MM-DD"
               start-placeholder="开始日期"
               end-placeholder="结束日期"
@@ -225,6 +226,7 @@
 </template>
 
 <script setup lang="ts">
+  import { dateRangeShortcuts } from '@/utils/date-range-shortcuts'
   import BusinessPageState from '@/components/system/business-page-state.vue'
   import DemandEditor from '@/components/demand/demand-editor.vue'
   import DemandDetail from '@/components/demand/demand-detail.vue'

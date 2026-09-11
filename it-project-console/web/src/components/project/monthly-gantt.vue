@@ -1,5 +1,12 @@
 <template>
-  <div class="gantt-scroll" tabindex="0" aria-label="月度项目时间轴，可横向和纵向滚动">
+  <div
+    class="gantt-scroll"
+    tabindex="0"
+    aria-label="月度项目时间轴，可横向和纵向滚动"
+    @scroll="hideTip"
+    @mouseleave="hideTip"
+    @keydown.esc="hideTip"
+  >
     <div class="gantt-grid" :style="{ '--days': days, minWidth: `${230 + days * 36}px` }">
       <div class="frozen header">项目 / 主负责人 / 当前环节</div>
       <div
@@ -8,69 +15,175 @@
       >
         <span v-for="day in days" :key="day" :class="{ weekend: isWeekend(day) }">{{ day }}</span>
       </div>
-      <template v-for="row in rows" :key="row.project.id">
-        <button class="frozen project-cell" @click="emit('detail', row.project.id)">
-          <strong :title="row.project.name">{{ row.project.name }}</strong>
-          <small>{{ ownerName(row.project.primaryOwnerId) }} · {{ row.project.stage }}</small>
+      <template v-for="row in displayRows" :key="row.project.id">
+        <button
+          class="frozen project-cell"
+          :style="{ minHeight: `${row.height}px` }"
+          @click="emit('detail', row.project.id)"
+          @mousemove="showTip($event, row)"
+          @focus="showFocus($event, row)"
+          @blur="hideTip"
+        >
+          <strong>{{ row.project.name }}</strong>
+          <small>{{ teamSummary(row.project) }} · {{ row.project.stage }}</small>
           <small :class="{ 'risk-text': row.risks.length }">{{
             row.risks.join('；') || statusText(row)
           }}</small>
         </button>
-        <ElTooltip placement="top" effect="light" :show-after="180">
-          <template #content>
-            <div class="gantt-tip">
-              <strong>{{ row.project.name }}</strong>
-              <p>{{ ownerName(row.project.primaryOwnerId) }} · {{ row.project.stage }}</p>
-              <p>立项 {{ row.start }} → 预计交付 {{ row.project.expectedDeliveryDate }}</p>
-              <p
-                >原计划交付 {{ row.project.originalDeliveryDate
-                }}{{ row.outside ? '（超出本月显示范围）' : '' }}</p
-              >
-              <p>{{ row.clipped ? '跨月区间已裁剪' : '' }}</p>
-              <p>{{ row.risks.join('；') || statusText(row) }}</p>
-            </div>
-          </template>
+        <div
+          class="track project-track"
+          :style="{ minHeight: `${row.height}px` }"
+          @mousemove="showTip($event, row)"
+        >
+          <span
+            v-for="day in days"
+            v-show="isWeekend(day)"
+            :key="day"
+            class="weekend-column"
+            :style="barStyle(day - 1, 1)"
+          ></span>
           <button
-            class="track project-track"
+            class="plan-bar"
+            :style="barStyle(row.left, row.width)"
             :aria-label="`查看${row.project.name}详情`"
             @click="emit('detail', row.project.id)"
+            @focus="showFocus($event, row)"
+            @blur="hideTip"
+          ></button>
+          <button
+            v-for="segment in row.segments"
+            :key="segment.stage"
+            class="phase-segment"
+            :class="segment.state"
+            :style="{
+              ...barStyle(segment.left, segment.width),
+              top: `${43 + segment.lane * 29}px`
+            }"
+            :aria-label="stageExplanation(segment)"
+            @mousemove.stop="showTip($event, row, segment)"
+            @focus="showFocus($event, row, segment)"
+            @blur="hideTip"
+            @click="emit('detail', row.project.id)"
           >
-            <span class="plan-bar" :style="barStyle(row.left, row.width)"></span>
-            <span class="progress-label"
-              >{{ statusText(row) }}{{ row.clipped ? ' · 跨月' : '' }}</span
-            >
-            <span
-              v-if="row.originalMarker !== null"
-              class="original-marker"
-              :style="{ left: `${(row.originalMarker / days) * 100}%` }"
-              aria-label="原计划交付"
-            ></span>
-            <span
-              v-if="todayIndex >= 0"
-              class="today-line"
-              :style="{ left: `${((todayIndex + 0.5) / days) * 100}%` }"
-            ></span>
+            {{ segment.width < 1.6 ? segment.stage.slice(2) : segment.stage }}
           </button>
-        </ElTooltip>
+          <span class="progress-label"
+            >{{
+              row.segments.length
+                ? row.risks.length
+                  ? row.risks.join('；')
+                  : statusText(row)
+                : '暂无本月环节排期'
+            }}{{ row.clipped ? ' · 跨月' : '' }}</span
+          >
+          <span
+            v-if="row.originalMarker !== null"
+            class="original-marker"
+            :style="{ left: `${(row.originalMarker / days) * 100}%` }"
+            aria-label="原计划交付"
+          ></span>
+          <span
+            v-if="todayIndex >= 0"
+            class="today-line"
+            :style="{ left: `${((todayIndex + 0.5) / days) * 100}%` }"
+          ></span>
+        </div>
       </template>
     </div>
   </div>
+  <ElTooltip
+    ref="tooltip"
+    :visible="!!tip"
+    virtual-triggering
+    :virtual-ref="cursorRef"
+    effect="light"
+    placement="bottom-start"
+    :offset="14"
+    :show-arrow="false"
+    :enterable="false"
+    :persistent="false"
+    :popper-options="popperOptions"
+    :popper-style="{ pointerEvents: 'none', maxWidth: 'min(390px, calc(100vw - 16px))' }"
+  >
+    <template #content>
+      <div v-if="tip" class="gantt-tip">
+        <strong>{{ tip.row.project.name }}</strong>
+        <p>{{ projectCode(tip.row.project) }} · {{ tip.row.project.priority }}</p>
+        <template v-if="tip.segment">
+          <p
+            ><b>{{ tip.segment.stage }}</b> ·
+            <span :class="{ 'risk-text': tip.segment.lateDays }"
+              >{{ tip.segment.label
+              }}{{ tip.segment.lateDays ? ` ${tip.segment.lateDays} 天` : '' }}</span
+            ></p
+          >
+          <p>计划日期：{{ tip.segment.plan?.startDate }} → {{ tip.segment.plan?.endDate }}</p>
+          <p
+            >实际完成：{{
+              tip.segment.completedAt
+                ? displayTime(tip.segment.completedAt).slice(0, 10)
+                : '尚未完成'
+            }}</p
+          >
+        </template>
+        <template v-else>
+          <p>当前环节：{{ tip.row.project.stage }} · {{ statusText(tip.row) }}</p>
+          <p>整体计划：{{ tip.row.start }} → {{ tip.row.project.expectedDeliveryDate }}</p>
+          <p>原计划交付：{{ tip.row.project.originalDeliveryDate || '—' }}</p>
+          <p>已完成环节：{{ completedNames(tip.row.project) }}</p>
+          <p v-if="tip.row.project.blocker">阻塞：{{ tip.row.project.blocker }}</p>
+        </template>
+        <p>主负责人：{{ ownerName(tip.row.project.primaryOwnerId) }}</p>
+        <p>协作人员：{{ tip.row.project.collaboratorIds.map(ownerName).join('、') || '无' }}</p>
+        <p>最近更新：{{ displayTime(tip.row.project.lastOverallUpdatedAt) }}</p>
+        <p v-if="tip.row.risks.length" class="risk-text">{{ tip.row.risks.join('；') }}</p>
+        <p class="tip-note">分段长度表示计划天数，颜色表示环节状态 · 点击看详情</p>
+      </div>
+    </template>
+  </ElTooltip>
   <div class="gantt-legend"
-    ><span>灰条：计划区间</span><span>竖标：原计划交付</span><span>蓝线：今天</span
-    ><span>悬停查看明细，点击打开详情</span></div
+    ><span>上排灰条：整体计划</span><span>下排分段：环节计划</span>
+    <span class="legend-done">● 按时完成</span><span class="legend-current">● 进行中</span>
+    <span class="risk-text">● 延期 / 延期完成</span><span>● 未开始 / 待核实</span>
+    <span>蓝色虚线：今天</span><span>竖标：原计划交付</span><span>悬停或键盘聚焦查看明细</span></div
   >
 </template>
 <script setup lang="ts">
-  import { computed } from 'vue'
-  import type { DemoUser } from '@/domain/prototype'
+  import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+  import type { DemoProject, DemoStageHistory, DemoUser } from '@/domain/prototype'
   import { monthDays, type GanttRow } from '@/services/gantt-service'
-  const props = defineProps<{ rows: GanttRow[]; month: string; today: string; users: DemoUser[] }>()
+  import { ganttStageSegments, type GanttSegment } from '@/services/gantt-stage-segments'
+  import { stageExecutions, stageExplanation } from '@/services/stage-execution'
+  import { projectCode } from '@/utils/project-code'
+  import { displayTime } from '@/utils/project-display'
+  const props = defineProps<{
+    rows: GanttRow[]
+    month: string
+    today: string
+    users: DemoUser[]
+    histories: DemoStageHistory[]
+  }>()
   const emit = defineEmits<{ detail: [id: string] }>()
   const days = computed(() => monthDays(props.month))
+  const displayRows = computed(() =>
+    props.rows.map((row) => {
+      const segments = ganttStageSegments(row.project, props.histories, props.month, props.today)
+      return { ...row, segments, height: 108 + Math.max(0, ...segments.map((s) => s.lane)) * 29 }
+    })
+  )
   const todayIndex = computed(() =>
     props.today.startsWith(props.month) ? Number(props.today.slice(8)) - 1 : -1
   )
   const ownerName = (id: string) => props.users.find((user) => user.id === id)?.name ?? '未分配'
+  const teamSummary = (project: DemoProject) => {
+    const members = project.collaboratorIds.map(ownerName)
+    return (
+      ownerName(project.primaryOwnerId) +
+      (members.length
+        ? ` + ${members.slice(0, 2).join('、')}${members.length > 2 ? ` 等${members.length}人` : ''}`
+        : '')
+    )
+  }
   const barStyle = (left: number, width: number) => ({
     left: `${(left / days.value) * 100}%`,
     width: `${(width / days.value) * 100}%`
@@ -80,162 +193,54 @@
       ? '已完成'
       : row.project.status === 'cancelled'
         ? '已取消'
-        : '正常推进'
+        : row.project.simpleStatus === 'blocked'
+          ? '已阻塞'
+          : '进行中'
   const isWeekend = (day: number) =>
     [0, 6].includes(
       new Date(`${props.month}-${String(day).padStart(2, '0')}T00:00:00Z`).getUTCDay()
     )
+  const completedNames = (project: DemoProject) =>
+    stageExecutions(project, props.histories, props.today)
+      .filter((s) => s.completed)
+      .map((s) => s.stage)
+      .join('、') || '暂无可靠完成记录'
+  const tip = shallowRef<{ row: GanttRow; segment?: GanttSegment } | null>(null)
+  const cursor = shallowRef(new DOMRect())
+  const cursorRef = { getBoundingClientRect: () => cursor.value }
+  const tooltip = ref<{ updatePopper: () => void }>()
+  const popperOptions = {
+    strategy: 'fixed' as const,
+    modifiers: [
+      {
+        name: 'flip',
+        options: { fallbackPlacements: ['top-start', 'bottom-end', 'top-end'], padding: 8 }
+      },
+      { name: 'preventOverflow', options: { padding: 8, altAxis: true, tether: false } }
+    ]
+  }
+  function showTip(event: MouseEvent, row: GanttRow, segment?: GanttSegment) {
+    cursor.value = new DOMRect(event.clientX, event.clientY, 0, 0)
+    tip.value = { row, segment }
+    void nextTick(() => tooltip.value?.updatePopper())
+  }
+  function showFocus(event: FocusEvent, row: GanttRow, segment?: GanttSegment) {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    cursor.value = new DOMRect(rect.left, rect.bottom, 0, 0)
+    tip.value = { row, segment }
+    void nextTick(() => tooltip.value?.updatePopper())
+  }
+  const hideTip = () => {
+    tip.value = null
+  }
+  watch(() => [props.rows, props.month, props.histories], hideTip)
+  onMounted(() => {
+    window.addEventListener('scroll', hideTip, true)
+    window.addEventListener('resize', hideTip)
+  })
+  onBeforeUnmount(() => {
+    window.removeEventListener('scroll', hideTip, true)
+    window.removeEventListener('resize', hideTip)
+  })
 </script>
-<style scoped>
-  .gantt-scroll {
-    max-width: 100%;
-    height: max(400px, calc(100dvh - 370px));
-    overflow: auto;
-    scrollbar-gutter: stable;
-    scrollbar-width: auto;
-    scrollbar-color: #aeb7c6 #f1f3f7;
-    border: 1px solid var(--el-border-color-light);
-    border-radius: 10px;
-  }
-  .gantt-grid {
-    display: grid;
-    width: 100%;
-    grid-template-columns: 230px minmax(0, 1fr);
-  }
-  .gantt-scroll::-webkit-scrollbar {
-    /* Override the application's global zero-height horizontal scrollbar. */
-    width: 12px !important;
-    height: 12px !important;
-    display: block;
-  }
-  .gantt-scroll::-webkit-scrollbar-thumb {
-    background: #aeb7c6;
-    border: 2px solid #f1f3f7;
-    border-radius: 8px;
-  }
-  .gantt-scroll::-webkit-scrollbar-track {
-    background: #f1f3f7;
-  }
-  .gantt-grid > .header {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    box-shadow: 0 1px 0 var(--el-border-color-light);
-  }
-  .gantt-grid > .frozen.header {
-    z-index: 6;
-  }
-  .frozen {
-    position: sticky;
-    left: 0;
-    z-index: 3;
-    background: var(--el-bg-color);
-    border-right: 1px solid var(--el-border-color-light);
-  }
-  .header {
-    height: 42px;
-    align-content: center;
-    font-size: 11px;
-    color: var(--el-text-color-secondary);
-    background: var(--el-fill-color-light);
-  }
-  .frozen.header {
-    padding: 0 16px;
-  }
-  .day-grid {
-    display: grid;
-    text-align: center;
-  }
-  .weekend {
-    color: var(--el-text-color-placeholder);
-  }
-  .project-cell {
-    min-height: 82px;
-    padding: 13px 16px;
-    text-align: left;
-    cursor: pointer;
-    border-bottom: 1px solid var(--el-border-color-lighter);
-  }
-  .project-cell strong {
-    display: block;
-    font-size: 13px;
-    font-weight: 500;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .project-cell small {
-    display: block;
-    font-size: 11px;
-    color: var(--el-text-color-secondary);
-    margin-top: 4px;
-  }
-  .project-cell .risk-text {
-    color: var(--el-color-danger);
-  }
-  .track {
-    position: relative;
-  }
-  .project-track {
-    cursor: pointer;
-    border-bottom: 1px solid var(--el-border-color-lighter);
-    background: repeating-linear-gradient(
-      to right,
-      transparent 0,
-      transparent calc(100% / var(--days) - 1px),
-      var(--el-border-color-lighter) calc(100% / var(--days) - 1px),
-      var(--el-border-color-lighter) calc(100% / var(--days))
-    );
-  }
-  .plan-bar,
-  .progress-bar {
-    position: absolute;
-    border-radius: 4px;
-    height: 10px;
-    top: 22px;
-    background: #dbe4f0;
-  }
-  .progress-bar {
-    height: 8px;
-    top: 39px;
-    background: #5d87ff;
-  }
-  .progress-bar.completed {
-    background: #13b99a;
-  }
-  .progress-bar.stale {
-    background: #f59b18;
-  }
-  .progress-label {
-    position: absolute;
-    bottom: 8px;
-    right: 8px;
-    font-size: 11px;
-    color: var(--el-text-color-secondary);
-    background: var(--el-bg-color);
-  }
-  .original-marker {
-    position: absolute;
-    top: 17px;
-    height: 35px;
-    border-left: 2px dashed #7987a1;
-  }
-  .today-line {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    border-left: 1px solid #5d87ff;
-  }
-  .gantt-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
-    margin-top: 14px;
-    font-size: 12px;
-    color: var(--el-text-color-secondary);
-  }
-  .gantt-tip {
-    max-width: 430px;
-    line-height: 1.8;
-  }
-</style>
+<style scoped src="./monthly-gantt.css"></style>

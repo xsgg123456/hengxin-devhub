@@ -39,7 +39,7 @@ export function filterProjects(
       const owner = users.find((u) => u.id === p.primaryOwnerId)?.name ?? ''
       if (
         q.keyword &&
-        !`${p.name} ${p.id} ${owner} ${p.department}`
+        !`${p.name} ${p.code} ${owner} ${p.department}`
           .toLowerCase()
           .includes(q.keyword.toLowerCase())
       )

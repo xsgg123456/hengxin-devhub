@@ -1,4 +1,4 @@
-import { IT_DEPARTMENT_NAMES } from '../../lib/it-department.js'
+import { isEngineerEligible } from '../../lib/it-department.js'
 import { refreshProjectRisks } from '../risks/risk-scan-job.js'
 import type { Prisma, PrismaClient } from '../../generated/prisma/client.js'
 import type { Actor } from '../../plugins/auth.js'
@@ -10,8 +10,9 @@ import { lifecycleEvent } from '../notifications/lifecycle-event-service.js'
 export async function createProject(tx: Prisma.TransactionClient, input: ProjectInput, demandId?: string) {
   const ids = [input.primaryOwnerId, ...input.collaboratorIds]
   if (new Set(ids).size !== ids.length) throw new AppError(400, 'INVALID_MEMBERS', '主负责人与协作人员不能重复')
-  const users = await tx.user.count({ where: { id: { in: ids }, department: { in: IT_DEPARTMENT_NAMES }, active: true } })
-  if (users !== ids.length) throw new AppError(400, 'INVALID_MEMBERS', '主负责人与协作人员必须是有效 IT 用户')
+  const users = await tx.user.findMany({ where: { id: { in: ids }, active: true } })
+  if (users.length !== ids.length || users.some(user => !isEngineerEligible(user)))
+    throw new AppError(400, 'INVALID_MEMBERS', '主负责人与协作人员必须具有有效工程师资格')
   const now = new Date()
   const project = await tx.project.create({ data: {
     requestId: input.requestId, name: input.name, department: input.department,
@@ -38,7 +39,7 @@ export class ProjectService {
       const project = await createProject(tx, input)
       await lifecycleEvent(tx, { eventType: 'PROJECT_ASSIGNED', requestId: `${actor.id}:${input.requestId}`,
         projectId: project.id, recipientIds: [input.primaryOwnerId, ...input.collaboratorIds] })
-      return { id: project.id, version: project.version, stage: project.stage }
+      return { id: project.id, code: project.code, version: project.version, stage: project.stage }
     })
   }
 }

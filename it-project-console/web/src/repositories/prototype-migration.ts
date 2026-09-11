@@ -1,3 +1,4 @@
+import { backfillProjectCodes } from '@/utils/project-code'
 import { PROJECT_STAGES, type PrototypeSnapshot } from '@/domain/prototype'
 import { DEMO_USERS } from '@/mocks/auth-context'
 export function migratePrototypeSnapshot(value: unknown): PrototypeSnapshot {
@@ -31,6 +32,9 @@ export function migratePrototypeSnapshot(value: unknown): PrototypeSnapshot {
       id: user.id,
       name: user.name,
       department: user.department,
+      ...(typeof user.engineerEligible === 'boolean'
+        ? { engineerEligible: user.engineerEligible }
+        : {}),
       role: user.role,
       roleLabel:
         user.role === 'manager' ? '管理人员' : user.role === 'engineer' ? 'IT工程师' : '业务人员'
@@ -132,5 +136,6 @@ export function migratePrototypeSnapshot(value: unknown): PrototypeSnapshot {
       if (complete && completedAt) project.status = 'completed'
     }
   }
+  backfillProjectCodes(snapshot.database)
   return snapshot
 }

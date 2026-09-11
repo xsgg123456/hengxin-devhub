@@ -9,6 +9,7 @@
           <p
             v-if="
               row.plan &&
+              (row.plan.originalStartDate || row.plan.originalEndDate) &&
               (row.plan.originalStartDate !== row.plan.startDate ||
                 row.plan.originalEndDate !== row.plan.endDate)
             "
@@ -18,14 +19,20 @@
           >
         </template></ElTableColumn
       >
-      <ElTableColumn label="状态" width="96"
+      <ElTableColumn label="状态" min-width="140"
         ><template #default="{ row }"
           ><ElTag
             size="small"
-            :type="row.completed ? 'success' : row.current ? 'primary' : 'info'"
-            >{{
-              row.completed ? '已完成' : row.current ? (row.plan ? '进行中' : '待排期') : '未开始'
-            }}</ElTag
+            :type="
+              row.state === 'late' || row.state === 'late-done'
+                ? 'danger'
+                : row.state === 'done'
+                  ? 'success'
+                  : row.current
+                    ? 'primary'
+                    : 'info'
+            "
+            >{{ row.label }}{{ row.lateDays ? ` ${row.lateDays}天` : '' }}</ElTag
           ></template
         ></ElTableColumn
       >
@@ -52,7 +59,7 @@
 </template>
 <script setup lang="ts">
   import { computed } from 'vue'
-  import { PROJECT_STAGES } from '@/domain/prototype'
+  import { stageExecutions } from '@/services/stage-execution'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { displayTime } from '@/utils/project-display'
   const props = defineProps<{ projectId: string }>()
@@ -62,18 +69,6 @@
     () => store.database?.stageHistories.filter((h) => h.projectId === props.projectId) ?? []
   )
   const rows = computed(() =>
-    PROJECT_STAGES.map((stage, index) => {
-      const history = histories.value.filter((h) => h.stage === stage).at(-1)
-      const currentIndex = PROJECT_STAGES.indexOf(project.value?.stage ?? '方案设计')
-      const completed =
-        index < currentIndex || (index === currentIndex && project.value?.status === 'completed')
-      return {
-        stage,
-        plan: project.value?.stagePlans?.find((p) => p.stage === stage),
-        completed,
-        current: index === currentIndex && !completed,
-        completedAt: completed && history?.completedAt ? history.completedAt : null
-      }
-    })
+    project.value ? stageExecutions(project.value, histories.value) : []
   )
 </script>

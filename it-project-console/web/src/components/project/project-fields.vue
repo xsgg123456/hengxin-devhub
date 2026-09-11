@@ -48,12 +48,12 @@
   import type { FormInstance, FormRules } from 'element-plus'
   import type { ProjectInput } from '@/services/workflow-service'
   import { usePrototypeStore } from '@/store/modules/prototype'
-  import { isItDepartment } from '@/utils/it-department'
+  import { isEngineerEligible } from '@/utils/engineer-eligibility'
   const model = defineModel<ProjectInput>({ required: true })
   defineProps<{ hideIdentity?: boolean; disabled?: boolean }>()
   const store = usePrototypeStore()
   const engineers = computed(
-    () => store.database?.users.filter((user) => isItDepartment(user.department)) ?? []
+    () => store.database?.users.filter((user) => isEngineerEligible(user)) ?? []
   )
   const formRef = ref<FormInstance>()
   const rules: FormRules = Object.fromEntries(

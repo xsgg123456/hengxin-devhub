@@ -88,6 +88,7 @@
             ><ElDatePicker
               v-model="dates"
               type="daterange"
+              :shortcuts="dateRangeShortcuts"
               value-format="YYYY-MM-DD"
               start-placeholder="开始日期"
               end-placeholder="结束日期"
@@ -121,7 +122,9 @@
           ><strong>{{ metric.value }}<small> 个</small></strong></button
         ></div
       >
-      <div v-if="store.currentUser.role !== 'engineer' || scope !== 'mine'" class="overview-charts mb-5"
+      <div
+        v-if="store.currentUser.role !== 'engineer' || scope !== 'mine'"
+        class="overview-charts mb-5"
         ><ProjectDistribution
           v-if="!loading && !error"
           :distribution="distribution"
@@ -170,6 +173,7 @@
   </BusinessPageState>
 </template>
 <script setup lang="ts">
+  import { dateRangeShortcuts } from '@/utils/date-range-shortcuts'
   import BusinessPageState from '@/components/system/business-page-state.vue'
   import { computed, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'

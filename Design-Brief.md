@@ -1,3 +1,4 @@
+> 2026-09-11 第二轮已确认并开始开发：[界面优化与双排甘特图](it-project-console/docs/UI-ROUND2-CONFIRMATION.md)，本轮新增规则以该文正式验收条款为准。
 > 2026-09-11 本轮已确认并开始实施：[先排期后执行与需求池统一筛选](it-project-console/docs/STAGE-PLAN-ITERATION.md)。该文逐条为当前验收标准，覆盖旧人工百分比、滚动填日期、验收后二次完成与自动归档规则。保留旧章节作历史参照，实施以本轮为准；正式部署另需明确授权。
 # 轻量化 IT 项目管理系统 · Design Brief
 

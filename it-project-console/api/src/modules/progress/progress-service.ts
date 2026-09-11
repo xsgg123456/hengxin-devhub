@@ -29,12 +29,14 @@ export class ProgressService {
           simpleStatus: status, blocker: status === 'blocked' ? blocker : '', lastOverallUpdatedAt: now
         } })
         if (status === 'completed') {
+          const plan = plans.find(plan => plan.stage === project.stage)!
+          const snapshot = { plannedStartDate: new Date(plan.startDate), plannedEndDate: new Date(plan.endDate) }
           const finished = await tx.stageHistory.updateMany({ where: { projectId: id, stage: project.stage, enteredAt: { not: null },
-            completedAt: null, interruptedAt: null }, data: { completedAt: now, status: 'completed' } })
+            completedAt: null, interruptedAt: null }, data: { completedAt: now, status: 'completed', ...snapshot } })
           if (!finished.count) {
             // A legacy stage may have no start evidence. Record only the observed completion.
             const future = await tx.stageHistory.findFirst({ where: { projectId: id, stage: project.stage, status: 'future', enteredAt: null } })
-            const data = { completedAt: now, status: 'completed', expectedDate: project.stageExpectedDate }
+            const data = { completedAt: now, status: 'completed', expectedDate: project.stageExpectedDate, ...snapshot }
             if (future) await tx.stageHistory.update({ where: { id: future.id }, data })
             else await tx.stageHistory.create({ data: { projectId: id, stage: project.stage, ...data } })
           }

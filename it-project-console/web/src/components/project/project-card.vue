@@ -10,7 +10,7 @@
         project.priority
       }}</ElTag></div
     >
-    <p class="project-id">{{ project.id }}</p>
+    <p class="project-id">{{ projectCode(project) }}</p>
     <div class="tags"
       ><ElTag size="small">{{
         project.status === 'active'
@@ -55,7 +55,7 @@
       >
     </dl>
     <RiskTag :risks="risks" />
-    <StageProgress class="mt-3" :stage="project.stage" :status="project.simpleStatus" />
+    <StageProgress class="mt-3" :project="project" :histories="store.database?.stageHistories ?? []" />
     <div class="actions"
       ><ElButton
         v-if="canUpdate && (!isOverall || !needsPlan(project))"
@@ -72,7 +72,7 @@
     <p class="relation-note">{{
       canUpdate
         ? isOverall
-          ? '可更新整体进度与计划'
+          ? '按计划更新环节完成情况'
           : '仅填写个人进展，不改变整体进度'
         : '当前项目仅可查看'
     }}</p>
@@ -81,6 +81,7 @@
 </template>
 <script setup lang="ts">
   import { computed, ref } from 'vue'
+  import { projectCode } from '@/utils/project-code'
   import type { DemoProject } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { computeProjectRisks } from '@/services/risk-service'

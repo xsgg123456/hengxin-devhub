@@ -151,6 +151,12 @@ test('真实看板筛选分页、三角色读取、甘特与需求统计、错�
   await expect(page.getByText('21 个项目', { exact: true })).toBeVisible()
   const riskTrack = page.getByRole('button', { name: `查看${prefix}-0详情`, exact: true })
   await riskTrack.hover()
+  await expect.poll(async () => {
+    const box = (await riskTrack.boundingBox())!
+    await page.mouse.move(Math.min(box.x + box.width / 2, 1000), box.y + 4)
+    return page.locator('.gantt-tip').count()
+  }).toBe(1)
+  await expect(page.locator('.gantt-tip')).toContainText('整体计划')
   await expect(page.getByRole('tooltip').filter({ hasText: `${prefix}-0` })).not.toContainText('整体进度')
   await expect(page.locator('.original-marker')).toHaveCount(1)
   await page.screenshot({ path: resolve('../output/phase8-gantt-risk-progress.png'), fullPage: true })

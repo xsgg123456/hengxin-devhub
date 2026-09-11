@@ -17,3 +17,8 @@ build/
 .codex/.needs-review
 .codex/.review-state.json
 .codex/evolution/runtime/
+
+# 本地浏览器预览、测试输出和预览服务日志
+/output/
+/.playwright-cli/
+/design/role-prototypes-v2/preview-server*.log

@@ -1,8 +1,10 @@
+import { projectCode } from '@/utils/project-code'
 import type { DemoUser, PrototypeDatabase } from '@/domain/prototype'
 import { computeProjectRisks } from './risk-service'
 
 export interface ResponsibilityTask {
   id: string
+  code?: string
   name: string
   reason: string
   action: 'review' | 'supplement' | 'overall' | 'personal' | 'coordinate'
@@ -66,6 +68,7 @@ export function responsibilityTasks(
     const days = Math.max(0, ...ranked.map((r) => Number(r.match(/\d+/)?.[0] ?? 0)))
     tasks.push({
       id: p.id,
+      code: projectCode(p),
       projectId: p.id,
       name: p.name,
       reason: risks.join('；') || '参与项目，可按实际进展补充协作记录',

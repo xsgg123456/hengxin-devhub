@@ -12,7 +12,7 @@
         ><ElTag>{{ project.priority }}</ElTag></div
       >
       <p class="mb-4 text-xs text-g-600"
-        >{{ project.id }} · {{ project.source === 'direct' ? '直接创建' : '需求立项' }}</p
+        >{{ projectCode(project) }} · {{ project.source === 'direct' ? '直接创建' : '需求立项' }}</p
       >
       <RiskTag :risks="risks" />
       <ElDescriptions class="mt-5 mb-5" :column="2" border>
@@ -99,6 +99,7 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
+  import { projectCode } from '@/utils/project-code'
   import { computed, ref } from 'vue'
   import type { DemoProject } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'

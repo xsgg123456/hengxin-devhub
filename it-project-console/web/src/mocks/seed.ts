@@ -117,7 +117,17 @@ export function createInitialPrototypeSnapshot(): PrototypeSnapshot {
       ]
     }
   }
-  const snapshot = migratePrototypeSnapshot(legacy)
+  const snapshot = migratePrototypeSnapshot({
+    ...legacy,
+    database: {
+      ...legacy.database,
+      projects: legacy.database.projects.map((project) => ({
+        ...project,
+        createdAt: legacy.database.demands.find((demand) => demand.id === project.demandId)!
+          .submittedAt
+      }))
+    }
+  })
   for (const demand of snapshot.database.demands) {
     demand.description = `${demand.name}：统一部门协作流程，减少重复录入。`
     demand.prd = {

@@ -1,4 +1,4 @@
-import { isItDepartment } from '../../lib/it-department.js'
+import { directoryRole } from '../../lib/it-department.js'
 import type { PrismaClient } from '../../generated/prisma/client.js'
 import type { Actor } from '../../plugins/auth.js'
 import { assertActive, assertManager, command } from '../../lib/business-command.js'
@@ -78,11 +78,7 @@ export class ManagerGrantService {
           })
           if (count <= 1) throw new AppError(409, 'LAST_MANAGER', '至少保留一名有效管理人员')
         }
-        const role = input.enabled
-          ? 'MANAGER'
-          : isItDepartment(user.departmentRecord?.name)
-            ? 'ENGINEER'
-            : 'BUSINESS'
+        const role = directoryRole(user, input.enabled)
         await tx.managerGrant.upsert({
           where: { userId: user.id },
           create: { userId: user.id, grantedById: actor.id, active: input.enabled },

@@ -23,6 +23,7 @@ export const SCHEDULE_REASONS = [
 ] as const
 export type ProjectStage = (typeof PROJECT_STAGES)[number]
 export interface DemoUser {
+  engineerEligible?: boolean
   id: string
   name: string
   department: string
@@ -64,6 +65,7 @@ export interface StagePlan {
   originalEndDate?: string
 }
 export interface DemoProject {
+  code?: string
   stagePlans?: StagePlan[]
   actualCompletedAt?: string | null
   riskVersion?: number
@@ -106,6 +108,8 @@ export interface DemoProgressUpdate {
   createdAt: string
 }
 export interface DemoStageHistory {
+  plannedStartDate?: string | null
+  plannedEndDate?: string | null
   projectId: string
   stage: ProjectStage
   startedAt: string
@@ -129,6 +133,7 @@ export interface DemoScheduleChange {
   createdAt: string
 }
 export interface PrototypeDatabase {
+  projectCodeCounters?: Record<string, number>
   schemaVersion: 2
   users: DemoUser[]
   demands: DemoDemand[]

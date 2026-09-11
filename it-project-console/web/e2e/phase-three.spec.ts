@@ -136,9 +136,16 @@ test('甘特跨月同源进度，月份切换，冻结左栏与三档桌面截�
   const heading = page.getByRole('heading', { name: /\d{4}-\d{2} 甘特图/ })
   const month = await heading.textContent()
   const track = page.getByRole('button', { name: '查看客户数据治理一期详情' })
-  await expect(track).toContainText('正常推进')
+  await expect(track).toBeVisible()
   await track.hover()
-  await expect(page.locator('.gantt-tip').filter({ hasText: '客户数据治理一期' })).toContainText('预计交付')
+  // Playwright may scroll the narrow viewport to reach a wide plan bar; a real
+  // subsequent pointer move reopens the tooltip after the scroll dismisses it.
+  await expect.poll(async () => {
+    const box = (await track.boundingBox())!
+    await page.mouse.move(Math.min(box.x + box.width / 2, 1000), box.y + 4)
+    return page.locator('.gantt-tip').count()
+  }).toBe(1)
+  await expect(page.locator('.gantt-tip').filter({ hasText: '客户数据治理一期' })).toContainText('整体计划')
   await page.getByRole('button', { name: '下一月', exact: true }).click()
   await expect(heading).not.toHaveText(month!)
   await expect(track).toBeVisible()

@@ -73,9 +73,7 @@ test('领导评审从UI重置开始，四账号连续操作共享同一项目并
   await expect(drawer).not.toBeVisible()
   await expect(page).not.toHaveURL(/projectId=/)
   await page.getByRole('menuitem', { name: '甘特图', exact: true }).click()
-  await expect(page.getByRole('button', { name: `查看${name}详情`, exact: true })).toContainText(
-    '正常推进'
-  )
+  await expect(page.getByRole('button', { name: `查看${name}详情`, exact: true })).toBeVisible()
   await expect(page.locator('.project-cell').filter({ hasText: name })).toContainText('方案设计')
   await page.getByRole('button', { name: `查看${name}详情`, exact: true }).click()
   await expect(drawer).toContainText('预算联调样例已准备')

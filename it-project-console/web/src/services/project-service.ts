@@ -1,5 +1,6 @@
+import { nextProjectCode, backfillProjectCodes } from '@/utils/project-code'
 import { PROJECT_STAGES, type DemoProject, type PrototypeSnapshot } from '@/domain/prototype'
-import { isItDepartment } from '@/utils/it-department'
+import { isEngineerEligible } from '@/utils/engineer-eligibility'
 import { computeProjectRisks } from './risk-service'
 import { demandMaterials } from './demand-materials'
 import {
@@ -44,7 +45,7 @@ export function createProject(
     return existing
   }
   const engineers = snapshot.database.users
-    .filter((user) => isItDepartment(user.department))
+    .filter((user) => isEngineerEligible(user))
     .map((user) => user.id)
   if (!engineers.includes(input.primaryOwnerId)) throw new WorkflowError('请选择唯一 IT 主负责人')
   if (
@@ -56,7 +57,9 @@ export function createProject(
   const name = textValue(input.name, '项目名称', 100)
   const department = textValue(input.department, '需求部门', 100)
   const now = input.now ?? new Date().toISOString()
+  backfillProjectCodes(snapshot.database)
   const project: DemoProject = {
+    code: nextProjectCode(snapshot.database, now),
     id: nextId(
       'P',
       snapshot.database.projects,

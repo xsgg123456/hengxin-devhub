@@ -28,7 +28,7 @@ for (const [month, days] of [['2027-02', 28], ['2028-02', 29], ['2026-09', 30], 
       const key = 'it-project-console.prototype.v1'
       const snapshot: PrototypeSnapshot = JSON.parse(localStorage.getItem(key)!)
       snapshot.database.projects.push({
-        ...snapshot.database.projects[0]!, id: 'layout-date-boundary', demandId: null,
+        ...snapshot.database.projects[0]!, code: undefined, id: 'layout-date-boundary', demandId: null,
         name: '日期对齐验证', createdAt: `${month}-03T00:00:00Z`,
         expectedDeliveryDate: `${month}-20`, originalDeliveryDate: `${month}-18`,
         overallProgress: 50, status: 'active', archived: false
@@ -38,7 +38,7 @@ for (const [month, days] of [['2027-02', 28], ['2028-02', 29], ['2026-09', 30], 
     await page.goto('/#/monthly-gantt')
     await page.reload()
     await expect(page.locator('.day-grid > span')).toHaveCount(days)
-    const track = page.getByRole('button', { name: '查看日期对齐验证详情', exact: true })
+    const track = page.getByRole('button', { name: '查看日期对齐验证详情', exact: true }).locator('..')
     await expect(track).toBeVisible()
     await expect(track.locator('.progress-bar')).toHaveCount(0)
     await expect(track).not.toContainText('%')
@@ -66,7 +66,7 @@ test('甘特铺满宽屏，窄屏内部双向滚动且表头左列固定，标�
     const snapshot: PrototypeSnapshot = JSON.parse(localStorage.getItem(key)!)
     const source = snapshot.database.projects[0]!
     for (let index = 0; index < 10; index++) snapshot.database.projects.push({
-      ...source, id: `layout-scroll-${index}`, demandId: null, name: `滚动验证项目${index}`,
+      ...source, code: undefined, id: `layout-scroll-${index}`, demandId: null, name: `滚动验证项目${index}`,
       createdAt: '2026-01-01T00:00:00Z', expectedDeliveryDate: '2027-12-31',
       originalDeliveryDate: '2026-10-15', status: 'active', archived: false
     })

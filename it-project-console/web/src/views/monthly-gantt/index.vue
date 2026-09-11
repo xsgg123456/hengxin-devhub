@@ -84,6 +84,7 @@
           :month="month"
           :today="today"
           :users="store.database.users"
+          :histories="store.database.stageHistories"
           @detail="openDetail"
         />
       </div>

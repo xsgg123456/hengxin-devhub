@@ -4,6 +4,12 @@ import { parseEnv } from '../../config/env.js'
 import { createPrisma } from '../../plugins/prisma.js'
 import { DingtalkDirectory } from './dingtalk-directory.js'
 import type { DingIdentity } from './dingtalk-client.js'
+import { setEngineerOverride } from '../manager-grants/engineer-override-service.js'
+import { ManagerGrantService } from '../manager-grants/manager-grant-service.js'
+import { isEngineerEligible } from '../../lib/it-department.js'
+import { assertProjectWrite } from '../../plugins/auth.js'
+import { createProject } from '../projects/project-service.js'
+import { mapUser } from '../workspace/read-model.js'
 
 const env = parseEnv(process.env)
 if (env.NODE_ENV !== 'test' || !new URL(env.DATABASE_URL).searchParams.get('schema')?.startsWith('itpc_test_') || !env.S3_BUCKET.startsWith('itpc-test-')) throw new Error('必须通过隔离入口')
@@ -44,6 +50,40 @@ it.each(['信息技术部', 'IT部'])('%s：完整快照、稳定身份、角色
     expect(admin.id).not.toBe('user-manager-chen')
     expect((await db.user.findUniqueOrThrow({ where: { id: 'user-manager-chen' } })).dingUnionId).toBeNull()
     expect((await directory.sync()).bootstrapAdminInitialized).toBe(false)
+    const override = { userId: business.id, dingUserId: businessIdentity.userId, actorId: admin.id, enabled: true, reason: '核实后的工程师职责' }
+    await expect(setEngineerOverride(db, { ...override, dingUserId: 'wrong' })).rejects.toMatchObject({ code: 'IDENTITY_MISMATCH' })
+    await expect(setEngineerOverride(db, { ...override, actorId: business.id })).rejects.toMatchObject({ statusCode: 403 })
+    await setEngineerOverride(db, override)
+    await directory.sync()
+    const engineer = await directory.resolve(businessIdentity)
+    expect(engineer.department).toBe('市场部')
+    expect(engineer.role).toBe('ENGINEER')
+    expect(isEngineerEligible(engineer)).toBe(true)
+    expect(mapUser(engineer).engineerEligible).toBe(true)
+    const projectInput = { requestId: randomUUID(), name: '例外资格分派验证', department: '市场部', priority: 'P2' as const,
+      primaryOwnerId: admin.id, collaboratorIds: [engineer.id] }
+    await expect(db.$transaction(async tx => {
+      expect((await createProject(tx, projectInput)).id).toBeTruthy()
+      throw new Error('验证后回滚项目')
+    })).rejects.toThrow('验证后回滚项目')
+    expect(() => assertProjectWrite(engineer, { primaryOwnerId: admin.id, archived: false, status: 'ACTIVE' }, [engineer.id], false)).not.toThrow()
+    const grants = new ManagerGrantService(db)
+    await grants.set(admin, { userId: engineer.id, enabled: true, requestId: randomUUID() })
+    await grants.set(admin, { userId: engineer.id, enabled: false, requestId: randomUUID() })
+    await directory.sync()
+    expect((await directory.resolve(businessIdentity)).role).toBe('ENGINEER')
+    expect((await db.managerGrant.findUniqueOrThrow({ where: { userId: engineer.id } })).active).toBe(false)
+    await db.session.create({ data: { userId: engineer.id, tokenHash: randomUUID(), expiresAt: new Date(Date.now() + 100000) } })
+    await setEngineerOverride(db, { ...override, enabled: false, reason: '撤销职责' })
+    await directory.sync()
+    const revoked = await directory.resolve(businessIdentity)
+    expect(revoked.role).toBe('BUSINESS')
+    expect(isEngineerEligible(revoked)).toBe(false)
+    expect(mapUser(revoked).engineerEligible).toBe(false)
+    await expect(db.$transaction(tx => createProject(tx, projectInput))).rejects.toMatchObject({ code: 'INVALID_MEMBERS' })
+    expect(() => assertProjectWrite(revoked, { primaryOwnerId: admin.id, archived: false, status: 'ACTIVE' }, [revoked.id], false)).toThrow()
+    expect(await db.session.count({ where: { userId: engineer.id } })).toBe(0)
+    expect(await db.auditLog.count({ where: { entityType: 'engineer_override', entityId: engineer.id } })).toBe(2)
     await db.managerGrant.update({ where: { userId: admin.id }, data: { active: false } })
     await directory.sync()
     expect((await directory.resolve(adminIdentity)).role).toBe('ENGINEER')
@@ -73,6 +113,7 @@ it.each(['信息技术部', 'IT部'])('%s：完整快照、稳定身份、角色
     expect((await directory.resolve(adminIdentity)).role).toBe('ENGINEER')
   } finally {
     const saved = await db.user.findMany({ where: { dingUserId: { startsWith: prefix } }, select: { id: true } })
+    await db.commandReceipt.deleteMany({ where: { actorId: { in: saved.map(u => u.id) } } })
     await db.auditLog.deleteMany({ where: { OR: [{ entityId: prefix }, { entityId: { in: saved.map(u => u.id) } }] } })
     await db.managerGrant.deleteMany({ where: { userId: { in: saved.map(u => u.id) } } })
     await db.user.deleteMany({ where: { id: { in: saved.map(u => u.id) } } })

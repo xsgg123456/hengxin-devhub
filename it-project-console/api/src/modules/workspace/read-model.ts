@@ -6,12 +6,14 @@ import type {
   ProjectMember
 } from '../../generated/prisma/client.js'
 import { readStagePlans } from '../projects/project-plan-state.js'
+import { isEngineerEligible } from '../../lib/it-department.js'
 const date = (value: Date | null) => value?.toISOString().slice(0, 10) ?? ''
 export const mapUser = (user: User) => ({
   id: user.id,
   name: user.name,
   department: user.department,
   role: user.role.toLowerCase(),
+  engineerEligible: isEngineerEligible(user),
   roleLabel: { MANAGER: '管理人员', BUSINESS: '业务人员', ENGINEER: 'IT工程师' }[user.role]
 })
 export const mapDemand = (demand: Demand & { attachments: Attachment[] }) => {
@@ -53,6 +55,7 @@ export const mapDemand = (demand: Demand & { attachments: Attachment[] }) => {
 }
 export const mapProject = (project: Project & { members: ProjectMember[] }) => ({
   id: project.id,
+  code: project.code,
   requestId: project.requestId ?? project.id,
   version: project.version,
   demandId: project.demandId,

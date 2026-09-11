@@ -71,13 +71,19 @@ export function updateProgress(snapshot: PrototypeSnapshot, input: ProgressInput
           row.completedAt === null &&
           !row.interruptedAt
       )
-      if (history) history.completedAt = now
+      const completedPlan = project.stagePlans?.find((plan) => plan.stage === project.stage)
+      const completedRecord = {
+        completedAt: now,
+        plannedStartDate: completedPlan?.startDate ?? null,
+        plannedEndDate: completedPlan?.endDate ?? null
+      }
+      if (history) Object.assign(history, completedRecord)
       else
         snapshot.database.stageHistories.push({
           projectId: project.id,
           stage: project.stage,
           startedAt: '',
-          completedAt: now
+          ...completedRecord
         })
       if (nextStage) {
         project.stage = nextStage

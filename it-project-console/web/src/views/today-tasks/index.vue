@@ -20,7 +20,7 @@
         <div v-for="task in tasks" :key="task.id" class="task-row" :data-task-id="task.id">
           <div
             ><h3 class="font-medium">{{ task.name }}</h3
-            ><p class="text-xs text-g-500 mt-1">{{ task.id }}</p
+            ><p class="text-xs text-g-500 mt-1">{{ task.code || task.id }}</p
             ><p class="text-sm mt-2" :class="task.severity < 3 ? 'text-danger' : 'text-g-600'">{{
               task.reason
             }}</p></div

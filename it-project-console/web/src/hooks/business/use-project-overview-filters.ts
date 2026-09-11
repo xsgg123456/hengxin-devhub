@@ -1,3 +1,4 @@
+import { projectCode } from '@/utils/project-code'
 import { computed, ref, watch } from 'vue'
 import { runtimeConfig } from '@/config/runtime'
 import { useLiveQuery } from './use-live-query'
@@ -5,7 +6,7 @@ import type { DashboardResult } from '@/services/live-dashboard-types'
 import { useRouter } from 'vue-router'
 import { usePrototypeStore } from '@/store/modules/prototype'
 import { computeProjectRisks } from '@/services/risk-service'
-import { isItDepartment } from '@/utils/it-department'
+import { isEngineerEligible } from '@/utils/engineer-eligibility'
 
 export function useProjectOverviewFilters(personal = false) {
   const store = usePrototypeStore(),
@@ -19,9 +20,7 @@ export function useProjectOverviewFilters(personal = false) {
     stage = ref('')
   const dates = ref<[string, string] | null>(null),
     includeArchived = ref(false)
-  const engineers = computed(
-    () => store.database?.users.filter((u) => isItDepartment(u.department)) ?? []
-  )
+  const engineers = computed(() => store.database?.users.filter((u) => isEngineerEligible(u)) ?? [])
   const departments = computed(() => [...new Set(store.visibleProjects.map((p) => p.department))])
   const prototypeProjects = computed(() =>
     store.visibleProjects
@@ -52,7 +51,7 @@ export function useProjectOverviewFilters(personal = false) {
         const owner = store.database?.users.find((u) => u.id === p.primaryOwnerId)?.name ?? ''
         if (
           keyword.value.trim() &&
-          !`${p.name} ${p.id} ${owner} ${p.department}`
+          !`${p.name} ${projectCode(p)} ${owner} ${p.department}`
             .toLowerCase()
             .includes(keyword.value.trim().toLowerCase())
         )
