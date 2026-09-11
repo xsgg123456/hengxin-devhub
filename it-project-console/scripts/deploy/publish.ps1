@@ -16,6 +16,7 @@ param(
 . "$PSScriptRoot/common.ps1"
 . "$PSScriptRoot/package.ps1"
 . "$PSScriptRoot/upload.ps1"
+. "$PSScriptRoot/retention.ps1"
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
 if ($TargetHost -notmatch '^[a-zA-Z0-9][a-zA-Z0-9.-]*$' -or $TargetUser -notmatch '^[a-z_][a-z0-9_-]*$') { throw 'Invalid SSH destination.' }
 if ($RemoteDir -ne '/opt/it-project-console') { throw 'The supported production root is /opt/it-project-console.' }
@@ -48,5 +49,7 @@ try {
   $mode = if ($Action -eq 'Initialize') { 'init-config' } else { 'deploy' }
   $command = "bash '$RemoteDir/releases/$uploadedRelease/scripts/server/deploy-bundle.sh' '$mode' '$RemoteDir' '$uploadedRelease'"
   if ($Action -eq 'Initialize') { $command += " '$BootstrapAdminDingUserId'" }
-  Invoke-Checked ssh ($sshOptions + @($remote, $command))
+  if ($Action -eq 'Deploy') {
+    Invoke-DeployAndRetain $projectRoot $remote $sshOptions $RemoteDir $uploadedRelease $command
+  } else { Invoke-Checked ssh ($sshOptions + @($remote, $command)) }
 } finally { Pop-Location }

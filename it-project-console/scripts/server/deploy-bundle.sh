@@ -131,4 +131,9 @@ if ! wait_apps; then
 fi
 atomic_link current "$TAG"
 rm -f "$ROOT/pending"
+if [[ ! -L "$DIR/.deployed" ]] && touch "$DIR/.deployed"; then
+  rm -f "$ROOT/incoming/.uploading-$TAG" || echo 'WARNING: upload protection could not be removed; package retained.' >&2
+else
+  echo 'WARNING: success marker could not be written; package cleanup requires attention.' >&2
+fi
 echo "Deployment healthy: $TAG (project=$PROJECT)"

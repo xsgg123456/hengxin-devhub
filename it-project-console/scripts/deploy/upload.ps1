@@ -8,7 +8,9 @@ function Send-ReleasePackage {
   if ($expected -notmatch '^[a-f0-9]{64}$' -or (Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected) { throw 'Package checksum mismatch.' }
   $sshOptions = @(Get-SshArguments $Port $IdentityFile)
   $scpOptions = @(Get-SshArguments $Port $IdentityFile -Scp)
-  Invoke-Checked ssh ($sshOptions + @($Remote, "set -eu; umask 077; test ! -L '$RemoteDir'; test ! -L '$RemoteDir/incoming'; test ! -L '$RemoteDir/releases'; mkdir -p '$RemoteDir/incoming' '$RemoteDir/releases'; test `"`$(readlink -f '$RemoteDir')`" = '$RemoteDir'"))
+  # Register upload intent under the same lock as deployment/retention. Keep it until
+  # successful deployment so even a re-upload of an old successful tag is protected.
+  Invoke-Checked ssh ($sshOptions + @($Remote, "set -eu; umask 077; test ! -L '$RemoteDir'; test ! -L '$RemoteDir/incoming'; test ! -L '$RemoteDir/releases'; mkdir -p '$RemoteDir/incoming' '$RemoteDir/releases'; test `"`$(readlink -f '$RemoteDir')`" = '$RemoteDir'; test ! -L '$RemoteDir/.release.lock'; exec 9>'$RemoteDir/.release.lock'; flock -n 9; test ! -L '$RemoteDir/incoming/.uploading-$release'; touch '$RemoteDir/incoming/.uploading-$release'"))
   # SCP avoids PowerShell's binary pipeline conversion; remote checksum is independent.
   Invoke-Checked scp ($scpOptions + @($Archive, "${Remote}:$RemoteDir/incoming/$name"))
   $command = @"
