@@ -713,10 +713,12 @@ MinIO补丁初验完成：两个原tag源码副本经Go1.27.1/grpc1.79.3/crypto0
 2026-09-10 09:53最终验收：Chrome真人钉钉登录张帅/IT部/ENGINEER通过，me/workspace200，工程师管理接口403；本人3项目、全部18项目、需求2条、需求分布及项目图表、9月9项目甘特/切月/详情/进度表单取消通过。写入流程由72项集成和7条隔离真实浏览器回归证明，正式数据未为测试而改写。既定发布收尾完成，正式通知仍关闭；已知迁移占位与底层限制保留。
 
 
-## 2026-09-11 迭代实施计划（本地验收通过，未部署）
+## 2026-09-11 迭代实施计划（本地验收及生产部署通过）
 1. 数据与服务：api/prisma、modules/projects、progress、workspace、risk；支持无日期立项、完整排期/历史、阶段自动流转、验收自动完成及旧数据兼容。验收：权限、缺计划、日期顺序、版本冲突、重复提交、改期、重开、迁移集成通过。
 2. 项目UI与原型：web/components/project、hooks/business/use-progress-form、services/progress/management/workflow、repositories/migration、甘特图；原位实现已确认四张预览。验收：五阶段排期与完成闭环、旧数据只补剩余、百分比退出、历史可查。
 3. 需求池：api/modules/dashboard/demand-statistics-service/query-schemas，web/views/my-demands、use-demand-page、analytics-service；一次筛选带动全部结果。验收：日期、正常/延期完成、空态、重置、月份范围和指标/清单一致。
 4. 交付验证：pnpm typecheck、pnpm test、pnpm build、API test:integration、web test:e2e、真实API test:browser，code-reviewer两阶段审查修复；本地提交前运行项目门禁，不部署。
 
 执行结果及用例证据见 [本轮验收记录](it-project-console/docs/STAGE-PLAN-VERIFICATION.md)：Web 153、API 65、集成 96、原型浏览器 42、真实浏览器 7、发布配置 6、Harness 20 条通过，前后端构建和独立两阶段审查通过。
+
+用户后续明确授权生产发布，已部署 `20260911-ee53742`。完整备份、SQL备份、新迁移、服务健康、数据摘要、正式HTTPS附件与张帅现有登录浏览器验收通过；原19项目/4需求及业务历史保留。详见上方验收记录的生产章节。
