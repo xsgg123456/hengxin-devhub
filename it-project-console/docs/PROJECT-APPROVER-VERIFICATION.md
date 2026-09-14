@@ -24,4 +24,14 @@
 - 主代理目视普通管理员页面：风险待办和查看协调操作保持，未出现立项待办；原布局及交互复用。证据为忽略目录 `output/approval-*.log`、`output/approval-manager.png`。
 - 既有边界：pending 重派通过原 API，本次收紧其授权；现有抽屉的改派/重提仍在 returned 状态提供。本次不新增 pending 编辑界面。
 
-独立两阶段审查通过，未发现阻断问题。尚未生产部署，本地实现不代表生产权限已生效。
+独立两阶段审查通过，未发现阻断问题。
+
+## 生产部署（用户明确授权，2026-09-14）
+
+- 已部署 `20260914-1ed3b31`，回退版本保留 `20260914-5e6f8d4-r1`。发布包重新执行检查，依赖审计 0 critical / 0 high，镜像产物隐私审计 183 个文本文件通过。
+- 发布前通过真实钉钉接口核实姚泽攀唯一有效管理员身份，员工 ID 留在服务器私有文件，已配置 `PROJECT_APPROVER_DING_USER_ID`。原 server.env 已在服务器备份，其他配置保留。
+- 完整备份：`/opt/it-project-console/backups/full/20260914T072739Z-97143`；停写后 SQL 备份：`/opt/it-project-console/backups/20260914T073205Z-101600.sql`。无待执行迁移。
+- API、Web、PostgreSQL、MinIO 均 healthy；正式 HTTPS 首页和 `/health/ready` 均 200。
+- 生产镜像只读服务检查：姚泽攀绑定与审批能力通过，其他管理员在审批、直接创建、重提三个服务入口均得到 403；不创建业务记录、不外发测试消息。自动通知开关仍 false。
+- 未执行生产业务表摘要本地导出：自动审批审查因生产衍生信息外传风险拒绝该核验，改用备份完成、迁移状态、服务健康和上述权限检查；不声称完成了全表前后摘要比对。
+- 发布日志位于本地忽略目录 `output/approver-package.log`、`approver-backup.log`、`approver-deploy.log`。
