@@ -6,7 +6,7 @@ import { prepareManagerRiskDigest } from './manager-risk-digest.js'
 import { sendRobotMessage, robotMessageResult, type RobotClient } from '../dingtalk/dingtalk-robot-message.js'
 import { recipientScope, skipHistoricalNotifications, type NotificationScope } from './notification-scope.js'
 
-const supported = new Set(['PROPOSAL_ASSIGNED', 'PROPOSAL_RETURNED', 'MANAGER_RISK_DIGEST', 'PROJECT_RISKS_CHANGED', 'DEMAND_RETURNED', 'DEMAND_APPROVED', 'PROJECT_ASSIGNED', 'PROJECT_COMPLETED'])
+const supported = new Set(['ACCEPTANCE_SUBMITTED', 'ACCEPTANCE_RETURNED', 'PROPOSAL_ASSIGNED', 'PROPOSAL_RETURNED', 'MANAGER_RISK_DIGEST', 'PROJECT_RISKS_CHANGED', 'DEMAND_RETURNED', 'DEMAND_APPROVED', 'PROJECT_ASSIGNED', 'PROJECT_COMPLETED'])
 const samples = new Set(['user-manager-chen', 'user-business-li', 'user-engineer-wang', 'user-engineer-zhao'])
 const include = { recipient: true, demand: true, project: { include: { primaryOwner: true } }, deliveryLog: true } as const
 type Item = Prisma.NotificationOutboxGetPayload<{ include: typeof include }>
@@ -39,6 +39,7 @@ export function notificationContent(item: Item, origin: string) {
     return shown < blocks.length ? `${content}\n其余 ${blocks.length - shown} 个项目请点总览\n${overview}` : content
   }
   const title: Record<string, string> = {
+    ACCEPTANCE_SUBMITTED: '项目待业务验收', ACCEPTANCE_RETURNED: '业务验收退回整改',
     PROPOSAL_ASSIGNED: '项目待确认接单', PROPOSAL_RETURNED: '工程师退回管理评估',
     PROJECT_RISKS_CHANGED: '项目风险提醒', DEMAND_RETURNED: '需求已退回',
     DEMAND_APPROVED: '需求已正式立项', PROJECT_ASSIGNED: '项目已分配', PROJECT_COMPLETED: '项目已完成'
@@ -102,13 +103,18 @@ export class NotificationService {
 
   private skip(item: Item) {
     const payload = item.payload && typeof item.payload === 'object' && !Array.isArray(item.payload) ? item.payload : {}
-    return (item.eventType !== 'MANAGER_RISK_DIGEST' && !item.projectId && !item.demandId && typeof payload.proposalId !== 'string') ||
+    const acceptanceExpired = item.eventType.startsWith('ACCEPTANCE_') && (
+      !item.project || item.project.status !== 'ACTIVE' || item.project.archived ||
+      payload.acceptanceRound !== item.project.acceptanceRound ||
+      (item.eventType === 'ACCEPTANCE_SUBMITTED' && (item.project.acceptanceStatus !== 'pending' || item.project.acceptanceOwnerId !== item.recipientId || item.recipient.role !== 'BUSINESS')) ||
+      (item.eventType === 'ACCEPTANCE_RETURNED' && (item.project.acceptanceStatus !== 'returned' || item.project.primaryOwnerId !== item.recipientId)))
+    return acceptanceExpired || (item.eventType !== 'MANAGER_RISK_DIGEST' && !item.projectId && !item.demandId && typeof payload.proposalId !== 'string') ||
       (item.eventType === 'MANAGER_RISK_DIGEST' && (!Array.isArray(payload.projects) || payload.projects.length === 0)) ||
       !supported.has(item.eventType) || !item.recipient.active || !item.recipient.dingUserId ||
       (item.eventType === 'PROPOSAL_RETURNED' && !canApproveProjects(item.recipient, this.options.projectApproverDingUserId ?? '')) ||
       (item.eventType === 'MANAGER_RISK_DIGEST' && item.recipient.role !== 'MANAGER') ||
       (item.eventType === 'PROJECT_RISKS_CHANGED' && item.recipient.role !== 'MANAGER' &&
-        !(item.recipient.role === 'ENGINEER' && item.project?.primaryOwnerId === item.recipientId)) ||
+        !(item.project?.acceptanceStatus !== 'pending' && item.recipient.role === 'ENGINEER' && item.project?.primaryOwnerId === item.recipientId)) ||
       samples.has(item.recipientId) || item.projectId === 'project-demo' || item.demandId === 'demand-demo-owned'
       || [item.recipientId,item.projectId,item.demandId].some(id=>id?.startsWith('sample-'))
   }

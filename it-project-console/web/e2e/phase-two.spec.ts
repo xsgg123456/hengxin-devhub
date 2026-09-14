@@ -96,7 +96,9 @@ test('同一需求经草稿、立项、主责整体更新、协作个人更新�
   await drawer.getByRole('button', { name: '保存更新' }).click()
   await expect(drawer).not.toBeVisible()
   const afterPersonal = (await snapshot(page)).database.projects.find((p) => p.id === project.id)!
-  expect({ ...afterPersonal, updatedAt: overall.updatedAt }).toEqual(overall)
+  expect({ ...afterPersonal, updatedAt: overall.updatedAt }).toEqual({
+    ...overall, version: (overall.version ?? 0) + 1
+  })
   await identity(page, '陈立峰')
   await card(page, name).getByRole('button', { name: '详情', exact: true }).click()
   drawer = page.getByRole('dialog', { name: '项目详情', exact: true })

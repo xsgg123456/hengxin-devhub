@@ -85,7 +85,25 @@ export interface ProjectProposal {
   updatedAt: string
   projectId: string | null
 }
+export type AcceptanceAction = 'assign' | 'submit' | 'withdraw' | 'return' | 'accept'
+export interface AcceptanceHistory {
+  id: string
+  action: AcceptanceAction | 'invalidate'
+  actorId: string
+  createdAt: string
+  round: number
+  summary: string
+  url: string
+  ownerId: string | null
+}
 export interface DemoProject {
+  acceptanceOwnerId?: string | null
+  acceptanceStatus?: 'none' | 'pending' | 'returned' | 'accepted'
+  acceptanceSubmittedAt?: string | null
+  acceptanceSummary?: string
+  acceptanceUrl?: string
+  acceptanceRound?: number
+  acceptanceHistory?: AcceptanceHistory[]
   approvedLaunchDate?: string | null
   code?: string
   stagePlans?: StagePlan[]

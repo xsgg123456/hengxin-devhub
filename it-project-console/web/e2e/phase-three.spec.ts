@@ -1,3 +1,4 @@
+import { completeBusinessAcceptance } from './business-acceptance-helpers'
 import { planProject } from './review-helpers'
 import { expect, test, type Page } from '@playwright/test'
 import type { PrototypeSnapshot } from '../src/domain/prototype'
@@ -35,12 +36,7 @@ test('验收完成自动完成项目不归档，刷新保持，管理员重开�
   await identity(page, '王浩然')
   await open(page)
   await expect(detail(page).getByRole('button', { name: '完成并归档', exact: true })).toHaveCount(0)
-  await detail(page).getByRole('button', { name: '更新环节', exact: true }).click()
-  const update = page.getByRole('dialog', { name: '更新环节', exact: true })
-  await update.getByText('已完成', { exact: true }).click()
-  await update.getByLabel('补充说明（选填）', { exact: true }).fill('验收签字已全部完成')
-  await update.getByRole('button', { name: '保存更新' }).click()
-  await expect(update).not.toBeVisible()
+  await completeBusinessAcceptance(page, 'P-2026-008', '验收签字已全部完成')
   await expect.poll(async () => (await read(page)).database.projects[0]!.status).toBe('completed')
   await expect(detail(page).getByRole('button', { name: '完成并归档', exact: true })).toHaveCount(0)
   await page.reload()
@@ -53,7 +49,7 @@ test('验收完成自动完成项目不归档，刷新保持，管理员重开�
   await page.getByRole('button', { name: '确认重新打开', exact: true }).click()
   await expect(detail(page)).toContainText('验收签字已全部完成')
   await expect.poll(async () => (await read(page)).database.projects[0]!.status).toBe('active')
-  expect((await read(page)).database.lifecycleEvents.map((e) => e.action)).toEqual(['reopen', 'complete'])
+  expect((await read(page)).database.lifecycleEvents.map((e) => e.action)).toEqual(expect.arrayContaining(['reopen', 'complete']))
 })
 test('取消原因校验不写库，管理人员可删除任意项目并同步删除原需求', async ({ page }) => {
   await open(page)

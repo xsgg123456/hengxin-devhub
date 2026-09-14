@@ -1,17 +1,29 @@
 <template>
   <ElDrawer
     :model-value="modelValue"
-    :title="correction ? '管理纠正' : overall ? '更新环节' : '填写协作进展'"
+    :title="
+      correction ? '管理纠正' : acceptanceMode ? '业务验收' : overall ? '更新环节' : '填写协作进展'
+    "
     size="min(760px, 95vw)"
-    :before-close="beforeClose"
+    :before-close="closeDrawer"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <template v-if="project">
       <h3 class="mb-2 text-lg font-medium">{{ project.name }}</h3>
       <p class="mb-5 text-g-600">{{
-        overall ? '按既定计划更新当前环节的完成情况' : '只记录自己的进展与阻塞，不修改项目整体进度'
+        acceptanceMode
+          ? '主负责人提交交付，指定业务负责人确认验收结果'
+          : overall
+            ? '按既定计划更新当前环节的完成情况'
+            : '只记录自己的进展与阻塞，不修改项目整体进度'
       }}</p>
+      <AcceptancePanel
+        v-if="acceptanceMode && modelValue"
+        ref="acceptancePanel"
+        :project="currentProject!"
+      />
       <ElForm
+        v-else
         ref="formRef"
         :model="form"
         :rules="rules"
@@ -37,7 +49,9 @@
           <ElFormItem label="当前环节是否完成" prop="status">
             <ElRadioGroup v-model="form.status" aria-label="当前环节是否完成">
               <ElRadioButton value="in-progress">尚未完成</ElRadioButton>
-              <ElRadioButton v-if="!correction" value="completed">已完成</ElRadioButton>
+              <ElRadioButton v-if="!correction && project.stage !== '验收交付'" value="completed"
+                >已完成</ElRadioButton
+              >
             </ElRadioGroup>
           </ElFormItem>
           <ElAlert
@@ -53,7 +67,7 @@
             :title="
               nextStage
                 ? `保存后记录实际完成时间，并进入${nextStage}。`
-                : '保存后记录实际完成时间，项目自动完成。'
+                : '请提交业务验收，通过后记录实际完成时间。'
             "
             type="info"
             :closable="false"
@@ -85,10 +99,11 @@
       <ProjectPlanDrawer v-model="planOpen" :project="project" />
     </template>
     <template #footer>
-      <ElButton :disabled="busy" @click="beforeClose(() => emit('update:modelValue', false))"
+      <ElButton :disabled="busy" @click="closeDrawer(() => emit('update:modelValue', false))"
         >取消</ElButton
       >
       <ElButton
+        v-if="!acceptanceMode"
         type="primary"
         :loading="busy"
         :disabled="overall && !correction && unplanned"
@@ -99,7 +114,9 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
-  import { ref } from 'vue'
+  import { computed, ref } from 'vue'
+  import AcceptancePanel from './acceptance-panel.vue'
+  import { usePrototypeStore } from '@/store/modules/prototype'
   import ProjectPlanDrawer from './project-plan-drawer.vue'
   const planOpen = ref(false)
   import PrototypeSaveRecovery from '@/components/system/prototype-save-recovery.vue'
@@ -110,6 +127,18 @@
     project: DemoProject | null
     correction?: boolean
   }>()
+  const store = usePrototypeStore()
+  const acceptancePanel = ref<InstanceType<typeof AcceptancePanel> | null>(null)
+  const closeDrawer = (done: () => void) =>
+    acceptanceMode.value && acceptancePanel.value
+      ? acceptancePanel.value.beforeClose(done)
+      : beforeClose(done)
+  const currentProject = computed(
+    () => store.visibleProjects.find((p) => p.id === props.project?.id) ?? props.project
+  )
+  const acceptanceMode = computed(
+    () => !props.correction && currentProject.value?.stage === '验收交付' && overall.value
+  )
   const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
   const {
     overall,

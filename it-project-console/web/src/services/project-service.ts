@@ -1,4 +1,5 @@
 import { canApproveProjects } from '@/utils/project-approver'
+import { initializeAcceptance } from './acceptance-service'
 import { submitProjectProposal, recordProposalDeletion } from './proposal-service'
 import { nextProjectCode, backfillProjectCodes } from '@/utils/project-code'
 import { PROJECT_STAGES, type DemoProject, type PrototypeSnapshot } from '@/domain/prototype'
@@ -37,7 +38,8 @@ export function createProject(
   input: ProjectInput,
   demandId: string | null = null
 ) {
-  if (!canApproveProjects(assertWrite(snapshot))) throw new WorkflowError('仅指定立项审批人可以创建项目')
+  if (!canApproveProjects(assertWrite(snapshot)))
+    throw new WorkflowError('仅指定立项审批人可以创建项目')
   return createFormalProject(snapshot, input, demandId)
 }
 export function createFormalProject(
@@ -105,6 +107,7 @@ export function createFormalProject(
     lastOverallUpdatedAt: now
   }
   project.risks = computeProjectRisks(project, snapshot.database.scheduleChanges, now)
+  initializeAcceptance(project, snapshot.database)
   snapshot.database.projects.unshift(project)
   snapshot.database.stageHistories.push(
     ...PROJECT_STAGES.slice(0, 3).map((stage, index) => ({

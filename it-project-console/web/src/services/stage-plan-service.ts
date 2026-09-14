@@ -109,6 +109,7 @@ export function saveProjectPlan(snapshot: PrototypeSnapshot, input: PlanInput) {
   project.originalDeliveryDate ||=
     project.stagePlans.find((p) => p.stage === '验收交付')?.originalEndDate ?? ''
   project.updatedAt = now
+  project.version = (project.version ?? 0) + 1
   snapshot.database.lifecycleEvents.push({
     id: nextId('L', snapshot.database.lifecycleEvents),
     entityType: 'project',

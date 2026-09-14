@@ -45,6 +45,7 @@ export async function refreshProjectRisks(
     : []
   const owner = await tx.user.findUnique({ where: { id: project.primaryOwnerId } })
   if (
+    project.acceptanceStatus !== 'pending' &&
     owner?.active &&
     owner.role === 'ENGINEER' &&
     ownerAlerts.length &&

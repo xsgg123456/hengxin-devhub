@@ -13,6 +13,8 @@ export interface RiskProject {
   originalDeliveryDate: Date | null
   lastOverallUpdatedAt: Date
   createdAt: Date
+  acceptanceStatus?: string
+  acceptanceSubmittedAt?: Date | null
   blocker: string
 }
 export function computeRisks(
@@ -22,6 +24,7 @@ export function computeRisks(
   policy = defaultRiskPolicy
 ): string[] {
   if (project.status !== 'ACTIVE' || project.archived) return []
+  const pending = project.acceptanceStatus === 'pending'
   const today = businessDate(now),
     risks: string[] = []
   const label = (date: Date | null) => date?.toISOString().slice(0, 10) ?? ''
@@ -34,7 +37,7 @@ export function computeRisks(
       risks.push(`环节延期 ${daysLate(project.stageExpectedDate)} 天`)
   }
   if (daysLate(project.currentDeliveryDate) > 0)
-    risks.push(`项目延期 ${daysLate(project.currentDeliveryDate)} 天`)
+    risks.push(`项目延期 ${daysLate(project.currentDeliveryDate)} 天${pending ? '（等待业务确认）' : ''}`)
   else if (
     project.currentDeliveryDate &&
     project.originalDeliveryDate &&
@@ -49,7 +52,11 @@ export function computeRisks(
     today,
     policy.weekdays
   )
-  if (stale >= policy.staleWorkdays) risks.push(`已有 ${stale} 个工作日未更新整体进度`)
+  if (pending && project.acceptanceSubmittedAt) {
+    const waiting = workdaysBetween(businessDate(project.acceptanceSubmittedAt), today, [1, 2, 3, 4, 5])
+    if (waiting >= 3) risks.push(`验收等待 ${waiting} 个工作日：等待业务确认`)
+  }
+  if (!pending && stale >= policy.staleWorkdays) risks.push(`已有 ${stale} 个工作日未更新整体进度`)
   if (project.simpleStatus === 'blocked')
     risks.push(`当前已阻塞${project.blocker ? `：${project.blocker}` : ''}`)
   return risks

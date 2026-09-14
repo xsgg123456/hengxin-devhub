@@ -94,7 +94,7 @@
   }
   const heading = computed(
     () =>
-      ({ manager: '今日待办', engineer: '我的待办', business: '待我补充' })[store.currentUser.role]
+      ({ manager: '今日待办', engineer: '我的待办', business: '我的待办' })[store.currentUser.role]
   )
   const { data, loading, error, retry } = useLiveQuery<DashboardResult>('/dashboard', () => ({
     scope: 'all'
@@ -137,6 +137,7 @@
   const review = computed(() => store.visibleDemands.find((d) => d.id === reviewId.value))
   const supplement = computed(() => store.visibleDemands.find((d) => d.id === supplementId.value))
   const actionLabels = {
+    acceptance: '验收确认',
     confirm: '确认接单',
     reassess: '重新评估',
     proposal: '查看待接单',
@@ -158,7 +159,7 @@
     }
     if (task.action === 'review') reviewId.value = task.demandId ?? ''
     else if (task.action === 'supplement') supplementId.value = task.demandId ?? ''
-    else if (task.action === 'coordinate') {
+    else if (task.action === 'coordinate' || task.action === 'acceptance') {
       detailId.value = task.projectId ?? ''
       detailOpen.value = true
     } else openUpdate(task.projectId ?? '')

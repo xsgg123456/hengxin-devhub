@@ -52,7 +52,9 @@ test('领导评审从UI重置开始，四账号连续操作共享同一项目并
   const afterCollaboration = (await snapshot(page)).database.projects.find(
     (p) => p.id === project.id
   )!
-  expect({ ...afterCollaboration, updatedAt: overall.updatedAt }).toEqual(overall)
+  expect({ ...afterCollaboration, updatedAt: overall.updatedAt }).toEqual({
+    ...overall, version: (overall.version ?? 0) + 1
+  })
   await identity(page, '陈立峰')
   await page.getByPlaceholder('项目名称、编号、负责人或部门').fill(name)
   await expect(page.locator('[data-project-id]')).toHaveCount(1)

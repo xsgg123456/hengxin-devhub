@@ -191,7 +191,12 @@
                 link
                 type="primary"
                 @click="openProject(row.id)"
-                >项目进展</ElButton
+                >{{
+                  linkedProject(row.id)?.acceptanceStatus === 'pending' &&
+                  linkedProject(row.id)?.acceptanceOwnerId === prototypeStore.currentUser.id
+                    ? '验收确认'
+                    : '项目进展'
+                }}</ElButton
               >
               <ElButton v-else link type="primary" @click="detail = row">查看</ElButton>
               <ElButton v-if="canEdit(row)" link type="primary" @click="openEditor(row)">{{

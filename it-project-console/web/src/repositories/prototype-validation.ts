@@ -46,6 +46,30 @@ function attachment(v: unknown): boolean {
   }
 }
 
+function acceptance(p: Row): boolean {
+  if (p.acceptanceStatus === undefined) return true
+  return (
+    ['none', 'pending', 'returned', 'accepted'].includes(String(p.acceptanceStatus)) &&
+    (p.acceptanceOwnerId === null || typeof p.acceptanceOwnerId === 'string') &&
+    (p.acceptanceSubmittedAt === null || timestamp(p.acceptanceSubmittedAt)) &&
+    strings(p, ['acceptanceSummary', 'acceptanceUrl']) &&
+    Number.isInteger(p.acceptanceRound) &&
+    Number(p.acceptanceRound) >= 0 &&
+    rows(p.acceptanceHistory) &&
+    p.acceptanceHistory.every(
+      (h) =>
+        strings(h, ['actorId', 'summary', 'url']) &&
+        timestamp(h.createdAt) &&
+        (h.ownerId === null || typeof h.ownerId === 'string') &&
+        Number.isInteger(h.round) &&
+        Number(h.round) >= 0 &&
+        ['assign', 'submit', 'withdraw', 'return', 'accept', 'invalidate'].includes(
+          String(h.action)
+        )
+    )
+  )
+}
+
 // Validate after migration, before any page can consume corrupted nested values.
 export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot {
   if (!record(value) || !record(value.database)) return false
@@ -147,6 +171,7 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
     !db.projects.every(
       (p) =>
         strings(p, ['requestId', 'name', 'department', 'blocker']) &&
+        acceptance(p) &&
         userIds.has(p.primaryOwnerId) &&
         list(p.collaboratorIds) &&
         p.collaboratorIds.every((id) => userIds.has(id) && id !== p.primaryOwnerId) &&

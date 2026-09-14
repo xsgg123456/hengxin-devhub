@@ -27,7 +27,9 @@ export function computeProjectRisks(
       risks.push(`环节延期 ${days(project.stageExpectedDate)} 天`)
   }
   if (days(project.expectedDeliveryDate) > 0)
-    risks.push(`项目延期 ${days(project.expectedDeliveryDate)} 天`)
+    risks.push(
+      `项目延期 ${days(project.expectedDeliveryDate)} 天${project.acceptanceStatus === 'pending' ? '，等待业务确认' : ''}`
+    )
   else if (project.expectedDeliveryDate > project.originalDeliveryDate)
     risks.push(
       `有风险：交付计划较原定晚 ${Math.round((Date.parse(project.expectedDeliveryDate) - Date.parse(project.originalDeliveryDate)) / DAY)} 天`
@@ -38,7 +40,12 @@ export function computeProjectRisks(
     shanghaiDay(project.lastOverallUpdatedAt || project.createdAt),
     today
   )
-  if (staleDays >= 3) risks.push(`已有 ${staleDays} 个工作日未更新整体进度`)
+  if (project.acceptanceStatus === 'pending') {
+    const waiting = project.acceptanceSubmittedAt
+      ? workdaysBetween(shanghaiDay(project.acceptanceSubmittedAt), today)
+      : 0
+    if (waiting >= 3) risks.push(`验收等待 ${waiting} 个工作日，等待业务确认`)
+  } else if (staleDays >= 3) risks.push(`已有 ${staleDays} 个工作日未更新整体进度`)
   if (project.simpleStatus === 'blocked')
     risks.push(`当前已阻塞${project.blocker ? `：${project.blocker}` : ''}`)
   return risks

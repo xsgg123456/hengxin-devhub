@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { resolve } from 'node:path'
 import { createServer } from 'node:net'
+import { readdir } from 'node:fs/promises'
 import { isolatedIntegration } from './isolated-integration.js'
 
 async function freePort() {
@@ -34,6 +35,7 @@ async function stop(child: ChildProcess) {
     })
   } else child.kill('SIGTERM')
 }
+async function runSuite(args: string[]) {
 await isolatedIntegration(async ({ env }) => {
   const apiRoot = process.cwd(), webRoot = resolve('../web')
   const port = await freePort()
@@ -47,7 +49,7 @@ await isolatedIntegration(async ({ env }) => {
     web = start(resolve(webRoot, 'node_modules/vite/bin/vite.js'), ['--mode', 'live', '--host', '127.0.0.1', '--port', '4325', '--strictPort'], webRoot, webEnv)
     await ready(origin, web)
     await new Promise<void>((done, reject) => {
-      const test = start(resolve(webRoot, 'node_modules/@playwright/test/cli.js'), ['test', '--config=playwright.live.config.ts', ...process.argv.slice(2)], webRoot, webEnv)
+      const test = start(resolve(webRoot, 'node_modules/@playwright/test/cli.js'), ['test', '--config=playwright.live.config.ts', ...args], webRoot, webEnv)
       test.on('error', reject)
       test.on('exit', code => code === 0 ? done() : reject(new Error(`真实浏览器验收失败 (${code})`)))
     })
@@ -56,3 +58,16 @@ await isolatedIntegration(async ({ env }) => {
     await stop(api)
   }
 })
+}
+const args = process.argv.slice(2)
+if (args.length) await runSuite(args)
+else {
+  // Each suite owns an API, schema and bucket, including the real login rate-limit state.
+  const suites = (await readdir(resolve('../web/e2e-live'))).filter(name => name.endsWith('.spec.ts')).sort()
+  if (!suites.length) throw new Error('未找到真实浏览器验收文件')
+  for (const suite of suites) {
+    console.info(`开始独立浏览器验收: ${suite}`)
+    await runSuite([suite])
+  }
+  console.info(`全部 ${suites.length} 个浏览器验收文件通过，各自隔离环境已回收`)
+}

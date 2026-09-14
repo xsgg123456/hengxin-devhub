@@ -1,4 +1,5 @@
 import { recordProposalDeletion } from './proposal-service'
+import { invalidateAcceptance } from './acceptance-service'
 import type { DemoLifecycleEvent, DemoProject, PrototypeSnapshot } from '@/domain/prototype'
 import { assertWrite, nextId, textValue, WorkflowError } from './workflow-validation'
 import { computeProjectRisks } from './risk-service'
@@ -107,7 +108,7 @@ export function actionProject(snapshot: PrototypeSnapshot, input: ProjectActionI
   if (!['complete', 'cancel', 'archive', 'reopen', 'delete'].includes(input.action))
     throw new WorkflowError('项目操作无效')
   if (input.action === 'complete') {
-    throw new WorkflowError('请通过更新环节完成验收交付，项目会自动完成')
+    throw new WorkflowError('请提交业务验收，由指定业务负责人确认通过')
   } else if (input.action === 'delete') {
     const demand = snapshot.database.demands.find((row) => row.id === project.demandId)
     if (
@@ -140,9 +141,12 @@ export function actionProject(snapshot: PrototypeSnapshot, input: ProjectActionI
         after: { deleted: true }
       })
   } else {
+    if (input.action === 'reopen' || project.acceptanceStatus === 'pending')
+      invalidateAcceptance(project, actor.id, now, reason || input.action)
     if (input.action === 'cancel') project.status = 'cancelled'
     if (input.action === 'archive') project.archived = true
     if (input.action === 'reopen') {
+      project.lastOverallUpdatedAt = now
       project.actualCompletedAt = null
       project.status = 'active'
       project.archived = false
@@ -164,6 +168,7 @@ export function actionProject(snapshot: PrototypeSnapshot, input: ProjectActionI
         })
     }
     project.updatedAt = now
+    project.version = (project.version ?? 0) + 1
     project.risks = computeProjectRisks(project, snapshot.database.scheduleChanges, now)
   }
   recordLifecycle(snapshot, {

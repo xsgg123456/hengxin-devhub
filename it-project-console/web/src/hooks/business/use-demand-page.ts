@@ -1,4 +1,5 @@
 import { projectCode } from '@/utils/project-code'
+import { acceptanceLabel } from '@/services/acceptance-service'
 import { runtimeConfig } from '@/config/runtime'
 import { useLiveQuery } from './use-live-query'
 import { useDemandDeepLink } from './use-demand-deep-link'
@@ -204,7 +205,7 @@ export function useDemandPage() {
           : '尚未转为项目'
     }
     const state = { active: '进行中', completed: '已完成', cancelled: '已取消' }[project.status]
-    return `已转 ${projectCode(project)} · ${project.stage} · ${state}${project.archived ? ' · 已归档' : ''}`
+    return `已转 ${projectCode(project)} · ${project.stage} · ${state}${project.stage === '验收交付' ? ' · ' + acceptanceLabel(project) : ''}${project.archived ? ' · 已归档' : ''}`
   }
   const formatDate = (value: string) => value || '—'
   const formatDateTime = displayTime

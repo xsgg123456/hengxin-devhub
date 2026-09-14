@@ -3,6 +3,7 @@
     :model-value="modelValue"
     title="项目详情"
     size="min(760px, 95vw)"
+    :before-close="closeDetail"
     @update:model-value="$emit('update:modelValue', $event)"
   >
     <ElEmpty v-if="!project" description="项目不存在或已移除" />
@@ -62,6 +63,7 @@
           displayTime(project.lastOverallUpdatedAt)
         }}</ElDescriptionsItem>
       </ElDescriptions>
+      <AcceptancePanel v-if="modelValue" ref="acceptancePanel" :project="project" />
       <StageHistory :project-id="project.id" />
       <LifecycleActions :project="project" />
       <LifecycleHistory :project-id="project.id" />
@@ -97,7 +99,7 @@
       /></template>
     </template>
     <template #footer
-      ><ElButton @click="$emit('update:modelValue', false)">关闭</ElButton
+      ><ElButton @click="closeDetail(() => emit('update:modelValue', false))">关闭</ElButton
       ><ElButton v-if="canUpdate && isOverall" @click="planOpen = true">{{
         needsPlan(project!) ? '制定计划' : '调整计划'
       }}</ElButton
@@ -105,7 +107,9 @@
         v-if="canUpdate && (!isOverall || !needsPlan(project!))"
         type="primary"
         @click="$emit('edit', project!.id)"
-        >{{ isOverall ? '更新环节' : '填写协作进展' }}</ElButton
+        >{{
+          isOverall ? (project?.stage === '验收交付' ? '业务验收' : '更新环节') : '填写协作进展'
+        }}</ElButton
       ></template
     >
     <ProjectPlanDrawer v-model="planOpen" :project="project" />
@@ -122,13 +126,17 @@
   import ProjectPlanDrawer from './project-plan-drawer.vue'
   import { needsPlan } from '@/services/stage-plan-service'
   const planOpen = ref(false)
+  import AcceptancePanel from './acceptance-panel.vue'
   import StageHistory from './stage-history.vue'
   import RiskTag from './risk-tag.vue'
   import MaterialSummary from '@/components/demand/material-summary.vue'
   import LifecycleActions from './lifecycle-actions.vue'
   import LifecycleHistory from './lifecycle-history.vue'
   const props = defineProps<{ modelValue: boolean; project: DemoProject | null }>()
-  defineEmits<{ 'update:modelValue': [value: boolean]; edit: [id: string] }>()
+  const emit = defineEmits<{ 'update:modelValue': [value: boolean]; edit: [id: string] }>()
+  const acceptancePanel = ref<InstanceType<typeof AcceptancePanel> | null>(null)
+  const closeDetail = (done: () => void) =>
+    acceptancePanel.value ? acceptancePanel.value.beforeClose(done) : done()
   const store = usePrototypeStore()
   const project = computed(
     () => store.visibleProjects.find((p) => p.id === props.project?.id) ?? null

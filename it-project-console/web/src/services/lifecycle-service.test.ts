@@ -1,3 +1,4 @@
+import { acceptFixture } from './workflow-fixtures'
 import { confirmProjectProposal } from './proposal-service'
 import { describe, expect, it } from 'vitest'
 import { actionDemand, actionProject } from './lifecycle-service'
@@ -56,7 +57,7 @@ describe('项目生命周期', () => {
   it('验收完成自动完成项目但不归档，重开清除当前完成时间并保留历史', () => {
     const { snapshot, project } = projectFixture()
     snapshot.activeUserId = project.primaryOwnerId
-    for (const _stage of PROJECT_STAGES.slice(2))
+    for (const _stage of PROJECT_STAGES.slice(2, -1))
       updateProgress(snapshot, {
         projectId: project.id,
         kind: 'overall',
@@ -64,26 +65,21 @@ describe('项目生命周期', () => {
         status: 'completed',
         now
       })
+    acceptFixture(snapshot, project)
     expect(project).toMatchObject({ status: 'completed', archived: false, actualCompletedAt: now })
     expect(snapshot.database.lifecycleEvents[0]).toMatchObject({
       action: 'complete',
-      authorId: project.primaryOwnerId,
+      authorId: 'user-business-li',
       createdAt: now
     })
     expect(() => actionProject(snapshot, { projectId: project.id, action: 'complete' })).toThrow(
-      '自动完成'
+      '业务验收'
     )
     snapshot.activeUserId = 'user-manager-chen'
     actionProject(snapshot, { projectId: project.id, action: 'reopen', now })
     expect(project.actualCompletedAt).toBeNull()
     const again = '2026-09-09T09:00:00+08:00'
-    updateProgress(snapshot, {
-      projectId: project.id,
-      kind: 'overall',
-      summary: '',
-      status: 'completed',
-      now: again
-    })
+    acceptFixture(snapshot, project, again)
     expect(project.actualCompletedAt).toBe(again)
     expect(
       snapshot.database.lifecycleEvents.filter(

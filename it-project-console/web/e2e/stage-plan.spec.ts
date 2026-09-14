@@ -1,8 +1,9 @@
+import { completeBusinessAcceptance } from './business-acceptance-helpers'
 import { acceptProposal, date } from './review-helpers'
 import { expect, test } from '@playwright/test'
 import type { PrototypeSnapshot } from '../src/domain/prototype'
 
-test('确认接单后立项、先排五环节、调整留痕、逐环节完成后自动完结', async ({ page }) => {
+test('确认接单后立项、先排五环节、调整留痕、前四环节完成后业务验收完结', async ({ page }) => {
   test.setTimeout(90_000)
   await page.setViewportSize({ width: 1920, height: 1080 })
   await page.goto('/')
@@ -61,7 +62,7 @@ test('确认接单后立项、先排五环节、调整留痕、逐环节完成�
   await expect(detail).toContainText('2099-10-10 → 2099-10-11')
   await expect(detail).toContainText('王浩然')
   await detail.getByRole('button', { name: '关闭', exact: true }).click()
-  for (const stage of stages) {
+  for (const stage of stages.slice(0, 4)) {
     await card.getByRole('button', { name: '更新环节', exact: true }).click()
     const update = page.getByRole('dialog', { name: '更新环节', exact: true })
     await expect(update.locator('input[readonly]').first()).toHaveValue(stage)
@@ -73,6 +74,10 @@ test('确认接单后立项、先排五环节、调整留痕、逐环节完成�
     await update.getByRole('button', { name: '保存更新', exact: true }).click()
     await expect(update).not.toBeVisible()
   }
+  const pending: PrototypeSnapshot = await page.evaluate(() => JSON.parse(localStorage.getItem('it-project-console.prototype.v1')!))
+  const pendingProject = pending.database.projects.find(p => p.name === '五环节排期验收项目')!
+  expect(pendingProject.status).toBe('active')
+  await completeBusinessAcceptance(page, pendingProject.id, '五阶段交付已准备，请业务确认')
   const snapshot: PrototypeSnapshot = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('it-project-console.prototype.v1')!)
   )
@@ -90,7 +95,7 @@ test('确认接单后立项、先排五环节、调整留痕、逐环节完成�
     snapshot.database.progressUpdates.filter(
       (u) => u.projectId === saved.id && u.kind === 'overall'
     )
-  ).toHaveLength(5)
+  ).toHaveLength(4)
   await page.reload()
   await page.goto('/#/my-demands')
   // 完成证据从持久化重新读取，避免仅验证页面内存。

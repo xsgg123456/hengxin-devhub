@@ -9,6 +9,7 @@ export interface ResponsibilityTask {
   name: string
   reason: string
   action:
+    | 'acceptance'
     | 'confirm'
     | 'reassess'
     | 'proposal'
@@ -73,9 +74,30 @@ export function responsibilityTasks(
       })
     }
   }
-  if (user.role === 'business') return tasks
+  if (user.role === 'business') {
+    for (const p of db.projects) {
+      if (
+        p.status === 'active' &&
+        !p.archived &&
+        p.acceptanceStatus === 'pending' &&
+        p.acceptanceOwnerId === user.id
+      )
+        tasks.push({
+          id: p.id,
+          projectId: p.id,
+          code: projectCode(p),
+          name: p.name,
+          reason: '待我验收：请确认交付结果',
+          action: 'acceptance',
+          severity: 3,
+          days: 0
+        })
+    }
+    return tasks
+  }
   for (const p of db.projects) {
     if (p.status !== 'active' || p.archived) continue
+    if (p.acceptanceStatus === 'pending' && user.role === 'engineer') continue
     const risks =
       p.riskVersion !== undefined ? p.risks : computeProjectRisks(p, db.scheduleChanges, now)
     const delay = risks.filter((r) => r.includes('延期'))
@@ -91,6 +113,19 @@ export function responsibilityTasks(
             : 5
     if (user.role === 'manager' && risks.length === 0) continue
     const primary = p.primaryOwnerId === user.id
+    if (user.role === 'engineer' && primary && p.acceptanceStatus === 'returned') {
+      tasks.push({
+        id: p.id,
+        projectId: p.id,
+        code: projectCode(p),
+        name: p.name,
+        reason: '业务退回整改，请整改后提交验收',
+        action: 'overall',
+        severity: 1,
+        days: 0
+      })
+      continue
+    }
     if (user.role === 'engineer' && !primary && !p.collaboratorIds.includes(user.id)) continue
     // A healthy primary project is not a mandatory daily reporting task.
     if (user.role === 'engineer' && primary && !risks.length) continue

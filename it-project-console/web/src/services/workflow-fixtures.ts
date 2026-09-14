@@ -1,4 +1,5 @@
 import { saveProjectPlan, remainingStages } from './stage-plan-service'
+import { actionAcceptance } from './acceptance-service'
 import { createInitialPrototypeSnapshot } from '@/mocks/seed'
 import type { DemandInput, ProjectInput } from './workflow-service'
 export const now = '2026-09-08T09:00:00+08:00'
@@ -44,4 +45,28 @@ export function planFixture(
     })),
     now
   })
+}
+
+export function acceptFixture(
+  snapshot: import('@/domain/prototype').PrototypeSnapshot,
+  project: import('@/domain/prototype').DemoProject,
+  at = now
+) {
+  snapshot.activeUserId = 'user-manager-chen'
+  const run = (action: 'assign' | 'submit' | 'accept', extra = {}) =>
+    actionAcceptance(snapshot, {
+      projectId: project.id,
+      version: project.version ?? 0,
+      requestId: crypto.randomUUID(),
+      action,
+      summary: '测试交付',
+      now: at,
+      ...extra
+    })
+  if (project.acceptanceOwnerId !== 'user-business-li')
+    run('assign', { ownerId: 'user-business-li' })
+  snapshot.activeUserId = project.primaryOwnerId
+  run('submit')
+  snapshot.activeUserId = 'user-business-li'
+  run('accept')
 }

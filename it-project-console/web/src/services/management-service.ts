@@ -58,6 +58,8 @@ export function correctProject(snapshot: PrototypeSnapshot, input: CorrectionInp
   const project = snapshot.database.projects.find((row) => row.id === input.projectId)
   if (!project) throw new WorkflowError('项目不存在')
   if (project.status !== 'active' || project.archived) throw new WorkflowError('请先重新打开项目')
+  if (project.acceptanceStatus === 'pending')
+    throw new WorkflowError('待业务验收期间不能纠正阶段，请先由主负责人撤回验收')
   const index = PROJECT_STAGES.indexOf(input.stage)
   const oldIndex = PROJECT_STAGES.indexOf(project.stage)
   if (index < 2 || index > oldIndex + 1) throw new WorkflowError('不得跳过固定阶段')
@@ -107,6 +109,7 @@ export function correctProject(snapshot: PrototypeSnapshot, input: CorrectionInp
   project.simpleStatus = status
   project.blocker = status === 'blocked' ? blocker : ''
   project.updatedAt = now
+  project.version = (project.version ?? 0) + 1
   project.lastOverallUpdatedAt = now
   snapshot.database.progressUpdates.unshift({
     id: nextId('U', snapshot.database.progressUpdates),

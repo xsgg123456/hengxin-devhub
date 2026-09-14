@@ -160,5 +160,7 @@ export function createInitialPrototypeSnapshot(): PrototypeSnapshot {
     )
   })
   snapshot.database.progressUpdates[0].overallProgress = 65
+  for (const project of snapshot.database.projects) initializeAcceptance(project, snapshot.database)
   return snapshot
 }
+import { initializeAcceptance } from '@/services/acceptance-service'

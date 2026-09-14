@@ -1,3 +1,4 @@
+import { acceptFixture } from './workflow-fixtures'
 import { describe, expect, it } from 'vitest'
 import { createProject, updateProgress } from './workflow-service'
 import { saveProjectPlan, needsPlan, remainingStages } from './stage-plan-service'
@@ -130,10 +131,11 @@ describe('先排期后执行', () => {
     })
     expect(project.lastOverallUpdatedAt).toBe(now)
   })
-  it('按计划推进五阶段，验收自动完成记录实际时间及作者，不归档', () => {
+  it('按计划推进前序阶段，业务验收通过记录实际时间及作者，不归档', () => {
     const { snapshot, project } = setup()
     planFixture(snapshot, project)
-    for (const stage of remainingStages(project)) {
+    snapshot.activeUserId = project.primaryOwnerId
+    for (const stage of remainingStages(project).filter((s) => s !== '验收交付')) {
       expect(project.stage).toBe(stage)
       updateProgress(snapshot, {
         projectId: project.id,
@@ -143,12 +145,13 @@ describe('先排期后执行', () => {
         now
       })
     }
+    acceptFixture(snapshot, project)
     expect(project).toMatchObject({ status: 'completed', actualCompletedAt: now, archived: false })
     expect(
       snapshot.database.stageHistories.filter((h) => h.projectId === project.id && h.completedAt)
     ).toHaveLength(7)
     expect(snapshot.database.progressUpdates[0]).toMatchObject({
-      authorId: snapshot.activeUserId,
+      authorId: project.primaryOwnerId,
       createdAt: now,
       summary: ''
     })

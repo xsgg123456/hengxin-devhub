@@ -1,4 +1,5 @@
 import { backfillProjectCodes } from '@/utils/project-code'
+import { initializeAcceptance } from '@/services/acceptance-service'
 import { backfillDemandCodes } from '@/utils/demand-code'
 import { PROJECT_STAGES, type PrototypeSnapshot } from '@/domain/prototype'
 import { DEMO_USERS } from '@/mocks/auth-context'
@@ -33,7 +34,9 @@ export function migratePrototypeSnapshot(value: unknown): PrototypeSnapshot {
       id: user.id,
       ...(typeof user.canApproveProjects === 'boolean'
         ? { canApproveProjects: user.canApproveProjects }
-        : known?.id === 'user-manager-chen' ? { canApproveProjects: true } : {}),
+        : known?.id === 'user-manager-chen'
+          ? { canApproveProjects: true }
+          : {}),
       name: user.name,
       department: user.department,
       ...(typeof user.engineerEligible === 'boolean'
@@ -147,6 +150,7 @@ export function migratePrototypeSnapshot(value: unknown): PrototypeSnapshot {
     }
   }
   backfillProjectCodes(snapshot.database)
+  for (const project of snapshot.database.projects) initializeAcceptance(project, snapshot.database)
   backfillDemandCodes(snapshot.database)
   return snapshot
 }

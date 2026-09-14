@@ -2,10 +2,9 @@ import type { PrismaClient } from '../../generated/prisma/client.js'
 import type { Actor } from '../../plugins/auth.js'
 import { command } from '../../lib/business-command.js'
 import { AppError } from '../../lib/errors.js'
-import { lifecycleEvent } from '../notifications/lifecycle-event-service.js'
 import { assertScheduled } from '../projects/project-plan-state.js'
 import { progressSchema, STAGES } from './progress-schemas.js'
-import { enterStage, invalid, lockedProject, projectState, unchanged, writable, type ProjectChanged } from './progress-state.js'
+import { enterStage, invalid, lockedProject, unchanged, writable, type ProjectChanged } from './progress-state.js'
 export class ProgressService {
   constructor(private readonly db: PrismaClient, private readonly onProjectChanged: ProjectChanged = unchanged) {}
   async update(actor: Actor, id: string, body: unknown) {
@@ -22,6 +21,8 @@ export class ProgressService {
         throw new AppError(403, 'FORBIDDEN', '只有主负责人或管理人员能修改整体进度，项目成员可提交个人进展')
       const now = new Date(), status = input.status ?? 'in-progress', blocker = input.blocker ?? ''
       if (status === 'blocked' && !blocker) invalid('请填写阻塞说明')
+      if (input.kind === 'overall' && project.acceptanceStatus === 'pending') invalid('待业务验收期间请先撤回验收再更新整体进度')
+      if (input.kind === 'overall' && project.stage === '验收交付' && status === 'completed') invalid('请提交验收，由指定业务负责人确认通过')
       if (input.kind === 'overall') {
         const plans = assertScheduled(project.stage, project.stagePlans)
         const next = STAGES[STAGES.indexOf(project.stage as typeof STAGES[number]) + 1]
@@ -44,15 +45,6 @@ export class ProgressService {
             const expectedDate = new Date(plans.find(plan => plan.stage === next)!.endDate)
             await enterStage(tx, id, next, now, expectedDate)
             await tx.project.update({ where: { id }, data: { stage: next, simpleStatus: 'not-started', stageExpectedDate: expectedDate } })
-          } else {
-            const completed = await tx.project.update({ where: { id }, data: { status: 'COMPLETED', actualCompletedAt: now } })
-            await tx.lifecycleEvent.create({ data: { entityType: 'project', entityId: id, authorId: actor.id,
-              action: 'complete', reason: input.summary, before: projectState(project), after: projectState(completed), createdAt: now } })
-            if (project.demandId) {
-              const demand = await tx.demand.findUniqueOrThrow({ where: { id: project.demandId } })
-              await lifecycleEvent(tx, { eventType: 'PROJECT_COMPLETED', requestId: `${actor.id}:${input.requestId}`,
-                demandId: demand.id, projectId: id, recipientIds: [demand.ownerId] })
-            }
           }
         }
       }

@@ -53,6 +53,10 @@ export function updateProgress(snapshot: PrototypeSnapshot, input: ProgressInput
   const now = input.now ?? new Date().toISOString()
   const previousStage = project.stage
   if (input.kind === 'overall') {
+    if (project.acceptanceStatus === 'pending')
+      throw new WorkflowError('待业务验收期间请先撤回验收再更新')
+    if (project.stage === '验收交付' && status === 'completed')
+      throw new WorkflowError('请提交业务验收，由指定业务负责人确认通过')
     if (needsPlan(project)) throw new WorkflowError('请先完整制定当前及后续环节计划')
     if (!['in-progress', 'completed'].includes(status))
       throw new WorkflowError('请选择尚未完成或已完成')
@@ -123,6 +127,7 @@ export function updateProgress(snapshot: PrototypeSnapshot, input: ProgressInput
   }
   snapshot.database.progressUpdates.unshift(update)
   project.updatedAt = now
+  project.version = (project.version ?? 0) + 1
   project.risks = computeProjectRisks(project, snapshot.database.scheduleChanges, now)
   return update
 }

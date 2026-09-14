@@ -1,3 +1,5 @@
+import { AcceptanceService } from './acceptance-service.js'
+import { acceptanceSchema } from './acceptance-schemas.js'
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import type { PrismaClient } from '../../generated/prisma/client.js'
@@ -8,6 +10,8 @@ import { commandSchema } from '../demands/demand-schemas.js'
 export async function registerProjectRoutes(app: FastifyInstance, db: PrismaClient, authenticate: preHandlerHookHandler, approverId = '') {
   const api = app.withTypeProvider<ZodTypeProvider>()
   const service = new ProjectService(db, approverId)
+  const acceptance = new AcceptanceService(db)
+  api.post<{ Params: { id: string } }>('/api/projects/:id/acceptance', { preHandler: authenticate, schema: { body: acceptanceSchema } }, async request => ({ data: await acceptance.act(request.actor!, request.params.id, request.body) }))
   const proposals = new ProposalService(db, approverId)
   api.post<{ Params: { id: string } }>('/api/project-proposals/:id/confirm', { preHandler: authenticate, schema: { body: proposalConfirmSchema } }, async request => ({ data: await proposals.confirm(request.actor!, request.params.id, request.body) }))
   api.post<{ Params: { id: string } }>('/api/project-proposals/:id/resubmit', { preHandler: authenticate, schema: { body: proposalResubmitSchema } }, async request => ({ data: await proposals.resubmit(request.actor!, request.params.id, request.body) }))

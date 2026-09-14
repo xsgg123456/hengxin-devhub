@@ -1,3 +1,5 @@
+import { cancelAcceptanceNotifications } from '../notifications/acceptance-notifications.js'
+import { invalidateAcceptance, notificationLock } from './acceptance-state.js'
 import type { PrismaClient } from '../../generated/prisma/client.js'
 import type { Actor } from '../../plugins/auth.js'
 import { assertManager, command } from '../../lib/business-command.js'
@@ -12,6 +14,7 @@ export class ProjectAdminService {
     if (input.action === 'complete') invalid('请通过验收交付阶段更新完成项目')
     if (input.action !== 'delete') assertManager(actor)
     return command(this.db, actor, input.requestId, { operation: 'project-action', id, input }, async tx => {
+      await notificationLock(tx)
       if (input.action === 'delete') return deleteProjectGroup(tx, actor, id, input.version, input.reason)
       const project = await lockedProject(tx, id, input.version)
       const before = projectState(project), now = new Date()
@@ -26,7 +29,10 @@ export class ProjectAdminService {
           enteredAt: { not: null }, completedAt: null, interruptedAt: null } })
         if (!open) await enterStage(tx, id, project.stage, now, project.stageExpectedDate)
       }
+      await cancelAcceptanceNotifications(tx, id)
       const changed = await tx.project.update({ where: { id }, data: {
+        ...(input.action === 'reopen' || project.acceptanceStatus === 'pending' ? invalidateAcceptance(project, actor.id, now, input.reason ?? input.action) : {}),
+        ...(input.action === 'reopen' ? { lastOverallUpdatedAt: now } : {}),
         ...(input.action === 'cancel' ? { status: 'CANCELLED' } : {}),
         ...(input.action === 'archive' ? { archived: true } : {}),
         ...(input.action === 'reopen' ? { status: 'ACTIVE', archived: false, simpleStatus: 'in-progress', actualCompletedAt: null } : {}),
@@ -42,8 +48,10 @@ export class ProjectAdminService {
     assertManager(actor)
     const input = correctionSchema.parse(body)
     return command(this.db, actor, input.requestId, { operation: 'project-correct', id, input }, async tx => {
+      await notificationLock(tx)
       const project = await lockedProject(tx, id, input.version)
       writable(project)
+      if (project.acceptanceStatus === 'pending') invalid('待业务验收期间请先撤回验收再纠正阶段')
       const index = STAGES.indexOf(input.stage), oldIndex = STAGES.indexOf(project.stage as typeof STAGES[number])
       if (index < 2) invalid('受理与立项由系统记录，不能纠正为工程执行阶段')
       if (index > oldIndex + 1) invalid('不得跳过固定阶段')
