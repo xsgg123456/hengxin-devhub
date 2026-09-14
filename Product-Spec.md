@@ -1,3 +1,4 @@
+> 2026-09-14 交付访问链接支持 HTTP/HTTPS、内网 IP/主机名及省略协议的地址；省略协议点击补 http://。详见业务确认验收迭代第3条，覆盖此前仅HTTPS限制。
 > 2026-09-14 已确认并开始实施：[业务确认验收](it-project-console/docs/BUSINESS-ACCEPTANCE-ITERATION.md)。工程师提交、指定业务负责人通过或退回；通过后自动完成项目。本轮覆盖旧工程师自行完成验收规则，生产部署另需授权。
 > 2026-09-14 已确认并开始开发：[重点项目、上线基准与工程师接单](it-project-console/docs/PRIORITY-ACCEPTANCE-ITERATION.md)。本轮规则覆盖旧单级立项及管理审批不填日期规则，正式部署另需授权。
 > 2026-09-11 第二轮已确认并开始开发：[界面优化与双排甘特图](it-project-console/docs/UI-ROUND2-CONFIRMATION.md)，本轮新增规则以该文正式验收条款为准。

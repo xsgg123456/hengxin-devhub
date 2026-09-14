@@ -19,7 +19,7 @@
       >
       <ElDescriptionsItem v-if="safeUrl" label="交付访问链接"
         ><a :href="safeUrl" target="_blank" rel="noopener noreferrer" class="text-theme">{{
-          safeUrl
+          project.acceptanceUrl
         }}</a></ElDescriptionsItem
       >
     </ElDescriptions>
@@ -86,8 +86,8 @@
             v-model="url"
             aria-label="交付访问链接（选填）"
             maxlength="2000"
-            placeholder="https://"
-        /></ElFormItem>
+            placeholder="域名或内网地址，如 192.168.1.10:8080"
+        /><p class="text-sm text-g-600 mt-1">支持 HTTP/HTTPS，未填写协议时按 http:// 打开</p></ElFormItem>
         <ElButton
           type="primary"
           :loading="store.saving"
@@ -130,6 +130,7 @@
   </section>
 </template>
 <script setup lang="ts">
+  import { deliveryHref } from '@/utils/delivery-url'
   import { computed } from 'vue'
   import { useAcceptanceDraft } from '@/hooks/business/use-acceptance-draft'
   import { ElMessage, ElMessageBox } from 'element-plus'
@@ -204,15 +205,7 @@
         )
       : 0
   )
-  const safeUrl = computed(() => {
-    try {
-      return new URL(props.project.acceptanceUrl ?? '').protocol === 'https:'
-        ? props.project.acceptanceUrl
-        : ''
-    } catch {
-      return ''
-    }
-  })
+  const safeUrl = computed(() => deliveryHref(props.project.acceptanceUrl ?? ''))
   async function save(action: AcceptanceAction) {
     if (staleDraft.value) return
     error.value = ''
@@ -233,14 +226,9 @@
       error.value = '请选择业务验收负责人'
       return
     }
-    if (action === 'submit' && url.value.trim()) {
-      try {
-        const parsed = new URL(url.value.trim())
-        if (parsed.protocol !== 'https:' || parsed.username || parsed.password) throw new Error()
-      } catch {
-        error.value = '交付访问链接必须为 HTTPS 地址'
-        return
-      }
+    if (action === 'submit' && deliveryHref(url.value) === null) {
+      error.value = '请输入有效网页地址，支持HTTP/HTTPS和内网地址，请勿包含账号密码'
+      return
     }
     const input = {
       projectId: props.project.id,

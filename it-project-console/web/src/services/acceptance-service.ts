@@ -1,3 +1,4 @@
+import { deliveryHref } from '@/utils/delivery-url'
 import type {
   AcceptanceAction,
   DemoProject,
@@ -100,14 +101,8 @@ export function actionAcceptance(snapshot: PrototypeSnapshot, input: AcceptanceI
   if (summary.length > 2000 || url.length > 2000)
     throw new WorkflowError('说明和链接最多 2000 字符')
   if (input.action !== 'accept' && !summary) throw new WorkflowError('请填写说明或原因')
-  if (url) {
-    try {
-      const parsed = new URL(url)
-      if (parsed.protocol !== 'https:' || parsed.username || parsed.password) throw new Error()
-    } catch {
-      throw new WorkflowError('交付访问链接必须为 HTTPS 地址')
-    }
-  }
+  if (deliveryHref(url) === null)
+    throw new WorkflowError('请输入有效网页地址，支持HTTP/HTTPS和内网地址，请勿包含账号密码')
   const pending = p.acceptanceStatus === 'pending'
   if (input.action !== 'assign' && p.stage !== '验收交付')
     throw new WorkflowError('仅验收交付环节可操作验收')

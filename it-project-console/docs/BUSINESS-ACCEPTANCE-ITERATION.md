@@ -6,7 +6,7 @@
 
 1. 保留七环节。最后验收交付含待提交、待业务验收、退回整改、已通过。仅未归档进行中且处于验收交付、计划完整的项目可提交；仅主负责工程师可提交/撤回，协作人员和管理人员不能凭角色提交或代验收。通用进度和管理纠正接口不得绕过业务验收直接完成最后阶段。
 2. 每项目保存唯一业务验收负责人。需求项目默认带出有效 BUSINESS 角色的提交人；提交人为其他角色或无有效业务身份则待指定。直接创建/迁入未完成项目可由管理人员指定有效业务人员，提交前必须具备有效负责人。管理人员可改派并写原因、历史；待验收改派保持当前交付内容，旧人立即失权，新人得到待办/通知。本人提交人身份不替代指定验收权限。
-3. 工程师提交必填交付说明（最多2000字），可选 HTTPS 交付访问链接（最多2000字符），沿用既有需求材料展示。记录提交人、时间、轮次和交付内容；待业务验收时不能重复提交或修改本次内容，可由主负责人撤回并说明原因后重新提交。
+3. 工程师提交必填交付说明（最多2000字），可选交付访问链接（最多2000字符）：支持HTTP/HTTPS、内网IP、内网主机名、端口及路径；无协议地址点击时补http://，保留用户输入显示和存储，不探测地址能否公网访问。仍拒绝脚本/文件等非网页协议、账号密码、控制字符和无效地址。当前详情及历史链接使用同一规则。沿用既有需求材料展示。记录提交人、时间、轮次和交付内容；待业务验收时不能重复提交或修改本次内容，可由主负责人撤回并说明原因后重新提交。
 4. 仅当前指定且有效的业务验收人可通过/退回当前待验收。通过意见选填，退回问题说明必填（最多2000字）。退回后保持验收交付环节，主负责人整改再提交。通过同事务完成阶段和项目，actualCompletedAt 记录业务通过时刻，不自动归档。请求有版本和幂等保护，并发通过/退回/撤回只允许一个生效。
 5. 每次提交、撤回、改派、通过、退回保留独立历史（作者/时间/内容/轮次）；重提不覆盖。待验收期间通用整体更新、管理阶段纠正不改变验收状态或覆盖交付。取消/归档终止当前待验收，重新打开启动新的验收结果，不继承以前的通过；历史记录保留。删除复用既有整组删除、待发取消和独立审计，不残留可操作验收待办。
 6. 原位改造工程师更新入口、project-detail-drawer、today-tasks、my-demands 和 stage-history。最后环节主操作为提交验收；业务看到待我验收、通过/退回；管理看到验收人改派。详情展示当前负责人、交付说明/链接、提交时间/等待时长及历次记录；错误/加载/空态/权限/刷新/深链完整。保留760px抽屉、Element Plus主题、取消/关闭和已有计划/历史/材料交互。业务待办文案“待我补充”改“我的待办”，含待补充和待验收。
@@ -20,7 +20,7 @@
 - Project 新增 acceptanceOwnerId 可空字符串、acceptanceStatus（none/pending/returned/accepted）、acceptanceSubmittedAt 可空时间、acceptanceSummary/acceptanceUrl 字符串、acceptanceRound 整数、acceptanceHistory JSON数组。历史项字段 id/action/actorId/createdAt/round/summary/url/ownerId；action 为 assign/submit/withdraw/return/accept/invalidate。读模型同名，时间 ISO 字符串，默认值用于旧原型兼容。
 - POST /api/projects/:id/acceptance：{requestId,version,action:assign|submit|withdraw|return|accept,ownerId?,summary?,url?}，返回{id,version}；沿用认证、Origin、command事务及项目锁。assign 必填 ownerId/summary，submit 必填summary，withdraw/return必填summary。其他字段根据动作严格校验。前后端保持此契约。
 - 通知类型 ACCEPTANCE_SUBMITTED、ACCEPTANCE_RETURNED，payload 增 acceptanceRound；提交消息投递前校验仍pending、轮次/收件人一致且项目有效，退回消息校验当前仍returned及轮次。已受理按既有通道查回执。完成复用 PROJECT_COMPLETED。
-- 本轮复用依赖和母版，无新外部服务，无新菜单。交付链接复用HTTPS安全链接方式，不新增独立文件存储模块。
+- 本轮复用依赖和母版，无新外部服务，无新菜单。交付链接支持内网HTTP/HTTPS访问，不新增独立文件存储模块。
 
 ## 有序开发计划
 

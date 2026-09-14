@@ -108,9 +108,15 @@ describe('业务验收状态与权限', () => {
     s.activeUserId = p.primaryOwnerId
     expect(() => run('withdraw')).toThrow('主负责工程师')
   })
+  it.each(['http://192.168.1.10:8080/app', 'intranet:8080/app', 'www.baidu.com'])('原型保存内网及无协议链接 %s ', url => {
+    const { p, run } = fixture()
+    run('submit', '交付', { url })
+    expect(p.acceptanceUrl).toBe(url)
+    expect(p.acceptanceHistory?.at(-1)?.url).toBe(url)
+  })
   it('同人改派、含凭据链接、非交付阶段决策和缺计划通过均拒绝', () => {
     const { s, p, run } = fixture()
-    expect(() => run('submit', '交付', { url: 'https://user:pass@example.com' })).toThrow('HTTPS')
+    expect(() => run('submit', '交付', { url: 'https://user:pass@example.com' })).toThrow('账号密码')
     s.activeUserId = 'user-manager-chen'
     expect(() => run('assign', '指定', { ownerId: p.acceptanceOwnerId })).toThrow('未改变')
     s.activeUserId = p.primaryOwnerId

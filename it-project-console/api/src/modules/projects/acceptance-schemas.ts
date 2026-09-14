@@ -1,10 +1,9 @@
+import { deliveryHref } from '../../lib/delivery-url.js'
 import { z } from 'zod'
 import { commandSchema } from '../demands/demand-schemas.js'
 const summary = z.string().trim().min(1).max(2000)
-const url = z.string().trim().max(2000).refine(value => {
-  if (!value) return true
-  try { const parsed = new URL(value); return parsed.protocol === 'https:' && !parsed.username && !parsed.password } catch { return false }
-}, '交付链接必须为 HTTPS 地址且不能包含账号密码')
+const url = z.string().trim().max(2000).refine(value => deliveryHref(value) !== null,
+  '请输入有效网页地址，支持HTTP/HTTPS和内网地址，请勿包含账号密码')
 export const acceptanceSchema = z.discriminatedUnion('action', [
   commandSchema.extend({ action: z.literal('assign'), ownerId: z.string().trim().min(1), summary }).strict(),
   commandSchema.extend({ action: z.literal('submit'), summary, url: url.optional() }).strict(),

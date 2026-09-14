@@ -71,8 +71,8 @@
         >
         <p class="whitespace-pre-wrap">{{ item.summary || '未填写意见' }}</p>
         <a
-          v-if="httpsUrl(item.url)"
-          :href="item.url"
+          v-if="deliveryHref(item.url)"
+          :href="deliveryHref(item.url) ?? undefined"
           target="_blank"
           rel="noopener noreferrer"
           class="text-theme"
@@ -83,6 +83,7 @@
   </section>
 </template>
 <script setup lang="ts">
+  import { deliveryHref } from '@/utils/delivery-url'
   import { computed } from 'vue'
   import { stageExecutions } from '@/services/stage-execution'
   import { usePrototypeStore } from '@/store/modules/prototype'
@@ -99,13 +100,6 @@
   }
   const userName = (id: string | null) =>
     store.database?.users.find((u) => u.id === id)?.name ?? '未指定'
-  const httpsUrl = (url: string) => {
-    try {
-      return new URL(url).protocol === 'https:'
-    } catch {
-      return false
-    }
-  }
   const project = computed(() => store.visibleProjects.find((p) => p.id === props.projectId))
   const histories = computed(
     () => store.database?.stageHistories.filter((h) => h.projectId === props.projectId) ?? []
