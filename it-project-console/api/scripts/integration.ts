@@ -17,6 +17,7 @@ await isolatedIntegration(async ({ run }) => {
     'src/modules/dingtalk/directory.integration.test.ts',
     'src/modules/dingtalk/auth.integration.test.ts',
     'src/modules/notifications/notifications.integration.test.ts',
+    'src/modules/notifications/robot-notifications.integration.test.ts',
     'src/modules/notifications/manager-risk-digest.integration.test.ts',
     '--maxWorkers=1',
     '--no-file-parallelism'

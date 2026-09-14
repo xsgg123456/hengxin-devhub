@@ -744,3 +744,12 @@ MinIO补丁初验完成：两个原tag源码副本经Go1.27.1/grpc1.79.3/crypto0
 # 公司LOGO替换
 
 原位修改ArtLogo图片引用与index.html的favicon，使用同一公司原图；验证比例、实际加载及构建，独立审查后本地提交。本次不包含生产发布。
+
+## 2026-09-14 机器人单向单聊通知（本地实现与验证完成，待真实联调）
+
+依据：Product-Spec.md REQ-006、AC-ROBOT-001/002。复用已有企业应用与通知队列，无前端改造、无新依赖。
+1. 通道与配置：修改 api/src/config/env.ts、server.ts、modules/dingtalk/dingtalk-client.ts，新增 dingtalk-robot-message.ts；完善 api/.env.example、deploy/server.env.example 与旧环境导出。完成标准：固定官方机器人 API、逐员工发送、Token 复用、无效目标/限流/不确定响应严格分类，默认关闭，测试模式必须有指定收件人。
+2. 投递与切换：修改 notification-service.ts、manager-risk-digest.ts 与 prisma/notifications.prisma，增加兼容迁移，记录实际发送通道及机器人/员工标识；保留旧工作通知回执且禁止自动跨通道重发。通过明确启用时间隔离历史通知，历史未发送记录跳过并保留；测试白名单也约束管理汇总。完成标准：不重复、不发错人、历史不补发、同日消息不因切换配置吞掉，未读不重发。
+3. 自检与交付：补机器人传输、配置、队列隔离集成和迁移兼容测试；只读核查旧生产机器人接收入口，单向保证未核实前不正式启用。运行 pnpm typecheck/test/build/test:release、API test:integration/test:browser、Web test:e2e、Harness tests，派 code-reviewer 两阶段审查并修复，形成 docs/ROBOT-NOTIFICATION-VERIFICATION.md 与更新接入说明。本地提交；真实单人消息与生产部署/全量启用另按明确授权执行，不在开发中外发。
+
+验证完成：API单测80项、Web单测185项、隔离集成119项、真实API浏览器8项、原型浏览器48项（2worker）、发布脚本9项、Harness20项及前后端类型/构建通过。独立审查发现的HTTP400限流分类已修复并补回归，两阶段复审通过。完整证据及真实验收边界见 it-project-console/docs/ROBOT-NOTIFICATION-VERIFICATION.md；生产未部署或启用。

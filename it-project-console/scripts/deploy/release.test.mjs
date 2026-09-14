@@ -47,6 +47,10 @@ test('Compose 两种配置读取方式均保留特殊字符，独立新库与桶
   assert.equal(env.NEXTAUTH_URL, fixture.NEXTAUTH_URL)
   assert.equal(env.DINGTALK_APP_SECRET, fixture.DINGTALK_APP_SECRET)
   assert.equal(env.DINGTALK_NOTIFICATIONS_ENABLED, 'false')
+  assert.equal(env.DINGTALK_ROBOT_CODE, '')
+  assert.equal(env.DINGTALK_NOTIFICATION_MODE, 'test')
+  assert.equal(env.DINGTALK_NOTIFICATION_USER_IDS, '')
+  assert.equal(env.DINGTALK_NOTIFICATION_START_AT, '')
   assert.equal(env.DEV_LOGIN, 'false')
   assert.equal(env.NEXTAUTH_SECRET, undefined)
   } finally { await rm(root, { recursive: true, force: true }) }

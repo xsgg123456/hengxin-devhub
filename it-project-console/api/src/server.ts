@@ -8,7 +8,12 @@ import { NotificationService } from './modules/notifications/notification-servic
 const env = parseEnv(process.env)
 const { app, attachments, scanRisks, directory, dingClient, db } = await buildApp(env)
 const stopRisks = startRiskScheduler(scanRisks, env.RISK_SCAN_CRON, app.log)
-const notifications = new NotificationService(db,dingClient,{agentId:env.DINGTALK_AGENT_ID,webOrigin:env.WEB_ORIGIN,enabled:env.DINGTALK_NOTIFICATIONS_ENABLED,managerDigestTime:env.DINGTALK_MANAGER_DIGEST_TIME})
+const notifications = new NotificationService(db, dingClient, {
+  agentId: env.DINGTALK_AGENT_ID, webOrigin: env.WEB_ORIGIN, enabled: env.DINGTALK_NOTIFICATIONS_ENABLED,
+  managerDigestTime: env.DINGTALK_MANAGER_DIGEST_TIME, channel: 'robot', robotCode: env.DINGTALK_ROBOT_CODE,
+  startAt: env.DINGTALK_NOTIFICATION_START_AT ? new Date(env.DINGTALK_NOTIFICATION_START_AT) : undefined,
+  recipientUserIds: env.DINGTALK_NOTIFICATION_MODE === 'test' ? env.DINGTALK_NOTIFICATION_USER_IDS : undefined
+})
 const stopDingTalk = startDingTalkJobs(directory,notifications,Boolean(env.DINGTALK_CLIENT_ID&&env.DINGTALK_CLIENT_SECRET&&env.DINGTALK_CORP_ID),app.log)
 let cleaning = false
 const timer = setInterval(async () => {

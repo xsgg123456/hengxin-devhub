@@ -19,7 +19,7 @@ export class DingTalkClient {
   private token: { value: string; expiresAt: number } | null = null
   private pendingToken: Promise<string> | null = null
   constructor(private readonly config: { clientId: string; clientSecret: string }, private readonly fetchImpl: typeof fetch = fetch) {}
-  private async request(url: string, body?: unknown, headers: Record<string, string> = {}) {
+  private async request(url: string, body?: unknown, headers: Record<string, string> = {}, retryableCodes: readonly string[] = []) {
     let response: Response
     try {
       response = await this.fetchImpl(url, { method: body === undefined ? 'GET' : 'POST',
@@ -32,7 +32,8 @@ export class DingTalkClient {
     const explicitError = (payload.errcode !== undefined && String(payload.errcode) !== '0') ||
       (typeof payload.code === 'string' && !['0', 'OK'].includes(payload.code))
     if (!response.ok || explicitError)
-      throw new DingTalkError(response.status === 429 || response.status >= 500, response.status >= 500)
+      throw new DingTalkError(response.status === 429 || response.status >= 500 ||
+        (response.status === 400 && typeof payload.code === 'string' && retryableCodes.includes(payload.code)), response.status >= 500)
     return payload
   }
   private async appToken(): Promise<string> {
@@ -58,6 +59,24 @@ export class DingTalkClient {
       throw error
     }
     return this.request(`https://oapi.dingtalk.com${path}?access_token=${encodeURIComponent(token)}`, body)
+  }
+  async robot(path: 'batchSend' | 'readStatus', body: Record<string, unknown>): Promise<Record<string, unknown>> {
+    if (!['batchSend', 'readStatus'].includes(path)) throw new Error('Invalid robot API path')
+    let token: string
+    try { token = await this.appToken() }
+    catch (error) {
+      if (error instanceof DingTalkError) throw new DingTalkError(error.retryable, false)
+      throw error
+    }
+    const url = new URL(`https://api.dingtalk.com/v1.0/robot/oToMessages/${path}`)
+    if (path === 'readStatus') {
+      for (const [key, value] of Object.entries(body)) {
+        if (typeof value !== 'string') throw new Error('Invalid robot query parameter')
+        url.searchParams.set(key, value)
+      }
+    }
+    return this.request(url.href, path === 'batchSend' ? body : undefined, { 'x-acs-dingtalk-access-token': token },
+      path === 'batchSend' ? ['send.byToken.tooFast', 'send.too.fast', 'too.many.group', 'too.many.people'] : [])
   }
   async staff(userId: string): Promise<DingIdentity> {
     const payload = await this.legacy('/topapi/v2/user/get', { userid: userId, language: 'zh_CN' })

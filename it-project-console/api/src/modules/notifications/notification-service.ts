@@ -2,13 +2,18 @@ import type { Prisma, PrismaClient } from '../../generated/prisma/client.js'
 import { DingTalkError } from '../dingtalk/dingtalk-client.js'
 import { sendWorkMessage, workMessageResult, type MessageClient } from '../dingtalk/dingtalk-message.js'
 import { prepareManagerRiskDigest } from './manager-risk-digest.js'
+import { sendRobotMessage, robotMessageResult, type RobotClient } from '../dingtalk/dingtalk-robot-message.js'
+import { recipientScope, skipHistoricalNotifications, type NotificationScope } from './notification-scope.js'
 
 const supported = new Set(['PROPOSAL_ASSIGNED', 'PROPOSAL_RETURNED', 'MANAGER_RISK_DIGEST', 'PROJECT_RISKS_CHANGED', 'DEMAND_RETURNED', 'DEMAND_APPROVED', 'PROJECT_ASSIGNED', 'PROJECT_COMPLETED'])
 const samples = new Set(['user-manager-chen', 'user-business-li', 'user-engineer-wang', 'user-engineer-zhao'])
 const include = { recipient: true, demand: true, project: { include: { primaryOwner: true } }, deliveryLog: true } as const
 type Item = Prisma.NotificationOutboxGetPayload<{ include: typeof include }>
 type State = 'ACCEPTED' | 'SENT' | 'RETRY' | 'FAILED' | 'UNKNOWN' | 'SKIPPED'
-export type NotificationOptions = { agentId: string; webOrigin: string; enabled: boolean; managerDigestTime?: string }
+export type NotificationOptions = NotificationScope & {
+  agentId: string; webOrigin: string; enabled: boolean; managerDigestTime?: string
+  channel?: 'work' | 'robot'; robotCode?: string
+}
 export type NotificationOutcome = { accepted: number; sent: number; failed: number; skipped: number; unknown: number }
 
 export function notificationContent(item: Item, origin: string) {
@@ -47,7 +52,12 @@ export function notificationContent(item: Item, origin: string) {
 }
 
 export class NotificationService {
-  constructor(private readonly db: PrismaClient, private readonly client: MessageClient, private readonly options: NotificationOptions) {}
+  constructor(private readonly db: PrismaClient, private readonly client: MessageClient & Partial<RobotClient>, private readonly options: NotificationOptions) {}
+
+  private robotClient(): RobotClient {
+    if (!this.client.robot) throw new Error('机器人发送客户端未配置')
+    return { robot: this.client.robot.bind(this.client) }
+  }
 
   private async claim(now: Date) {
     return this.db.$transaction(async tx => {
@@ -56,13 +66,15 @@ export class NotificationService {
       if (!lock?.acquired) return []
       const items = await tx.notificationOutbox.findMany({
         where: { status: { in: ['PENDING', 'FAILED'] }, availableAt: { lte: now },
+          recipient: recipientScope(this.options),
+          AND: this.options.startAt ? [{ OR: [{ createdAt: { gte: this.options.startAt } }, { deliveryLog: { isNot: null } }] }] : undefined,
           NOT: { eventType: 'PROJECT_RISKS_CHANGED', recipient: { role: 'MANAGER' }, deliveryLog: null },
           OR: [{ deliveryLog: null }, { deliveryLog: { state: { in: ['ACCEPTED', 'POLLING', 'SENDING', 'CLAIMED', 'RETRY'] } } }] },
         include, orderBy: [{ availableAt: 'asc' }, { createdAt: 'asc' }], take: 5
       })
       for (const item of items) {
         await tx.notificationLog.upsert({ where: { outboxId: item.id },
-          create: { outboxId: item.id, state: 'CLAIMED' },
+          create: { outboxId: item.id, state: 'CLAIMED', channel: this.options.channel ?? 'work' },
           update: { state: item.deliveryLog?.taskId ? 'POLLING' : item.deliveryLog?.state === 'SENDING' ? 'SENDING' : 'CLAIMED' } })
         // A CLAIMED lease is safe to cancel; SENDING is persisted separately before external I/O.
         await tx.notificationOutbox.update({ where: { id: item.id }, data: { availableAt: new Date(now.getTime() + 5 * 60_000) } })
@@ -101,9 +113,11 @@ export class NotificationService {
   async flush(now = new Date()): Promise<NotificationOutcome> {
     const outcome = { accepted: 0, sent: 0, failed: 0, skipped: 0, unknown: 0 }
     if (!this.options.enabled) return outcome
-    if (!/^\d+$/.test(this.options.agentId) || !/^https?:$/.test(new URL(this.options.webOrigin).protocol))
-      throw new Error('钉钉工作通知配置无效')
-    await prepareManagerRiskDigest(this.db, now, this.options.managerDigestTime)
+    if ((this.options.channel === 'robot' ? !this.options.robotCode?.trim() || !this.options.startAt || !Number.isFinite(this.options.startAt.getTime()) || !this.client.robot : !/^\d+$/.test(this.options.agentId)) ||
+      !/^https?:$/.test(new URL(this.options.webOrigin).protocol)) throw new Error('钉钉通知配置无效')
+    if (this.options.startAt && now < this.options.startAt) return outcome
+    await skipHistoricalNotifications(this.db, this.options)
+    await prepareManagerRiskDigest(this.db, now, this.options.managerDigestTime, this.options)
     for (const claimed of await this.claim(now)) {
       // Serialize one external operation and its receipt with deletion, then release
       // the lock so a batch cannot hold deletion behind five network requests.
@@ -118,7 +132,14 @@ export class NotificationService {
         const taskId = item.deliveryLog?.taskId
         if (taskId) {
           try {
-            const result = await workMessageResult(this.client, this.options.agentId, taskId, item.recipient.dingUserId!)
+            const log = item.deliveryLog!
+            const userId = log.recipientDingId ?? item.recipient.dingUserId
+            if (!userId) throw new Error('收件人身份缺失')
+            const result = log.channel === 'robot'
+              ? await robotMessageResult(this.robotClient(), log.senderCode ?? this.options.robotCode!, taskId, userId)
+              : log.channel === 'work'
+                ? await workMessageResult(this.client, log.senderCode ?? this.options.agentId, taskId, userId)
+                : 'pending'
             if (result === 'sent') { await this.record(tx, item, 'SENT', now); outcome.sent++ }
             else if (result === 'failed') {
               await this.record(tx, item, item.attempts < 5 ? 'RETRY' : 'FAILED', now, '钉钉确认收件人投递失败')
@@ -132,6 +153,23 @@ export class NotificationService {
           outcome.unknown++
           return
         }
+        if (item.deliveryLog?.channel !== (this.options.channel ?? 'work') && item.attempts > 0) {
+          await this.record(tx, item, 'UNKNOWN', now, '旧通道已尝试投递，禁止跨通道自动重发')
+          outcome.unknown++
+          return
+        }
+        if (item.attempts > 0 && ((item.deliveryLog?.recipientDingId && item.deliveryLog.recipientDingId !== item.recipient.dingUserId) ||
+          (item.deliveryLog?.senderCode && item.deliveryLog.senderCode !== (this.options.channel === 'robot' ? this.options.robotCode : this.options.agentId)))) {
+          await this.record(tx, item, 'UNKNOWN', now, '发送身份发生变化，禁止自动重发')
+          outcome.unknown++
+          return
+        }
+        if ((this.options.startAt && item.createdAt < this.options.startAt) ||
+          (this.options.recipientUserIds && !this.options.recipientUserIds.includes(item.recipient.dingUserId ?? ''))) {
+          await this.record(tx, item, 'SKIPPED', now, '不在当前通知启用时间或收件范围内')
+          outcome.skipped++
+          return
+        }
         if (this.skip(item)) {
           await this.record(tx, item, 'SKIPPED', now, '目标停用、未绑定、样例数据或事件不支持')
           outcome.skipped++
@@ -141,12 +179,21 @@ export class NotificationService {
         // The outer transaction has not written/locked these rows, avoiding self-deadlock.
         // If receipt persistence rolls back after external acceptance, SENDING survives.
         await this.db.$transaction(async sendingTx => {
-          await sendingTx.notificationLog.update({ where: { outboxId: item.id }, data: { state: 'SENDING' } })
+          await sendingTx.notificationLog.update({ where: { outboxId: item.id }, data: {
+            state: 'SENDING', channel: this.options.channel ?? 'work',
+            senderCode: this.options.channel === 'robot' ? this.options.robotCode : this.options.agentId,
+            recipientDingId: item.recipient.dingUserId
+          } })
           await sendingTx.notificationOutbox.update({ where: { id: item.id }, data: { attempts: { increment: 1 } } })
         })
         item.attempts++
         let receipt: string
-        try { receipt = await sendWorkMessage(this.client, this.options.agentId, item.recipient.dingUserId!, notificationContent(item, this.options.webOrigin)) }
+        try {
+          const content = notificationContent(item, this.options.webOrigin)
+          receipt = this.options.channel === 'robot'
+            ? await sendRobotMessage(this.robotClient(), this.options.robotCode!, item.recipient.dingUserId!, content)
+            : await sendWorkMessage(this.client, this.options.agentId, item.recipient.dingUserId!, content)
+        }
         catch (error) {
           const known = error instanceof DingTalkError && !error.uncertain
           const state = known ? error.retryable && item.attempts < 5 ? 'RETRY' : 'FAILED' : 'UNKNOWN'
@@ -166,6 +213,14 @@ export class NotificationService {
     if (now.getTime() - item.deliveryLog!.createdAt.getTime() >= 24 * 60 * 60_000) {
       await this.record(tx, item, 'UNKNOWN', now, '回执超过24小时未确认，待人工核查')
       outcome.unknown++
-    } else { await this.record(tx, item, 'ACCEPTED', now, '等待钉钉送达回执'); outcome.accepted++ }
+    } else {
+      await this.record(tx, item, 'ACCEPTED', now, item.deliveryLog?.channel === 'robot' ? '钉钉已受理，尚无目标员工已读确认' : '等待钉钉送达回执')
+      if (item.deliveryLog?.channel === 'robot') {
+        const age = Math.max(0, now.getTime() - item.deliveryLog.createdAt.getTime())
+        const nextAge = [15, 60, 360, 1440].map(minutes => minutes * 60_000).find(delay => delay > age)!
+        await tx.notificationOutbox.update({ where: { id: item.id }, data: { availableAt: new Date(now.getTime() + nextAge - age) } })
+      }
+      outcome.accepted++
+    }
   }
 }

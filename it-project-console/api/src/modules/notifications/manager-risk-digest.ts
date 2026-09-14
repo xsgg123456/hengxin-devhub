@@ -1,10 +1,11 @@
 import type { PrismaClient } from '../../generated/prisma/client.js'
+import { recipientScope, scopeKey, type NotificationScope } from './notification-scope.js'
 
 const samples = new Set(['user-manager-chen', 'user-business-li', 'user-engineer-wang', 'user-engineer-zhao', 'project-demo', 'demand-demo-owned'])
 export const isSampleNotificationId = (id: string | null) => !!id && (samples.has(id) || id.startsWith('sample-'))
 
 /** Shanghai has no daylight saving: use the local calendar, independently of the server timezone. */
-export async function prepareManagerRiskDigest(db: PrismaClient, now: Date, time = '09:00') {
+export async function prepareManagerRiskDigest(db: PrismaClient, now: Date, time = '09:00', scope: NotificationScope = {}) {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error('管理人员汇总时间必须为HH:mm')
   const local = new Date(now.getTime() + 8 * 60 * 60_000)
   const day = local.toISOString().slice(0, 10)
@@ -13,11 +14,11 @@ export async function prepareManagerRiskDigest(db: PrismaClient, now: Date, time
     const [lock] = await tx.$queryRaw<Array<{ acquired: boolean }>>
       `SELECT pg_try_advisory_xact_lock(hashtextextended(current_schema() || ':notification-flush', 0)) AS acquired`
     if (!lock?.acquired) return 0
-    const key = `manager-risk-digest:${day}`
+    const key = `manager-risk-digest:${day}${scopeKey(scope)}`
     if (await tx.systemSetting.findUnique({ where: { key } })) return 0
     const sources = await tx.notificationOutbox.findMany({
-      where: { eventType: 'PROJECT_RISKS_CHANGED', recipient: { role: 'MANAGER' },
-        status: 'PENDING', attempts: 0, deliveryLog: null, availableAt: { lte: now }, createdAt: { lte: now } },
+      where: { eventType: 'PROJECT_RISKS_CHANGED', recipient: { role: 'MANAGER', ...recipientScope(scope) },
+        status: 'PENDING', attempts: 0, deliveryLog: null, availableAt: { lte: now }, createdAt: { lte: now, gte: scope.startAt } },
       include: { recipient: true, project: { include: { primaryOwner: true } } },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]
     })

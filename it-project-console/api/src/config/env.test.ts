@@ -11,6 +11,17 @@ const base = {
   DINGTALK_CORP_ID: 'legacy-corp', DINGTALK_AGENT_ID: '123'
 }
 
+it('机器人投递必须显式配置时间和测试范围，缺省保持关闭', () => {
+  const ready = { ...base, DINGTALK_NOTIFICATIONS_ENABLED: 'true', DINGTALK_ROBOT_CODE: 'robot',
+    DINGTALK_NOTIFICATION_START_AT: '2026-09-14T09:00:00+08:00', DINGTALK_NOTIFICATION_USER_IDS: ' u1, u1,u2 ' }
+  expect(parseEnv(ready).DINGTALK_NOTIFICATION_USER_IDS).toEqual(['u1', 'u2'])
+  for (const missing of ['DINGTALK_ROBOT_CODE', 'DINGTALK_NOTIFICATION_START_AT', 'DINGTALK_NOTIFICATION_USER_IDS']) {
+    expect(() => parseEnv({ ...ready, [missing]: '' })).toThrow(/DINGTALK_NOTIFICATIONS_ENABLED/)
+  }
+  expect(() => parseEnv({ ...ready, DINGTALK_NOTIFICATION_START_AT: '2026-09-14T09:00:00' })).toThrow()
+  expect(parseEnv({ ...ready, DINGTALK_NOTIFICATION_MODE: 'all', DINGTALK_NOTIFICATION_USER_IDS: '' }).DINGTALK_NOTIFICATION_MODE).toBe('all')
+})
+
 it('直接加载旧应用配置并保持原域名端口与回调路径', () => {
   const env = parseEnv(base)
   expect(env.WEB_ORIGIN).toBe('https://fixture.example:8443')

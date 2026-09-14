@@ -4,6 +4,9 @@ model NotificationLog {
   outbox NotificationOutbox @relation(fields: [outboxId], references: [id], onDelete: Cascade)
   state String
   taskId String? @map("task_id")
+  channel String @default("work")
+  senderCode String? @map("sender_code")
+  recipientDingId String? @map("recipient_ding_id")
   safeError String? @map("safe_error")
   sentAt DateTime? @map("sent_at") @db.Timestamptz(3)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)

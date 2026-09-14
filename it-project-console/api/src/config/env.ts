@@ -22,6 +22,10 @@ const schema = z
     DINGTALK_CLIENT_SECRET: z.string().trim().default(''),
     DINGTALK_CORP_ID: z.string().trim().default(''),
     DINGTALK_AGENT_ID: z.string().trim().default(''),
+    DINGTALK_ROBOT_CODE: z.string().trim().default(''),
+    DINGTALK_NOTIFICATION_MODE: z.enum(['test', 'all']).default('test'),
+    DINGTALK_NOTIFICATION_USER_IDS: z.string().default('').transform(value => [...new Set(value.split(',').map(id => id.trim()).filter(Boolean))]),
+    DINGTALK_NOTIFICATION_START_AT: z.union([z.literal(''), z.iso.datetime({ offset: true })]).default(''),
     DINGTALK_REDIRECT_URI: z.union([z.literal(''), z.string().url()]).default(''),
     BOOTSTRAP_ADMIN_DING_USER_ID: z.string().trim().default(''),
     DINGTALK_NOTIFICATIONS_ENABLED: z.enum(['true', 'false']).default('false').transform(v => v === 'true'),
@@ -46,7 +50,8 @@ const schema = z
       .default(500 * 1024 * 1024)
   })
   .superRefine((v, context) => {
-    if (v.DINGTALK_NOTIFICATIONS_ENABLED && (!v.DINGTALK_CLIENT_ID || !v.DINGTALK_CLIENT_SECRET || !v.DINGTALK_CORP_ID || !/^\d+$/.test(v.DINGTALK_AGENT_ID) || Number(v.DINGTALK_AGENT_ID) <= 0))
+    if (v.DINGTALK_NOTIFICATIONS_ENABLED && (!v.DINGTALK_CLIENT_ID || !v.DINGTALK_CLIENT_SECRET || !v.DINGTALK_CORP_ID || !v.DINGTALK_ROBOT_CODE || !v.DINGTALK_NOTIFICATION_START_AT ||
+      (v.DINGTALK_NOTIFICATION_MODE === 'test' && !v.DINGTALK_NOTIFICATION_USER_IDS.length)))
       context.addIssue({code:'custom',path:['DINGTALK_NOTIFICATIONS_ENABLED'],message:'通知投递需要完整钉钉企业应用配置'})
     if (v.NODE_ENV === 'production' && v.DINGTALK_REDIRECT_URI && !v.DINGTALK_REDIRECT_URI.startsWith('https://'))
       context.addIssue({code:'custom',path:['DINGTALK_REDIRECT_URI'],message:'生产回调必须使用HTTPS'})
