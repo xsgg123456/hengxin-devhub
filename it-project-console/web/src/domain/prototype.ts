@@ -23,6 +23,7 @@ export const SCHEDULE_REASONS = [
 ] as const
 export type ProjectStage = (typeof PROJECT_STAGES)[number]
 export interface DemoUser {
+  canApproveProjects?: boolean
   engineerEligible?: boolean
   id: string
   name: string

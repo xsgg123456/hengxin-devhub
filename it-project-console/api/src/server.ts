@@ -9,6 +9,7 @@ const env = parseEnv(process.env)
 const { app, attachments, scanRisks, directory, dingClient, db } = await buildApp(env)
 const stopRisks = startRiskScheduler(scanRisks, env.RISK_SCAN_CRON, app.log)
 const notifications = new NotificationService(db, dingClient, {
+  projectApproverDingUserId: env.PROJECT_APPROVER_DING_USER_ID,
   agentId: env.DINGTALK_AGENT_ID, webOrigin: env.WEB_ORIGIN, enabled: env.DINGTALK_NOTIFICATIONS_ENABLED,
   managerDigestTime: env.DINGTALK_MANAGER_DIGEST_TIME, channel: 'robot', robotCode: env.DINGTALK_ROBOT_CODE,
   startAt: env.DINGTALK_NOTIFICATION_START_AT ? new Date(env.DINGTALK_NOTIFICATION_START_AT) : undefined,

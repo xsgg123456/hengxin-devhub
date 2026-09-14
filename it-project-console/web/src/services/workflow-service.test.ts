@@ -71,7 +71,7 @@ describe('需求与立项事务', () => {
     snapshot.activeUserId = 'user-engineer-wang'
     expect(() =>
       reviewDemand(snapshot, { demandId: demand.id, decision: 'establish', project: projectInput })
-    ).toThrow('管理人员')
+    ).toThrow('指定立项审批人')
     snapshot.activeUserId = 'user-manager-chen'
     const first = reviewDemand(snapshot, {
       demandId: demand.id,

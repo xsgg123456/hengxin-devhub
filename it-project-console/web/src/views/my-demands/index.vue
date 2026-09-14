@@ -198,7 +198,7 @@
                 row.status === 'returned' ? '补充重提' : '编辑'
               }}</ElButton>
               <ElButton
-                v-if="prototypeStore.currentUser.role === 'manager' && row.status === 'pending'"
+                v-if="canApproveProjects(prototypeStore.currentUser) && row.status === 'pending'"
                 link
                 type="primary"
                 @click="openReview(row)"
@@ -226,6 +226,7 @@
 </template>
 
 <script setup lang="ts">
+  import { canApproveProjects } from '@/utils/project-approver'
   import { demandCode } from '@/utils/demand-code'
   import { dateRangeShortcuts } from '@/utils/date-range-shortcuts'
   import BusinessPageState from '@/components/system/business-page-state.vue'

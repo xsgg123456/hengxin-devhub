@@ -28,7 +28,7 @@
       >业务期望上线：{{ demand.expectedLaunchDate }}<br />{{ demand.description }}</p
     >
     <MaterialSummary v-if="demand" :demand="demand" />
-    <ProjectFields ref="fields" v-model="form" :disabled="busy || (!!proposal && !canReassess)" />
+    <ProjectFields ref="fields" v-model="form" :disabled="busy || !canApproveProjects(store.currentUser) || (!!proposal && !canReassess)" />
     <ElForm v-if="canConfirm" label-position="top"
       ><ElFormItem label="退回评估原因（退回时必填）"
         ><ElInput v-model="reason" type="textarea" :rows="3" maxlength="300" /></ElFormItem
@@ -65,13 +65,14 @@
       <ElButton v-if="canConfirm" type="primary" :loading="busy" @click="confirm('accept')"
         >确认接单并立项</ElButton
       >
-      <ElButton v-if="!proposal || canReassess" type="primary" :loading="busy" @click="save"
+      <ElButton v-if="(!proposal && canApproveProjects(store.currentUser)) || canReassess" type="primary" :loading="busy" @click="save"
         >提交工程师确认</ElButton
       ></template
     >
   </ElDrawer>
 </template>
 <script setup lang="ts">
+  import { canApproveProjects } from '@/utils/project-approver'
   import { runtimeConfig } from '@/config/runtime'
   import PrototypeSaveRecovery from '@/components/system/prototype-save-recovery.vue'
   import { computed, ref, watch } from 'vue'
@@ -110,7 +111,7 @@
       props.proposal?.status === 'pending' && props.proposal.primaryOwnerId === store.currentUser.id
   )
   const canReassess = computed(
-    () => props.proposal?.status === 'returned' && store.currentUser.role === 'manager'
+    () => props.proposal?.status === 'returned' && canApproveProjects(store.currentUser)
   )
   const demand = computed(() => store.visibleDemands.find((d) => d.id === props.proposal?.demandId))
   const emptyForm = (): ProjectInput => ({

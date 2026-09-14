@@ -1,3 +1,4 @@
+import { canApproveProjects } from '../lib/project-approver.js'
 import { createHash, randomBytes } from 'node:crypto'
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import type { PrismaClient } from '../generated/prisma/client.js'
@@ -9,6 +10,7 @@ export type Actor = {
   name: string
   department: string
   role: 'MANAGER' | 'ENGINEER' | 'BUSINESS'
+  canApproveProjects?: boolean
   active: boolean
 }
 declare module 'fastify' {
@@ -30,7 +32,7 @@ export function authService(db: PrismaClient, env: Env) {
     if (!session || session.expiresAt <= new Date() || !session.user.active)
       throw new AppError(401, 'SESSION_EXPIRED', '登录已过期，请重新登录')
     const { id, name, department, role, active } = session.user
-    request.actor = { id, name, department, role, active }
+    request.actor = { id, name, department, role, active, canApproveProjects: canApproveProjects(session.user, env.PROJECT_APPROVER_DING_USER_ID) }
   }
   async function login(userId: string, request: FastifyRequest, reply: FastifyReply) {
     const user = await db.user.findUnique({ where: { id: userId } })
@@ -52,6 +54,7 @@ export function authService(db: PrismaClient, env: Env) {
       expires: expiresAt
     })
     return {
+      canApproveProjects: canApproveProjects(user, env.PROJECT_APPROVER_DING_USER_ID),
       id: user.id,
       name: user.name,
       department: user.department,

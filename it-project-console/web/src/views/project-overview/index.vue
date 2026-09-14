@@ -17,7 +17,7 @@
             @click="router.push('/manager-grants')"
             >管理人员名单</ElButton
           ><ElButton
-            v-if="store.currentUser.role === 'manager'"
+            v-if="canApproveProjects(store.currentUser)"
             type="primary"
             @click="createOpen = true"
             >直接创建项目</ElButton
@@ -173,6 +173,7 @@
   </BusinessPageState>
 </template>
 <script setup lang="ts">
+  import { canApproveProjects } from '@/utils/project-approver'
   import { dateRangeShortcuts } from '@/utils/date-range-shortcuts'
   import BusinessPageState from '@/components/system/business-page-state.vue'
   import { computed, ref, watch } from 'vue'

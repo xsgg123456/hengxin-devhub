@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient, ProjectProposal } from '../../generated/prisma/client.js'
+import { assertProjectApprover, projectApproverRecipients } from '../../lib/project-approver.js'
 import type { Actor } from '../../plugins/auth.js'
 import { AppError } from '../../lib/errors.js'
 import { assertManager, command } from '../../lib/business-command.js'
@@ -58,7 +59,7 @@ async function lockedProposal(tx: Prisma.TransactionClient, id: string, version:
   return row
 }
 export class ProposalService {
-  constructor(private readonly db: PrismaClient) {}
+  constructor(private readonly db: PrismaClient, private readonly approverId = '') {}
   async confirm(actor: Actor, id: string, body: unknown) {
     const input = proposalConfirmSchema.parse(body)
     return command(this.db, actor, input.requestId, { operation: 'confirm-proposal', id, input }, async tx => {
@@ -81,9 +82,9 @@ export class ProposalService {
           demandId: row.demandId ?? undefined, projectId, recipientIds: [...(demand ? [demand.ownerId] : []), row.primaryOwnerId, ...row.collaboratorIds] })
       } else {
         if (row.demandId) await tx.demand.update({ where: { id: row.demandId }, data: { status: 'PENDING', reviewReason: `工程师退回管理评估：${input.reason}`, reviewedBy: actor.id, reviewedAt: new Date(), version: { increment: 1 } } })
-        const managers = await tx.user.findMany({ where: { active: true, role: 'MANAGER' }, select: { id: true } })
+        const recipients = await projectApproverRecipients(tx, this.approverId)
         await lifecycleEvent(tx, { eventType: 'PROPOSAL_RETURNED', requestId: `${actor.id}:${input.requestId}`, proposalId: id,
-          demandId: row.demandId ?? undefined, name: row.name, reason: input.reason, recipientIds: managers.map(user => user.id) })
+          demandId: row.demandId ?? undefined, name: row.name, reason: input.reason, recipientIds: recipients })
       }
       const updated = await tx.projectProposal.update({ where: { id }, data: { status: input.decision === 'accept' ? 'confirmed' : 'returned', projectId,
         reviewReason: input.decision === 'return' ? input.reason : '', version: { increment: 1 } } })
@@ -92,9 +93,10 @@ export class ProposalService {
     })
   }
   async resubmit(actor: Actor, id: string, body: unknown) {
-    assertManager(actor)
+    await assertProjectApprover(this.db, actor, this.approverId)
     const input = proposalResubmitSchema.parse(body)
     return command(this.db, actor, input.requestId, { operation: 'resubmit-proposal', id, input }, async tx => {
+      await assertProjectApprover(tx, actor, this.approverId)
       const row = await lockedProposal(tx, id, input.version)
       if (!['pending', 'returned'].includes(row.status)) throw new AppError(409, 'INVALID_STATE', '已接单记录不可重提')
       await validateProjectMembers(tx, input)

@@ -1,10 +1,12 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify'
 import type { PrismaClient } from '../../generated/prisma/client.js'
 import { mapUser, mapDemand, mapProject } from './read-model.js'
+import { canApproveProjects } from '../../lib/project-approver.js'
 export function registerWorkspaceRoutes(
   app: FastifyInstance,
   db: PrismaClient,
-  authenticate: preHandlerHookHandler
+  authenticate: preHandlerHookHandler,
+  approverId = ''
 ) {
   app.get('/api/workspace', { preHandler: authenticate }, async (request) => {
     const database = await db.$transaction(
@@ -27,7 +29,7 @@ export function registerWorkspaceRoutes(
           ])
         return {
           schemaVersion: 2,
-          users: users.map(mapUser),
+          users: users.map(user => ({ ...mapUser(user), canApproveProjects: canApproveProjects(user, approverId) })),
           demands: demands.map(mapDemand),
           projects: projects.map(mapProject),
           projectProposals: projectProposals.map(row => ({ ...row, approvedLaunchDate: row.approvedLaunchDate.toISOString().slice(0, 10), createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() })),

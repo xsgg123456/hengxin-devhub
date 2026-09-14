@@ -35,7 +35,7 @@
     />
     <template #footer>
       <ElButton :disabled="saving" @click="close">取消</ElButton>
-      <ElButton type="primary" :loading="saving" :disabled="saving" @click="save">{{
+      <ElButton type="primary" :loading="saving" :disabled="saving || !canApproveProjects(store.currentUser)" @click="save">{{
         decision === 'establish'
           ? '提交工程师确认'
           : decision === 'return'
@@ -46,6 +46,7 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
+  import { canApproveProjects } from '@/utils/project-approver'
   import { runtimeConfig } from '@/config/runtime'
   import PrototypeSaveRecovery from '@/components/system/prototype-save-recovery.vue'
   import { computed, onBeforeUnmount, ref, watch } from 'vue'

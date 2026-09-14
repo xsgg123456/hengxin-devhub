@@ -3,6 +3,7 @@ import type { DemoUser } from '@/domain/prototype'
 export const DEMO_USERS = [
   {
     id: 'user-manager-chen',
+    canApproveProjects: true,
     name: '陈立峰',
     department: '信息技术部',
     role: 'manager',

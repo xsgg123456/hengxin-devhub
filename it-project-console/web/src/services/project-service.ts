@@ -1,3 +1,4 @@
+import { canApproveProjects } from '@/utils/project-approver'
 import { submitProjectProposal, recordProposalDeletion } from './proposal-service'
 import { nextProjectCode, backfillProjectCodes } from '@/utils/project-code'
 import { PROJECT_STAGES, type DemoProject, type PrototypeSnapshot } from '@/domain/prototype'
@@ -36,7 +37,7 @@ export function createProject(
   input: ProjectInput,
   demandId: string | null = null
 ) {
-  if (assertWrite(snapshot).role !== 'manager') throw new WorkflowError('只有管理人员可以创建项目')
+  if (!canApproveProjects(assertWrite(snapshot))) throw new WorkflowError('仅指定立项审批人可以创建项目')
   return createFormalProject(snapshot, input, demandId)
 }
 export function createFormalProject(
@@ -117,7 +118,7 @@ export function createFormalProject(
 }
 export function reviewDemand(snapshot: PrototypeSnapshot, input: ReviewInput) {
   const actor = assertWrite(snapshot)
-  if (actor.role !== 'manager') throw new WorkflowError('只有管理人员可以评估需求')
+  if (!canApproveProjects(actor)) throw new WorkflowError('仅指定立项审批人可以评估需求')
   const demand = snapshot.database.demands.find((row) => row.id === input.demandId)
   if (!demand) throw new WorkflowError('需求不存在')
   if (input.decision === 'establish' && demand.status === 'established') {

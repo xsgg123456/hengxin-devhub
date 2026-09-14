@@ -1,9 +1,10 @@
 import { isEngineerEligible } from '../../lib/it-department.js'
 import { refreshProjectRisks } from '../risks/risk-scan-job.js'
 import type { Prisma, PrismaClient } from '../../generated/prisma/client.js'
+import { assertProjectApprover } from '../../lib/project-approver.js'
 import type { Actor } from '../../plugins/auth.js'
 import { AppError } from '../../lib/errors.js'
-import { assertManager, command } from '../../lib/business-command.js'
+import { command } from '../../lib/business-command.js'
 import { projectSchema, type ProjectInput } from './project-schemas.js'
 import { saveProposal } from './proposal-service.js'
 
@@ -28,11 +29,12 @@ export async function createProject(tx: Prisma.TransactionClient, input: Project
   return project
 }
 export class ProjectService {
-  constructor(private readonly db: PrismaClient) {}
+  constructor(private readonly db: PrismaClient, private readonly approverId = '') {}
   async create(actor: Actor, body: unknown) {
-    assertManager(actor)
+    await assertProjectApprover(this.db, actor, this.approverId)
     const input = projectSchema.parse(body)
     return command(this.db, actor, input.requestId, { operation: 'create-project', input }, async tx => {
+      await assertProjectApprover(tx, actor, this.approverId)
       return saveProposal(tx, actor, input)
     })
   }

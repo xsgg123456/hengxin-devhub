@@ -753,3 +753,10 @@ MinIO补丁初验完成：两个原tag源码副本经Go1.27.1/grpc1.79.3/crypto0
 3. 自检与交付：补机器人传输、配置、队列隔离集成和迁移兼容测试；只读核查旧生产机器人接收入口，单向保证未核实前不正式启用。运行 pnpm typecheck/test/build/test:release、API test:integration/test:browser、Web test:e2e、Harness tests，派 code-reviewer 两阶段审查并修复，形成 docs/ROBOT-NOTIFICATION-VERIFICATION.md 与更新接入说明。本地提交；真实单人消息与生产部署/全量启用另按明确授权执行，不在开发中外发。
 
 验证完成：API单测80项、Web单测185项、隔离集成119项、真实API浏览器8项、原型浏览器48项（2worker）、发布脚本9项、Harness20项及前后端类型/构建通过。独立审查发现的HTTP400限流分类已修复并补回归，两阶段复审通过。完整证据及真实验收边界见 it-project-console/docs/ROBOT-NOTIFICATION-VERIFICATION.md；生产未部署或启用。
+## 2026-09-14 指定立项审批人（本地实现，验收见记录）
+
+1. 后端：新增 PROJECT_APPROVER_DING_USER_ID 配置与统一权限规则；审批、直接创建及重提接口逐次校验有效管理员和员工绑定，登录/工作台输出 canApproveProjects，工程师退回仅通知指定审批人。完成标准：缺配置关闭授权，绕过 UI 和同名账号均无权，原接单与其他管理操作正常。
+2. 前端：原位修改需求列表、立项抽屉、项目总览、task-service 与原型服务，按能力限制操作/待办；演示数据用明确的演示审批人并兼容旧快照。保留原布局、详情、删除与工程师接单交互。
+3. 验证：权限正反例、通知收件人、角色与账号失效、前端入口；运行类型检查、单测、构建、隔离 API 集成及真实/原型浏览器回归，独立 code-reviewer 两阶段通过后本地提交。生产配置实际员工标识与部署在后续明确授权时执行。
+
+结果：类型/构建、API80/Web187单测、119+6隔离集成、发布9/Harness20通过；49原型和8真实浏览器用例均有通过记录，首轮冷启动超时与登录限流的复测详情见 it-project-console/docs/PROJECT-APPROVER-VERIFICATION.md。独立两阶段审查通过。未生产部署。

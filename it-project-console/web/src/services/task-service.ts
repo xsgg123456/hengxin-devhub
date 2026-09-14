@@ -1,3 +1,4 @@
+import { canApproveProjects } from '@/utils/project-approver'
 import { projectCode } from '@/utils/project-code'
 import type { DemoUser, PrototypeDatabase } from '@/domain/prototype'
 import { computeProjectRisks } from './risk-service'
@@ -32,7 +33,7 @@ export function responsibilityTasks(
   for (const p of db.projectProposals ?? []) {
     if (p.status === 'confirmed') continue
     const confirm = user.id === p.primaryOwnerId && p.status === 'pending'
-    const manage = user.role === 'manager'
+    const manage = canApproveProjects(user)
     if (confirm || manage)
       tasks.push({
         id: p.id,
@@ -47,7 +48,7 @@ export function responsibilityTasks(
   }
   for (const d of db.demands) {
     if (
-      user.role === 'manager' &&
+      canApproveProjects(user) &&
       d.status === 'pending' &&
       !(db.projectProposals ?? []).some((p) => p.demandId === d.id && p.status === 'returned')
     ) {

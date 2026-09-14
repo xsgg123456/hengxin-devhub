@@ -1,3 +1,4 @@
+import { canApproveProjects } from '@/utils/project-approver'
 import type { ProjectProposal, PrototypeSnapshot } from '@/domain/prototype'
 import type { ProjectInput } from './project-service'
 import { createFormalProject } from './project-service'
@@ -69,7 +70,7 @@ export function submitProjectProposal(
   demandId: string | null = null
 ) {
   const actor = assertWrite(snapshot)
-  if (actor.role !== 'manager') throw new WorkflowError('只有管理人员可以提交立项评估')
+  if (!canApproveProjects(actor)) throw new WorkflowError('仅指定立项审批人可以提交立项评估')
   const list = (snapshot.database.projectProposals ??= [])
   const requestId = textValue(input.requestId, '请求编号')
   const existing = list.find(
@@ -151,7 +152,7 @@ export function resubmitProjectProposal(
   input: ProjectInput
 ) {
   const actor = assertWrite(snapshot)
-  if (actor.role !== 'manager') throw new WorkflowError('只有管理人员可以重新评估')
+  if (!canApproveProjects(actor)) throw new WorkflowError('仅指定立项审批人可以重新评估')
   const proposal = snapshot.database.projectProposals?.find((row) => row.id === id)
   if (!proposal || proposal.version !== version || proposal.status !== 'returned')
     throw new WorkflowError('记录已更新，请刷新后重试')

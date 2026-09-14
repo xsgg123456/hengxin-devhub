@@ -1,18 +1,20 @@
 import type { PrismaClient } from '../../generated/prisma/client.js'
+import { assertProjectApprover } from '../../lib/project-approver.js'
 import type { Actor } from '../../plugins/auth.js'
 import { AppError } from '../../lib/errors.js'
-import { assertManager, command, lockedDemand } from '../../lib/business-command.js'
+import { command, lockedDemand } from '../../lib/business-command.js'
 import { reviewSchema } from '../projects/project-schemas.js'
 import { saveProposal, clearProposalNotifications, auditProposal } from '../projects/proposal-service.js'
 import { demandData } from '../demands/demand-materials.js'
 import { lifecycleEvent } from '../notifications/lifecycle-event-service.js'
 
 export class ApprovalService {
-  constructor(private readonly db: PrismaClient) {}
+  constructor(private readonly db: PrismaClient, private readonly approverId = '') {}
   async review(actor: Actor, id: string, body: unknown) {
-    assertManager(actor)
+    await assertProjectApprover(this.db, actor, this.approverId)
     const input = reviewSchema.parse(body)
     return command(this.db, actor, input.requestId, { operation: 'review-demand', id, input }, async tx => {
+      await assertProjectApprover(tx, actor, this.approverId)
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':notification-flush', 0))::text`
       const demand = await lockedDemand(tx, id, input.version)
       if (demand.status !== 'PENDING' || demand.project) throw new AppError(409, 'INVALID_STATE', '仅待评估需求可处理')

@@ -41,6 +41,7 @@ const isolated = {
   ...process.env,
   NODE_ENV: 'test',
   DEV_LOGIN: 'true',
+  PROJECT_APPROVER_DING_USER_ID: 'fixture-project-approver',
   DINGTALK_CLIENT_ID: '',
   DINGTALK_CLIENT_SECRET: '',
   DINGTALK_APP_KEY: '',
@@ -81,6 +82,7 @@ try {
   await run('node_modules/prisma/build/index.js', ['migrate', 'deploy'])
   await run('node_modules/prisma/build/index.js', ['migrate', 'deploy'])
   await run('node_modules/tsx/dist/cli.mjs', ['prisma/seed.ts'])
+  await db.query(`UPDATE "${schema}".users SET ding_user_id = $1 WHERE id = $2`, ['fixture-project-approver', 'user-manager-chen'])
   await action({ env: isolated, run })
 } finally {
   try {

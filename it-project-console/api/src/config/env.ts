@@ -27,6 +27,7 @@ const schema = z
     DINGTALK_NOTIFICATION_USER_IDS: z.string().default('').transform(value => [...new Set(value.split(',').map(id => id.trim()).filter(Boolean))]),
     DINGTALK_NOTIFICATION_START_AT: z.union([z.literal(''), z.iso.datetime({ offset: true })]).default(''),
     DINGTALK_REDIRECT_URI: z.union([z.literal(''), z.string().url()]).default(''),
+    PROJECT_APPROVER_DING_USER_ID: z.string().trim().default(''),
     BOOTSTRAP_ADMIN_DING_USER_ID: z.string().trim().default(''),
     DINGTALK_NOTIFICATIONS_ENABLED: z.enum(['true', 'false']).default('false').transform(v => v === 'true'),
     DINGTALK_MANAGER_DIGEST_TIME: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('09:00'),

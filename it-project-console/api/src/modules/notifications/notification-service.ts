@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from '../../generated/prisma/client.js'
+import { canApproveProjects } from '../../lib/project-approver.js'
 import { DingTalkError } from '../dingtalk/dingtalk-client.js'
 import { sendWorkMessage, workMessageResult, type MessageClient } from '../dingtalk/dingtalk-message.js'
 import { prepareManagerRiskDigest } from './manager-risk-digest.js'
@@ -11,6 +12,7 @@ const include = { recipient: true, demand: true, project: { include: { primaryOw
 type Item = Prisma.NotificationOutboxGetPayload<{ include: typeof include }>
 type State = 'ACCEPTED' | 'SENT' | 'RETRY' | 'FAILED' | 'UNKNOWN' | 'SKIPPED'
 export type NotificationOptions = NotificationScope & {
+  projectApproverDingUserId?: string
   agentId: string; webOrigin: string; enabled: boolean; managerDigestTime?: string
   channel?: 'work' | 'robot'; robotCode?: string
 }
@@ -103,6 +105,7 @@ export class NotificationService {
     return (item.eventType !== 'MANAGER_RISK_DIGEST' && !item.projectId && !item.demandId && typeof payload.proposalId !== 'string') ||
       (item.eventType === 'MANAGER_RISK_DIGEST' && (!Array.isArray(payload.projects) || payload.projects.length === 0)) ||
       !supported.has(item.eventType) || !item.recipient.active || !item.recipient.dingUserId ||
+      (item.eventType === 'PROPOSAL_RETURNED' && !canApproveProjects(item.recipient, this.options.projectApproverDingUserId ?? '')) ||
       (item.eventType === 'MANAGER_RISK_DIGEST' && item.recipient.role !== 'MANAGER') ||
       (item.eventType === 'PROJECT_RISKS_CHANGED' && item.recipient.role !== 'MANAGER' &&
         !(item.recipient.role === 'ENGINEER' && item.project?.primaryOwnerId === item.recipientId)) ||

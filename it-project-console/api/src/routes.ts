@@ -27,10 +27,10 @@ export async function registerRoutes(
   registerProgressRoutes(app, db, auth.authenticate, async (tx, id) => {
     await refreshProjectRisks(tx, id)
   })
-  registerWorkspaceRoutes(app, db, auth.authenticate)
+  registerWorkspaceRoutes(app, db, auth.authenticate, env.PROJECT_APPROVER_DING_USER_ID)
   registerDemandRoutes(app, db, auth.authenticate)
-  registerApprovalRoutes(app, db, auth.authenticate)
-  registerProjectRoutes(app, db, auth.authenticate)
+  registerApprovalRoutes(app, db, auth.authenticate, env.PROJECT_APPROVER_DING_USER_ID)
+  registerProjectRoutes(app, db, auth.authenticate, env.PROJECT_APPROVER_DING_USER_ID)
   if (env.NODE_ENV !== 'production' && env.DEV_LOGIN) {
     api.get('/api/auth/dev-accounts', async () => ({
       data: await db.user.findMany({
