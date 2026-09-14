@@ -5,17 +5,14 @@ import type { Actor } from '../../plugins/auth.js'
 import { AppError } from '../../lib/errors.js'
 import { assertManager, command } from '../../lib/business-command.js'
 import { projectSchema, type ProjectInput } from './project-schemas.js'
-import { lifecycleEvent } from '../notifications/lifecycle-event-service.js'
+import { saveProposal } from './proposal-service.js'
 
 export async function createProject(tx: Prisma.TransactionClient, input: ProjectInput, demandId?: string) {
-  const ids = [input.primaryOwnerId, ...input.collaboratorIds]
-  if (new Set(ids).size !== ids.length) throw new AppError(400, 'INVALID_MEMBERS', '主负责人与协作人员不能重复')
-  const users = await tx.user.findMany({ where: { id: { in: ids }, active: true } })
-  if (users.length !== ids.length || users.some(user => !isEngineerEligible(user)))
-    throw new AppError(400, 'INVALID_MEMBERS', '主负责人与协作人员必须具有有效工程师资格')
+  await validateProjectMembers(tx, input)
   const now = new Date()
   const project = await tx.project.create({ data: {
     requestId: input.requestId, name: input.name, department: input.department,
+    approvedLaunchDate: new Date(input.approvedLaunchDate),
     demandId, source: demandId ? 'demand' : 'direct', priority: input.priority,
     primaryOwnerId: input.primaryOwnerId, stage: '方案设计', simpleStatus: 'not-started',
     lastOverallUpdatedAt: now,
@@ -36,10 +33,15 @@ export class ProjectService {
     assertManager(actor)
     const input = projectSchema.parse(body)
     return command(this.db, actor, input.requestId, { operation: 'create-project', input }, async tx => {
-      const project = await createProject(tx, input)
-      await lifecycleEvent(tx, { eventType: 'PROJECT_ASSIGNED', requestId: `${actor.id}:${input.requestId}`,
-        projectId: project.id, recipientIds: [input.primaryOwnerId, ...input.collaboratorIds] })
-      return { id: project.id, code: project.code, version: project.version, stage: project.stage }
+      return saveProposal(tx, actor, input)
     })
   }
+}
+
+export async function validateProjectMembers(tx: Prisma.TransactionClient, input: Pick<ProjectInput, 'primaryOwnerId' | 'collaboratorIds'>) {
+  const ids = [input.primaryOwnerId, ...input.collaboratorIds]
+  if (new Set(ids).size !== ids.length) throw new AppError(400, 'INVALID_MEMBERS', '主负责人与协作人员不能重复')
+  const users = await tx.user.findMany({ where: { id: { in: ids }, active: true } })
+  if (users.length !== ids.length || users.some(user => !isEngineerEligible(user)))
+    throw new AppError(400, 'INVALID_MEMBERS', '主负责人与协作人员必须具有有效工程师资格')
 }

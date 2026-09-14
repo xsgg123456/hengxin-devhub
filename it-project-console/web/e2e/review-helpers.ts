@@ -9,9 +9,13 @@ export const card = (page: Page, name: string) =>
   page.locator('[data-project-id]').filter({ hasText: name })
 export const row = (page: Page, name: string) => page.getByRole('row').filter({ hasText: name })
 export async function identity(page: Page, name: string) {
+  if ((await page.getByRole('button', { name: '切换演示身份' }).textContent())?.includes(name)) return
   await page.getByRole('button', { name: '切换演示身份' }).click()
   await page.locator('.identity-menu-item').filter({ hasText: name }).click()
   await expect(page.getByRole('button', { name: '切换演示身份' })).toContainText(name)
+  const active = (await snapshot(page)).database.users.find(user => user.name === name)!
+  const path = active.role === 'manager' ? 'project-overview' : active.role === 'business' ? 'my-demands' : 'my-projects'
+  await expect.poll(() => new URL(page.url()).hash).toBe('#/' + path)
 }
 export async function reset(page: Page) {
   await page.getByRole('button', { name: '切换演示身份' }).click()
@@ -49,4 +53,16 @@ export async function planProject(page: Page, name: string) {
   await date(drawer, '验收交付计划结束日期', '2099-10-30')
   await drawer.getByRole('button', { name: '保存计划' }).click()
   await expect(drawer).not.toBeVisible()
+}
+
+export async function acceptProposal(page: Page, name: string) {
+  await page.goto('/#/today-tasks')
+  await identity(page, '王浩然')
+  await page.goto('/#/today-tasks')
+  await page.locator('.task-row').filter({ hasText: name }).getByRole('button', { name: '确认接单', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: '接单详情 · ' + name, exact: true })
+  await drawer.getByRole('button', { name: '确认接单并立项', exact: true }).click()
+  await expect(drawer).not.toBeVisible()
+  await page.goto('/#/my-projects')
+  await expect(card(page, name)).toBeVisible()
 }

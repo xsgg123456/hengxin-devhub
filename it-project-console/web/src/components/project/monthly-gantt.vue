@@ -18,13 +18,22 @@
       <template v-for="row in displayRows" :key="row.project.id">
         <button
           class="frozen project-cell"
+          :class="{ 'priority-row': row.project.priority === 'P0' }"
           :style="{ minHeight: `${row.height}px` }"
           @click="emit('detail', row.project.id)"
           @mousemove="showTip($event, row)"
           @focus="showFocus($event, row)"
           @blur="hideTip"
         >
-          <strong>{{ row.project.name }}</strong>
+          <div v-if="row.project.priority === 'P0'" class="gantt-priority"
+            ><span class="priority-focus"
+              ><svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="m12 2.5 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3.1-5.8 3.1 1.1-6.5L2.6 9.3l6.5-.9Z"
+                /></svg
+              >P0 · 重点项目</span
+            ></div
+          ><strong>{{ row.project.name }}</strong>
           <small>{{ teamSummary(row.project) }} · {{ row.project.stage }}</small>
           <small :class="{ 'risk-text': row.risks.length }">{{
             row.risks.join('；') || statusText(row)
@@ -32,6 +41,7 @@
         </button>
         <div
           class="track project-track"
+          :class="{ 'priority-track': row.project.priority === 'P0' }"
           :style="{ minHeight: `${row.height}px` }"
           @mousemove="showTip($event, row)"
         >

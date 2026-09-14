@@ -1,3 +1,4 @@
+import { recordProposalDeletion } from './proposal-service'
 import type { DemoLifecycleEvent, DemoProject, PrototypeSnapshot } from '@/domain/prototype'
 import { assertWrite, nextId, textValue, WorkflowError } from './workflow-validation'
 import { computeProjectRisks } from './risk-service'
@@ -33,6 +34,16 @@ export function projectState(project: DemoProject) {
   }
 }
 function removeGroup(snapshot: PrototypeSnapshot, demandId?: string | null, projectId?: string) {
+  for (const proposal of snapshot.database.projectProposals ?? []) {
+    if (
+      (demandId && proposal.demandId === demandId) ||
+      (projectId && proposal.projectId === projectId)
+    )
+      recordProposalDeletion(snapshot, proposal, '删除关联需求或项目')
+  }
+  snapshot.database.projectProposals = snapshot.database.projectProposals?.filter(
+    (row) => !(demandId && row.demandId === demandId) && !(projectId && row.projectId === projectId)
+  )
   snapshot.database.demands = snapshot.database.demands.filter((row) => row.id !== demandId)
   snapshot.database.projects = snapshot.database.projects.filter((row) => row.id !== projectId)
   snapshot.database.progressUpdates = snapshot.database.progressUpdates.filter(
@@ -67,7 +78,13 @@ export function actionDemand(snapshot: PrototypeSnapshot, input: DemandActionInp
       })
   } else {
     if (demand.submitterId !== actor.id) throw new WorkflowError('只能维护本人需求')
-    if (!['pending', 'returned'].includes(demand.status) || project)
+    if (
+      !['pending', 'returned'].includes(demand.status) ||
+      project ||
+      snapshot.database.projectProposals?.some(
+        (p) => p.demandId === demand.id && p.status !== 'confirmed'
+      )
+    )
       throw new WorkflowError('当前需求状态不允许撤回')
   }
   const before = { status: demand.status, name: demand.name }

@@ -1,3 +1,4 @@
+import { submitProjectProposal, recordProposalDeletion } from './proposal-service'
 import { nextProjectCode, backfillProjectCodes } from '@/utils/project-code'
 import { PROJECT_STAGES, type DemoProject, type PrototypeSnapshot } from '@/domain/prototype'
 import { isEngineerEligible } from '@/utils/engineer-eligibility'
@@ -11,6 +12,7 @@ import {
   WorkflowError
 } from './workflow-validation'
 export interface ProjectInput {
+  approvedLaunchDate: string
   requestId: string
   name: string
   department: string
@@ -34,8 +36,15 @@ export function createProject(
   input: ProjectInput,
   demandId: string | null = null
 ) {
-  const actor = assertWrite(snapshot)
-  if (actor.role !== 'manager') throw new WorkflowError('只有管理人员可以创建项目')
+  if (assertWrite(snapshot).role !== 'manager') throw new WorkflowError('只有管理人员可以创建项目')
+  return createFormalProject(snapshot, input, demandId)
+}
+export function createFormalProject(
+  snapshot: PrototypeSnapshot,
+  input: ProjectInput,
+  demandId: string | null = null
+) {
+  assertWrite(snapshot)
   const requestId = textValue(input.requestId, '请求编号')
   const existing = snapshot.database.projects.find(
     (row) => row.requestId === requestId || (demandId !== null && row.demandId === demandId)
@@ -59,6 +68,7 @@ export function createProject(
   const now = input.now ?? new Date().toISOString()
   backfillProjectCodes(snapshot.database)
   const project: DemoProject = {
+    approvedLaunchDate: input.approvedLaunchDate,
     code: nextProjectCode(snapshot.database, now),
     id: nextId(
       'P',
@@ -114,11 +124,17 @@ export function reviewDemand(snapshot: PrototypeSnapshot, input: ReviewInput) {
     const existing = snapshot.database.projects.find((row) => row.demandId === demand.id)
     if (existing) return existing
   }
+  if (input.decision === 'establish' && demand.status === 'awaiting_engineer') {
+    const proposal = snapshot.database.projectProposals?.find(
+      (row) => row.demandId === demand.id && row.requestId === input.project?.requestId
+    )
+    if (proposal) return proposal
+  }
   if (demand.status !== 'pending') throw new WorkflowError('仅待评估需求可处理')
   if (input.decision === 'establish') {
     if (!input.project) throw new WorkflowError('请填写立项信息')
     validateMaterials(demandMaterials(demand))
-    const project = createProject(
+    const project = submitProjectProposal(
       snapshot,
       {
         ...input.project,
@@ -128,13 +144,19 @@ export function reviewDemand(snapshot: PrototypeSnapshot, input: ReviewInput) {
       },
       demand.id
     )
-    demand.status = 'established'
+    demand.status = 'awaiting_engineer'
     demand.reviewedBy = actor.id
     demand.reviewedAt = input.now ?? new Date().toISOString()
     return project
   }
   if (!['return', 'reject'].includes(input.decision)) throw new WorkflowError('处理结果无效')
   const reason = textValue(input.reason ?? '', '处理原因')
+  for (const proposal of snapshot.database.projectProposals ?? []) {
+    if (proposal.demandId === demand.id) recordProposalDeletion(snapshot, proposal, reason)
+  }
+  snapshot.database.projectProposals = snapshot.database.projectProposals?.filter(
+    (p) => p.demandId !== demand.id
+  )
   demand.status = input.decision === 'return' ? 'returned' : 'rejected'
   demand.reviewReason = reason
   demand.reviewedBy = actor.id

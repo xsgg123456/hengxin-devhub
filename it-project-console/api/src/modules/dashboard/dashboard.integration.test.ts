@@ -320,3 +320,33 @@ it('需求完成筛选按最新验收计划与上海日期，首尾日期和指�
   expect(empty.demands).toEqual([])
   expect(empty.departments).toEqual([])
 })
+it('待立项汇总筛选同时返回待评估和待工程师确认，且与指标及本人范围一致', async () => {
+  const tag = `待立项点击-${randomUUID()}`
+  const pending = await db.demand.create({ data: { name: '待评估', department: tag, ownerId: business, status: 'PENDING', submittedAt: new Date() } })
+  const awaiting = await db.demand.create({ data: { name: '待确认', department: tag, ownerId: business, status: 'AWAITING_ENGINEER', submittedAt: new Date() } })
+  await db.demand.createMany({ data: [
+    { name: '退回业务补充', department: tag, ownerId: business, status: 'RETURNED', submittedAt: new Date() },
+    { name: '已立项', department: tag, ownerId: business, status: 'APPROVED', submittedAt: new Date() },
+    { name: '其他人的待确认', department: tag, ownerId: manager, status: 'AWAITING_ENGINEER', submittedAt: new Date() }
+  ] })
+  const params = `department=${encodeURIComponent(tag)}&scope=mine`
+  const data = await get<Awaited<ReturnType<typeof demandStatistics>>>(`/api/demand-statistics?${params}&status=pre_establishment`)
+  expect(data.demands.map(row => row.id).sort()).toEqual([pending.id, awaiting.id].sort())
+  const dashboardData = await get<Awaited<ReturnType<typeof dashboard>>>(`/api/dashboard?${params}`)
+  expect(dashboardData.metrics.find(row => row.key === 'pending')?.value).toBe(data.demands.length)
+  const stillPending = await get<Awaited<ReturnType<typeof demandStatistics>>>(`/api/demand-statistics?${params}&status=pending`)
+  expect(stillPending.demands.map(row => row.id)).toEqual([pending.id])
+})
+it('管理人员本人创建并指派他人的直接待立项仍计入本人，主责与创建人重合不重复', async () => {
+  const tag = `直接待立项本人-${randomUUID()}`
+  const base = { department: tag, priority: 'P1', approvedLaunchDate: new Date('2099-12-31') }
+  await db.projectProposal.createMany({ data: [
+    { ...base, requestId: randomUUID(), name: '本人创建他人负责', createdBy: manager, primaryOwnerId: owner, status: 'pending' },
+    { ...base, requestId: randomUUID(), name: '本人创建本人负责', createdBy: manager, primaryOwnerId: manager, status: 'returned' },
+    { ...base, requestId: randomUUID(), name: '他人创建本人负责', createdBy: owner, primaryOwnerId: manager, status: 'pending' },
+    { ...base, requestId: randomUUID(), name: '与本人无关', createdBy: owner, primaryOwnerId: collab, status: 'pending' },
+    { ...base, requestId: randomUUID(), name: '本人已确认', createdBy: manager, primaryOwnerId: owner, status: 'confirmed' }
+  ] })
+  const result = await get<Awaited<ReturnType<typeof dashboard>>>(`/api/dashboard?department=${encodeURIComponent(tag)}&scope=mine`, manager)
+  expect(result.metrics.find(row => row.key === 'pending')?.value).toBe(3)
+})

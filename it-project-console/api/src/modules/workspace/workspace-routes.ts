@@ -9,7 +9,7 @@ export function registerWorkspaceRoutes(
   app.get('/api/workspace', { preHandler: authenticate }, async (request) => {
     const database = await db.$transaction(
       async (tx) => {
-        const [users, demands, projects, progressUpdates, scheduleChanges, lifecycleEvents] =
+        const [users, demands, projects, progressUpdates, scheduleChanges, lifecycleEvents, projectProposals] =
           await Promise.all([
             tx.user.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
             tx.demand.findMany({
@@ -22,13 +22,15 @@ export function registerWorkspaceRoutes(
             }),
             tx.progressUpdate.findMany({ orderBy: { createdAt: 'desc' } }),
             tx.scheduleChange.findMany({ orderBy: { createdAt: 'desc' } }),
-            tx.lifecycleEvent.findMany({ orderBy: { createdAt: 'desc' } })
+            tx.lifecycleEvent.findMany({ orderBy: { createdAt: 'desc' } }),
+            tx.projectProposal.findMany({ orderBy: { createdAt: 'desc' } })
           ])
         return {
           schemaVersion: 2,
           users: users.map(mapUser),
           demands: demands.map(mapDemand),
           projects: projects.map(mapProject),
+          projectProposals: projectProposals.map(row => ({ ...row, approvedLaunchDate: row.approvedLaunchDate.toISOString().slice(0, 10), createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() })),
           stageHistories: projects.flatMap((project) =>
             project.stageHistories
               .filter((item) => item.enteredAt || item.completedAt || item.interruptedAt)

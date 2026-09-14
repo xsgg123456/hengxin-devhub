@@ -11,6 +11,9 @@ export interface LiveDemandInput {
   prototype: DemoAttachment | null
 }
 export interface LiveWriteResult {
+  proposalId?: string
+  projectId?: string
+  status?: string
   id: string
   version: number
 }
@@ -54,6 +57,7 @@ export function saveLiveDemand(
 }
 export function projectDto(input: ProjectInput) {
   return {
+    approvedLaunchDate: input.approvedLaunchDate,
     requestId: input.requestId,
     name: input.name,
     department: input.department,
@@ -78,6 +82,7 @@ export function reviewLiveDemand(
       requestId: project.requestId,
       ...(decision === 'establish'
         ? {
+            approvedLaunchDate: project.approvedLaunchDate,
             priority: project.priority,
             primaryOwnerId: project.primaryOwnerId,
             collaboratorIds: project.collaboratorIds

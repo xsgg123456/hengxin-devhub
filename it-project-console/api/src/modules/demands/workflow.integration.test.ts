@@ -18,7 +18,7 @@ const key = () => randomUUID()
 const valid = () => ({ requestId: key(), name: '集成需求', description: '真实需求说明',
   expectedLaunchDate: '2099-12-31', prd: { kind: 'link', url: 'https://example.com/prd' },
   prototype: { kind: 'link', url: 'https://example.com/html' }, submit: true })
-const project = () => ({ requestId: key(), name: '直接项目', department: '财务部', priority: 'P1',
+const project = () => ({ requestId: key(), approvedLaunchDate: '2099-12-31', name: '直接项目', department: '财务部', priority: 'P1',
   primaryOwnerId: engineer, collaboratorIds: ['user-engineer-zhao'] })
 function call(method: HTTPMethods, url: string, payload?: Record<string, unknown>, user = business) {
   return runtime.app.inject({ method, url, payload, headers: { cookie: cookies[user], origin: env.WEB_ORIGIN } })
@@ -144,6 +144,9 @@ describe('真实需求与立项事务', () => {
     const results = await Promise.all([call('POST', `/api/demands/${id}/review`, review, manager),
       call('POST', `/api/demands/${id}/review`, { ...review, requestId: key() }, manager)])
     expect(results.map(r => r.statusCode).sort()).toEqual([200, 409])
+    const proposal = await db.projectProposal.findUniqueOrThrow({ where: { demandId: id } })
+    expect(await db.project.count({ where: { demandId: id } })).toBe(0)
+    expect((await call('POST', `/api/project-proposals/${proposal.id}/confirm`, { requestId: key(), version: proposal.version, decision: 'accept' }, engineer)).statusCode).toBe(200)
     const row = await db.project.findUniqueOrThrow({ where: { demandId: id }, include: { members: true, stageHistories: true } })
     expect(row).toMatchObject({ source: 'demand', primaryOwnerId: engineer, stage: '方案设计', overallProgress: 0 })
     expect(row.members.map(m => m.userId)).toEqual(['user-engineer-zhao'])
@@ -153,7 +156,7 @@ describe('真实需求与立项事务', () => {
     expect(row.stageHistories.filter(s => s.status === 'future')).toHaveLength(4)
     expect((await db.notificationOutbox.findMany({ where: { projectId: row.id } })).map(e => e.recipientId).sort())
       .toEqual([business, engineer, 'user-engineer-zhao'].sort())
-    expect((await call('DELETE', `/api/demands/${id}`, { requestId: key(), version: 2 })).statusCode).toBe(200)
+    expect((await call('DELETE', `/api/demands/${id}`, { requestId: key(), version: 3 })).statusCode).toBe(200)
   })
   it('无效人员不落半成品，直接创建不伪造需求或排期且可幂等重试', async () => {
     const count = await db.demand.count()
@@ -164,7 +167,11 @@ describe('真实需求与立项事务', () => {
     const a = await call('POST', '/api/projects', input, manager)
     expect(a.statusCode, a.body).toBe(200)
     expect((await call('POST', '/api/projects', input, manager)).json()).toEqual(a.json())
-    const row = await db.project.findUniqueOrThrow({ where: { id: a.json<{ data: { id: string } }>().data.id } })
+    const proposalId = a.json<{ data: { id: string } }>().data.id
+    expect(await db.project.findUnique({ where: { id: proposalId } })).toBeNull()
+    const accepted = await call('POST', `/api/project-proposals/${proposalId}/confirm`, { requestId: key(), version: 1, decision: 'accept' }, engineer)
+    expect(accepted.statusCode, accepted.body).toBe(200)
+    const row = await db.project.findUniqueOrThrow({ where: { id: accepted.json<{ data: { projectId: string } }>().data.projectId } })
     expect(row.source).toBe('direct'); expect(row.demandId).toBeNull()
     expect(row).toMatchObject({ stagePlans: [], currentLaunchDate: null, originalLaunchDate: null,
       currentDeliveryDate: null, originalDeliveryDate: null, stageExpectedDate: null })
@@ -192,7 +199,7 @@ describe('真实需求与立项事务', () => {
     const { id } = await create()
     const { name: _name, department: _department, ...fields } = project()
     const input = { ...fields, version: 1, decision: 'approve' }
-    await db.$executeRaw`ALTER TABLE notification_outbox ADD CONSTRAINT workflow_test_fault CHECK (event_type <> 'DEMAND_APPROVED') NOT VALID`
+    await db.$executeRaw`ALTER TABLE notification_outbox ADD CONSTRAINT workflow_test_fault CHECK (event_type <> 'PROPOSAL_ASSIGNED') NOT VALID`
     try {
       expect((await call('POST', `/api/demands/${id}/review`, input, manager)).statusCode).toBe(500)
       expect(await db.project.findUnique({ where: { demandId: id } })).toBeNull()

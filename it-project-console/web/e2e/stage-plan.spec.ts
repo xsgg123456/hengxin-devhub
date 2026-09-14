@@ -1,7 +1,8 @@
+import { acceptProposal, date } from './review-helpers'
 import { expect, test } from '@playwright/test'
 import type { PrototypeSnapshot } from '../src/domain/prototype'
 
-test('无日期立项、先排五环节、调整留痕、逐环节完成后自动完结', async ({ page }) => {
+test('确认接单后立项、先排五环节、调整留痕、逐环节完成后自动完结', async ({ page }) => {
   test.setTimeout(90_000)
   await page.setViewportSize({ width: 1920, height: 1080 })
   await page.goto('/')
@@ -15,14 +16,11 @@ test('无日期立项、先排五环节、调整留痕、逐环节完成后自�
     .filter({ has: page.getByRole('combobox', { name: '主负责人', exact: true }) })
     .click()
   await page.getByRole('option', { name: '王浩然', exact: true }).click()
-  await expect(creation.locator('.el-date-editor')).toHaveCount(0)
-  await creation.getByRole('button', { name: '创建项目', exact: true }).click()
+  await date(creation, '审批确认上线日期', '2099-10-20')
+  await creation.getByRole('button', { name: '提交工程师确认', exact: true }).click()
+  await expect(creation).not.toBeVisible()
+  await acceptProposal(page, '五环节排期验收项目')
   const detail = page.getByRole('dialog', { name: '项目详情', exact: true })
-  await expect(detail).toBeVisible()
-  await expect(detail.getByRole('button', { name: '更新环节', exact: true })).toHaveCount(0)
-  await detail.getByRole('button', { name: '关闭', exact: true }).click()
-  await page.getByRole('button', { name: '切换演示身份' }).click()
-  await page.locator('.identity-menu-item').filter({ hasText: '王浩然' }).click()
   const card = page.locator('[data-project-id]').filter({ hasText: '五环节排期验收项目' })
   await card.getByRole('button', { name: '制定计划', exact: true }).click()
   const plan = page.getByRole('dialog', { name: '制定项目计划', exact: true })

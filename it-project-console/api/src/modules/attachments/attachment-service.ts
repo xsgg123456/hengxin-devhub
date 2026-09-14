@@ -19,7 +19,7 @@ const finalKey = (id: string) => `attachments/${id}`
 async function lockedDemand(tx: Prisma.TransactionClient, id: string) {
   // A parameterized row lock serializes quota allocation, confirmation and cleanup.
   await tx.$queryRaw`SELECT id FROM demands WHERE id = ${id} FOR UPDATE`
-  const demand = await tx.demand.findUnique({ where: { id } })
+  const demand = await tx.demand.findUnique({ where: { id }, include: { proposals: true } })
   if (!demand) throw new AppError(404, 'DEMAND_NOT_FOUND', '需求不存在')
   return demand
 }

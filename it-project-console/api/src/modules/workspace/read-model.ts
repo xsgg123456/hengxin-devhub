@@ -73,6 +73,7 @@ export const mapProject = (project: Project & { members: ProjectMember[] }) => (
   stagePlans: readStagePlans(project.stagePlans),
   actualCompletedAt: project.actualCompletedAt?.toISOString() ?? null,
   stageExpectedDate: date(project.stageExpectedDate),
+  approvedLaunchDate: date(project.approvedLaunchDate),
   originalLaunchDate: date(project.originalLaunchDate),
   expectedLaunchDate: date(project.currentLaunchDate),
   originalDeliveryDate: date(project.originalDeliveryDate),

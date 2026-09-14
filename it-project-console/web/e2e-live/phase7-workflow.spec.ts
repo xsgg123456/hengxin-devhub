@@ -22,6 +22,7 @@ async function select(page: Page, drawer: Locator, label: string, value: string)
   await page.locator(`[id="${listId}"]`).getByRole('option', { name: value, exact: true }).click()
 }
 async function switchUser(page: Page, name: string) {
+  if ((await page.getByRole('button', { name: '当前用户' }).textContent())?.includes(name)) return
   await page.getByRole('button', { name: '当前用户' }).click()
   await page.getByRole('button', { name: new RegExp(name + ' ·') }).click()
   await expect(page.getByRole('button', { name: '当前用户' })).toContainText(name)
@@ -48,8 +49,15 @@ test('真实排期与协作隔离→风险与留痕→验收自动完成→管�
   await select(page, drawer, '主负责人', '王浩然')
   await select(page, drawer, '协作人员', '赵清越')
   await drawer.getByLabel('需求部门', { exact: true }).click()
-  await drawer.getByRole('button', { name: '创建项目', exact: true }).click()
+  await date(drawer, '审批确认上线日期', '2099-09-30')
+  await drawer.getByRole('button', { name: '提交工程师确认', exact: true }).click()
   await expect(drawer).not.toBeVisible()
+  await page.goto('/#/today-tasks')
+  await switchUser(page, '王浩然')
+  await page.goto('/#/today-tasks')
+  await page.locator('.task-row').filter({ hasText: name }).getByRole('button', { name: '确认接单', exact: true }).click()
+  await page.getByRole('dialog', { name: '接单详情 · ' + name }).getByRole('button', { name: '确认接单并立项' }).click()
+  await expect(page.getByRole('dialog', { name: '接单详情 · ' + name })).not.toBeVisible()
   const created = (await read(page)).database.projects.find((p) => p.name === name)!
   expect(created.demandId).toBeNull()
   await detail(page).getByRole('button', { name: '关闭', exact: true }).click()
@@ -62,8 +70,10 @@ test('真实排期与协作隔离→风险与留痕→验收自动完成→管�
     await date(drawer, `${stage}计划开始日期`, '2099-10-01')
     await date(drawer, `${stage}计划结束日期`, '2099-10-01')
   }
+  await expect(drawer).toContainText(/超出审批日期\s*1\s*天/)
   await drawer.getByRole('button', { name: '保存计划' }).click()
   await expect(drawer).not.toBeVisible()
+  expect((await read(page)).database.projects.find(p => p.id === created.id)).toMatchObject({ approvedLaunchDate: '2099-09-30', originalLaunchDate: '2099-10-01' })
   await expect(detail(page)).toContainText('保存项目计划 · 首次排期')
   await expect(detail(page)).not.toContainText('[object Object]')
   await detail(page).getByRole('button', { name: '调整计划', exact: true }).click()

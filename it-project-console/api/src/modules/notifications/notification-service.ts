@@ -3,7 +3,7 @@ import { DingTalkError } from '../dingtalk/dingtalk-client.js'
 import { sendWorkMessage, workMessageResult, type MessageClient } from '../dingtalk/dingtalk-message.js'
 import { prepareManagerRiskDigest } from './manager-risk-digest.js'
 
-const supported = new Set(['MANAGER_RISK_DIGEST', 'PROJECT_RISKS_CHANGED', 'DEMAND_RETURNED', 'DEMAND_APPROVED', 'PROJECT_ASSIGNED', 'PROJECT_COMPLETED'])
+const supported = new Set(['PROPOSAL_ASSIGNED', 'PROPOSAL_RETURNED', 'MANAGER_RISK_DIGEST', 'PROJECT_RISKS_CHANGED', 'DEMAND_RETURNED', 'DEMAND_APPROVED', 'PROJECT_ASSIGNED', 'PROJECT_COMPLETED'])
 const samples = new Set(['user-manager-chen', 'user-business-li', 'user-engineer-wang', 'user-engineer-zhao'])
 const include = { recipient: true, demand: true, project: { include: { primaryOwner: true } }, deliveryLog: true } as const
 type Item = Prisma.NotificationOutboxGetPayload<{ include: typeof include }>
@@ -32,14 +32,15 @@ export function notificationContent(item: Item, origin: string) {
     return shown < blocks.length ? `${content}\n其余 ${blocks.length - shown} 个项目请点总览\n${overview}` : content
   }
   const title: Record<string, string> = {
+    PROPOSAL_ASSIGNED: '项目待确认接单', PROPOSAL_RETURNED: '工程师退回管理评估',
     PROJECT_RISKS_CHANGED: '项目风险提醒', DEMAND_RETURNED: '需求已退回',
     DEMAND_APPROVED: '需求已正式立项', PROJECT_ASSIGNED: '项目已分配', PROJECT_COMPLETED: '项目已完成'
   }
   const risks = Array.isArray(payload.risks) ? payload.risks.filter((risk): risk is string =>
     typeof risk === 'string' && (item.recipient.role === 'MANAGER' || /临期|延期|未更新|阻塞/.test(risk))) : []
-  const path = item.projectId ? `/#/project-overview?projectId=${encodeURIComponent(item.projectId)}` :
+  const path = typeof payload.proposalId === 'string' ? `/#/today-tasks?proposalId=${encodeURIComponent(payload.proposalId)}` : item.projectId ? `/#/project-overview?projectId=${encodeURIComponent(item.projectId)}` :
     `/#/my-demands?demandId=${encodeURIComponent(item.demandId ?? '')}`
-  return [title[item.eventType], `项目：${item.project?.name ?? item.demand?.name ?? '需求'}`,
+  return [title[item.eventType], `项目：${item.project?.name ?? item.demand?.name ?? payload.name ?? '需求'}`,
     item.project ? `负责人：${item.project.primaryOwner.name}` : '', ...risks,
     typeof payload.reason === 'string' ? `原因：${payload.reason}` : '',
     `查看详情：${new URL(path, origin).href}`].filter(Boolean).join('\n')
@@ -87,7 +88,7 @@ export class NotificationService {
 
   private skip(item: Item) {
     const payload = item.payload && typeof item.payload === 'object' && !Array.isArray(item.payload) ? item.payload : {}
-    return (item.eventType !== 'MANAGER_RISK_DIGEST' && !item.projectId && !item.demandId) ||
+    return (item.eventType !== 'MANAGER_RISK_DIGEST' && !item.projectId && !item.demandId && typeof payload.proposalId !== 'string') ||
       (item.eventType === 'MANAGER_RISK_DIGEST' && (!Array.isArray(payload.projects) || payload.projects.length === 0)) ||
       !supported.has(item.eventType) || !item.recipient.active || !item.recipient.dingUserId ||
       (item.eventType === 'MANAGER_RISK_DIGEST' && item.recipient.role !== 'MANAGER') ||

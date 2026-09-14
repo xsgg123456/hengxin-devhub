@@ -30,7 +30,12 @@
       store.currentUser.role === 'manager' || (store.currentUser.role === 'business' && own.value)
   )
   const withdrawable = computed(
-    () => own.value && ['pending', 'returned'].includes(props.demand.status)
+    () =>
+      own.value &&
+      ['pending', 'returned'].includes(props.demand.status) &&
+      !store.database?.projectProposals?.some(
+        (p) => p.demandId === props.demand.id && p.status !== 'confirmed'
+      )
   )
   async function act(action: 'withdraw' | 'delete') {
     if (

@@ -13,6 +13,7 @@ export const demandInput: DemandInput = {
   now
 }
 export const projectInput: ProjectInput = {
+  approvedLaunchDate: '2026-09-20',
   requestId: 'project-one',
   name: '测试项目',
   department: '市场部',
@@ -30,6 +31,17 @@ export function fresh() {
   return snapshot
 }
 
-export function planFixture(snapshot: import('@/domain/prototype').PrototypeSnapshot, project: import('@/domain/prototype').DemoProject) {
-  return saveProjectPlan(snapshot, { projectId: project.id, plans: remainingStages(project).map((stage, index) => ({ stage, startDate: `2026-09-${String(9 + index * 3).padStart(2, '0')}`, endDate: `2026-09-${String(11 + index * 3).padStart(2, '0')}` })), now })
+export function planFixture(
+  snapshot: import('@/domain/prototype').PrototypeSnapshot,
+  project: import('@/domain/prototype').DemoProject
+) {
+  return saveProjectPlan(snapshot, {
+    projectId: project.id,
+    plans: remainingStages(project).map((stage, index) => ({
+      stage,
+      startDate: `2026-09-${String(9 + index * 3).padStart(2, '0')}`,
+      endDate: `2026-09-${String(11 + index * 3).padStart(2, '0')}`
+    })),
+    now
+  })
 }

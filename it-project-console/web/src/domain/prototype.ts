@@ -2,7 +2,7 @@ export type SystemRole = 'business' | 'engineer' | 'manager'
 export type PrototypeScenario =
   'normal' | 'empty' | 'loading' | 'network-error' | 'save-error' | 'forbidden'
 export type DemandStatus =
-  'draft' | 'pending' | 'returned' | 'rejected' | 'established' | 'withdrawn'
+  'awaiting_engineer' | 'draft' | 'pending' | 'returned' | 'rejected' | 'established' | 'withdrawn'
 export type ProjectStatus = 'active' | 'completed' | 'cancelled'
 export type SimpleStatus = 'not-started' | 'in-progress' | 'nearly-done' | 'completed' | 'blocked'
 export const PROJECT_STAGES = [
@@ -66,7 +66,26 @@ export interface StagePlan {
   originalStartDate?: string
   originalEndDate?: string
 }
+export interface ProjectProposal {
+  id: string
+  requestId: string
+  version: number
+  name: string
+  department: string
+  demandId: string | null
+  priority: 'P0' | 'P1' | 'P2'
+  primaryOwnerId: string
+  collaboratorIds: string[]
+  approvedLaunchDate: string
+  status: 'pending' | 'returned' | 'confirmed'
+  reviewReason: string
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+  projectId: string | null
+}
 export interface DemoProject {
+  approvedLaunchDate?: string | null
   code?: string
   stagePlans?: StagePlan[]
   actualCompletedAt?: string | null
@@ -135,6 +154,7 @@ export interface DemoScheduleChange {
   createdAt: string
 }
 export interface PrototypeDatabase {
+  projectProposals?: ProjectProposal[]
   demandCodeCounters?: Record<string, number>
   projectCodeCounters?: Record<string, number>
   schemaVersion: 2
@@ -148,9 +168,12 @@ export interface PrototypeDatabase {
 }
 export interface DemoLifecycleEvent {
   id: string
-  entityType: 'project' | 'demand' | 'user'
+  entityType: 'project' | 'demand' | 'user' | 'proposal'
   entityId: string
   action:
+    | 'submit'
+    | 'accept'
+    | 'return'
     | 'plan'
     | 'complete'
     | 'cancel'

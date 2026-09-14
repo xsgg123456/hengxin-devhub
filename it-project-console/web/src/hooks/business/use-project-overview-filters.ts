@@ -70,6 +70,7 @@ export function useProjectOverviewFilters(personal = false) {
       })
       .sort(
         (a, b) =>
+          a.priority.localeCompare(b.priority) ||
           Number(b.risks.some((r) => r.includes('延期'))) -
             Number(a.risks.some((r) => r.includes('延期'))) ||
           b.risks.length - a.risks.length ||
@@ -102,12 +103,22 @@ export function useProjectOverviewFilters(personal = false) {
     {
       label: '待立项',
       key: 'pending',
-      value: store.visibleDemands.filter(
-        (d) =>
-          d.status === 'pending' &&
-          (!department.value || d.department === department.value) &&
-          (scope.value !== 'mine' || d.submitterId === store.currentUser.id)
-      ).length
+      value:
+        store.visibleDemands.filter(
+          (d) =>
+            ['pending', 'awaiting_engineer'].includes(d.status) &&
+            (!department.value || d.department === department.value) &&
+            (scope.value !== 'mine' || d.submitterId === store.currentUser.id)
+        ).length +
+        (store.database?.projectProposals ?? []).filter(
+          (p) =>
+            !p.demandId &&
+            p.status !== 'confirmed' &&
+            (!department.value || p.department === department.value) &&
+            (scope.value !== 'mine' ||
+              p.primaryOwnerId === store.currentUser.id ||
+              p.createdBy === store.currentUser.id)
+        ).length
     }
   ])
   const page = ref(1)
@@ -163,8 +174,12 @@ export function useProjectOverviewFilters(personal = false) {
   function applyMetric(key: string) {
     if (key === 'pending') {
       void router.push({
-        path: '/my-demands',
-        query: { status: 'pending', scope: scope.value, department: department.value }
+        path: store.currentUser.role === 'business' ? '/my-demands' : '/today-tasks',
+        query: {
+          status: store.currentUser.role === 'business' ? 'pre_establishment' : 'pending',
+          scope: scope.value,
+          department: department.value
+        }
       })
       return
     }

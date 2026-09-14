@@ -13,7 +13,7 @@ const input: UploadInput = {
 }
 
 function setup() {
-  const demand = { id: 'demand', ownerId: 'owner', status: 'DRAFT', attachmentIds: [] as string[] }
+  const demand = { id: 'demand', ownerId: 'owner', status: 'DRAFT', proposals: [] as { status: string }[], attachmentIds: [] as string[] }
   const attachment = {
     ...input,
     id: 'file',
@@ -198,4 +198,17 @@ describe('附件权限、预算和确认边界', () => {
       data: { stagingCleanedAt: expect.any(Date) }
     })
   })
+})
+
+it('接单或退回管理期间禁止用户材料写入，但后台临时对象清理继续', async () => {
+  for (const status of ['pending', 'returned']) {
+    const { service, demand, attachment, storage } = setup()
+    demand.status = 'PENDING'; demand.proposals = [{ status }]
+    await expect(service.requestUpload(actor, input)).rejects.toMatchObject({ code: 'DEMAND_NOT_EDITABLE' })
+    await expect(service.confirmUpload(actor, 'file')).rejects.toMatchObject({ code: 'DEMAND_NOT_EDITABLE' })
+    await expect(service.discard(actor, 'file')).rejects.toMatchObject({ code: 'DEMAND_NOT_EDITABLE' })
+    attachment.status = 'READY'; attachment.expiresAt = new Date(0)
+    await service.cleanupExpired()
+    expect(storage.delete).toHaveBeenCalledWith('staging/file')
+  }
 })

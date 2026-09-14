@@ -30,6 +30,14 @@
           }}</ElButton>
         </div>
       </div>
+      <ElAlert v-if="proposalError" :title="proposalError" type="warning" :closable="false" />
+      <ProjectCreateDrawer
+        v-if="proposal"
+        :key="proposal.id"
+        :model-value="true"
+        :proposal="proposal"
+        @update:model-value="closeProposal"
+      />
       <ProjectDetailDrawer v-model="detailOpen" :project="selected" @edit="openUpdate" />
       <ProgressUpdateDrawer v-model="updateOpen" :project="updateProject" />
       <DemandReview v-if="review" :demand="review" @close="reviewId = ''" @saved="reviewId = ''" />
@@ -49,12 +57,41 @@
   import BusinessPageState from '@/components/system/business-page-state.vue'
   import { computed, ref, watch } from 'vue'
   import { usePrototypeStore } from '@/store/modules/prototype'
-  import { responsibilityTasks, type ResponsibilityTask } from '@/services/task-service'
+  import {
+    responsibilityTasks,
+    filterPendingTasks,
+    type ResponsibilityTask
+  } from '@/services/task-service'
   import ProjectDetailDrawer from '@/components/project/project-detail-drawer.vue'
   import ProgressUpdateDrawer from '@/components/project/progress-update-drawer.vue'
   import DemandReview from '@/components/demand/demand-review.vue'
   import DemandEditor from '@/components/demand/demand-editor.vue'
+  import ProjectCreateDrawer from '@/components/project/project-create-drawer.vue'
+  import { useRoute, useRouter } from 'vue-router'
+  const route = useRoute(),
+    router = useRouter()
   const store = usePrototypeStore()
+  const proposalId = ref('')
+  const proposal = computed(() =>
+    store.database?.projectProposals?.find((p) => p.id === proposalId.value)
+  )
+  const proposalError = computed(() =>
+    proposalId.value && store.ready && !proposal.value
+      ? '待接单记录不存在或无权访问，请刷新待办'
+      : ''
+  )
+  watch(
+    () => route.query.proposalId,
+    (id) => {
+      proposalId.value = typeof id === 'string' ? id : ''
+    },
+    { immediate: true }
+  )
+  function closeProposal() {
+    proposalId.value = ''
+    const { proposalId: _, ...query } = route.query
+    void router.replace({ query })
+  }
   const heading = computed(
     () =>
       ({ manager: '今日待办', engineer: '我的待办', business: '待我补充' })[store.currentUser.role]
@@ -62,7 +99,7 @@
   const { data, loading, error, retry } = useLiveQuery<DashboardResult>('/dashboard', () => ({
     scope: 'all'
   }))
-  const tasks = computed(() => {
+  const taskRows = computed(() => {
     if (!store.database) return []
     if (runtimeConfig.isPrototype) return responsibilityTasks(store.database, store.currentUser)
     if (!data.value) return []
@@ -74,6 +111,17 @@
       }))
       .sort((a, b) => a.severity - b.severity || b.days - a.days || a.id.localeCompare(b.id))
   })
+  const tasks = computed(() =>
+    route.query.status === 'pending' && store.database
+      ? filterPendingTasks(
+          taskRows.value,
+          store.database,
+          store.currentUser.id,
+          String(route.query.scope ?? 'all'),
+          String(route.query.department ?? '')
+        )
+      : taskRows.value
+  )
   const detailId = ref(''),
     updateId = ref(''),
     reviewId = ref(''),
@@ -89,6 +137,9 @@
   const review = computed(() => store.visibleDemands.find((d) => d.id === reviewId.value))
   const supplement = computed(() => store.visibleDemands.find((d) => d.id === supplementId.value))
   const actionLabels = {
+    confirm: '确认接单',
+    reassess: '重新评估',
+    proposal: '查看待接单',
     review: '评估需求',
     supplement: '补充重提',
     overall: '更新环节',
@@ -100,6 +151,11 @@
     updateOpen.value = true
   }
   function act(task: ResponsibilityTask) {
+    if (task.proposalId) {
+      proposalId.value = task.proposalId
+      void router.replace({ query: { ...route.query, proposalId: task.proposalId } })
+      return
+    }
     if (task.action === 'review') reviewId.value = task.demandId ?? ''
     else if (task.action === 'supplement') supplementId.value = task.demandId ?? ''
     else if (task.action === 'coordinate') {
@@ -110,6 +166,7 @@
   watch(
     () => store.currentUser.id,
     () => {
+      proposalId.value = ''
       detailOpen.value = false
       updateOpen.value = false
       reviewId.value = ''

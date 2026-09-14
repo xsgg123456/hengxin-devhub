@@ -86,6 +86,7 @@ describe('真实需求命令与文件适配', () => {
   })
   it('退回不附带立项字段，符合严格服务端schema', async () => {
     await reviewLiveDemand('d1', 3, 'return', '补材料', {
+      approvedLaunchDate: '',
       requestId: 'r1',
       name: 'x',
       department: 'd',

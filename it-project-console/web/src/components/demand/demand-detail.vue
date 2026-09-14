@@ -18,7 +18,11 @@
     ><p class="mb-5 whitespace-pre-wrap break-all">{{ demand.description || '暂无说明' }}</p>
     <ElAlert
       v-if="demand.reviewReason"
-      :title="`${demand.status === 'rejected' ? '不予立项原因' : '退回原因'}：${demand.reviewReason}`"
+      :title="
+        demand.reviewReason.startsWith('工程师退回管理评估：')
+          ? demand.reviewReason
+          : `${demand.status === 'rejected' ? '不予立项原因' : demand.status === 'pending' ? '工程师退回管理评估' : '退回原因'}：${demand.reviewReason}`
+      "
       type="warning"
       :closable="false"
       class="mb-5"

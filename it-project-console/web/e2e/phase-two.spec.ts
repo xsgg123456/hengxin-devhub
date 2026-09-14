@@ -1,3 +1,4 @@
+import { acceptProposal } from './review-helpers'
 import { planProject } from './review-helpers'
 import { expect, test, type Page, type Locator } from '@playwright/test'
 import type { PrototypeSnapshot } from '../src/domain/prototype'
@@ -8,9 +9,13 @@ const snapshot = (page: Page): Promise<PrototypeSnapshot> =>
 const card = (page: Page, name: string) => page.locator('[data-project-id]').filter({ hasText: name })
 const row = (page: Page, name: string) => page.getByRole('row').filter({ hasText: name })
 async function identity(page: Page, name: string) {
+  if ((await page.getByRole('button', { name: '切换演示身份' }).textContent())?.includes(name)) return
   await page.getByRole('button', { name: '切换演示身份' }).click()
   await page.locator('.identity-menu-item').filter({ hasText: name }).click()
   await expect(page.getByRole('button', { name: '切换演示身份' })).toContainText(name)
+  const active = (await snapshot(page)).database.users.find(user => user.name === name)!
+  const path = active.role === 'manager' ? 'project-overview' : active.role === 'business' ? 'my-demands' : 'my-projects'
+  await expect.poll(() => new URL(page.url()).hash).toBe('#/' + path)
 }
 async function date(drawer: Locator, name: string, value: string) {
   await drawer.getByLabel(name, { exact: true }).fill(value)
@@ -62,8 +67,9 @@ test('同一需求经草稿、立项、主责整体更新、协作个人更新�
   await row(page, name).getByRole('button', { name: '评估', exact: true }).click()
   drawer = page.getByRole('dialog', { name: `需求评估 · ${name}` })
   await assignment(page, drawer)
-  await drawer.getByRole('button', { name: '通过并立项' }).click()
-  await expect(row(page, name)).toContainText('已立项')
+  await drawer.getByRole('button', { name: '提交工程师确认' }).click()
+  await expect(row(page, name)).toContainText('待工程师确认')
+  await acceptProposal(page, name)
   const project = (await snapshot(page)).database.projects.find((p) => p.demandId === draft.id)!
   expect(project.stage).toBe('方案设计')
   expect((await snapshot(page)).database.projects.filter((p) => p.demandId === draft.id)).toHaveLength(1)
@@ -147,12 +153,13 @@ test('直接创建不伪造需求，无关工程师只能查看，三档桌面�
   await drawer.getByLabel('项目名称', { exact: true }).fill(name)
   await drawer.getByLabel('需求部门', { exact: true }).fill('IT部')
   await assignment(page, drawer, false)
-  await drawer.getByRole('button', { name: '创建项目', exact: true }).click()
+  await date(drawer, '审批确认上线日期', '2099-10-20')
+  await drawer.getByRole('button', { name: '提交工程师确认', exact: true }).click()
   await expect(drawer).not.toBeVisible()
+  await acceptProposal(page, name)
   const saved = await snapshot(page)
   expect(saved.database.demands).toEqual(before.database.demands)
   expect(saved.database.projects.find((p) => p.name === name)).toMatchObject({ source: 'direct', demandId: null, collaboratorIds: [] })
-  await page.getByRole('dialog', { name: '项目详情', exact: true }).getByRole('button', { name: '关闭', exact: true }).click()
   await identity(page, '赵清越')
   await expect(card(page, name)).toHaveCount(0)
   await page.getByText('全部项目', { exact: true }).click()

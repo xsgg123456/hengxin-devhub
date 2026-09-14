@@ -12,7 +12,7 @@ export function assertManager(actor: Actor) {
 }
 export async function lockedDemand(tx: Prisma.TransactionClient, id: string, version: number) {
   await tx.$queryRaw`SELECT id FROM demands WHERE id = ${id} FOR UPDATE`
-  const row = await tx.demand.findUnique({ where: { id }, include: { project: true } })
+  const row = await tx.demand.findUnique({ where: { id }, include: { project: true, proposals: true } })
   if (!row) throw new AppError(404, 'DEMAND_NOT_FOUND', '需求不存在')
   if (row.version !== version) throw new AppError(409, 'VERSION_CONFLICT', '记录已更新，请刷新后重试')
   return row

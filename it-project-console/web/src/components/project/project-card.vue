@@ -1,14 +1,24 @@
 <template>
   <article
     class="project-card"
-    :class="{ alert: severe, attention: risks.length && !severe }"
+    :class="{
+      'priority-project': project.priority === 'P0',
+      alert: severe,
+      attention: risks.length && !severe
+    }"
     :data-project-id="project.id"
   >
     <div class="card-heading"
       ><h3>{{ project.name }}</h3
-      ><ElTag size="small" :type="project.priority === 'P0' ? 'danger' : 'info'">{{
-        project.priority
-      }}</ElTag></div
+      ><template v-if="project.priority === 'P0'"
+        ><span class="priority-focus"
+          ><svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="m12 2.5 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3.1-5.8 3.1 1.1-6.5L2.6 9.3l6.5-.9Z"
+            /></svg
+          >P0 · 重点项目</span
+        ></template
+      ><ElTag v-else size="small" type="info">{{ project.priority }}</ElTag></div
     >
     <p class="project-id">{{ projectCode(project) }}</p>
     <div class="tags"
@@ -55,7 +65,11 @@
       >
     </dl>
     <RiskTag :risks="risks" />
-    <StageProgress class="mt-3" :project="project" :histories="store.database?.stageHistories ?? []" />
+    <StageProgress
+      class="mt-3"
+      :project="project"
+      :histories="store.database?.stageHistories ?? []"
+    />
     <div class="actions"
       ><ElButton
         v-if="canUpdate && (!isOverall || !needsPlan(project))"
@@ -124,6 +138,33 @@
   const severe = computed(() => risks.value.some((risk) => /延期|未更新/.test(risk)))
 </script>
 <style scoped>
+  .priority-focus {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 4px 9px;
+    border: 1px solid #edc16b;
+    border-radius: 5px;
+    background: #fff1d4;
+    color: #865100;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 18px;
+  }
+  .priority-focus svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+  }
+  .priority-project {
+    box-shadow: inset 3px 0 0 #dca339;
+    background: linear-gradient(110deg, #fffaf0 0%, #fff 50%) !important;
+  }
+  .priority-project .card-heading h3 {
+    font-weight: 600;
+  }
   .project-card {
     min-width: 0;
     padding: 18px;

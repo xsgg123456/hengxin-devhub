@@ -88,9 +88,15 @@ export function migratePrototypeSnapshot(value: unknown): PrototypeSnapshot {
     throw new Error('历史记录无效')
   for (const demand of snapshot.database.demands) {
     if (
-      !['draft', 'pending', 'returned', 'rejected', 'established', 'withdrawn'].includes(
-        demand.status
-      ) ||
+      ![
+        'awaiting_engineer',
+        'draft',
+        'pending',
+        'returned',
+        'rejected',
+        'established',
+        'withdrawn'
+      ].includes(demand.status) ||
       typeof demand.name !== 'string' ||
       typeof demand.description !== 'string'
     )

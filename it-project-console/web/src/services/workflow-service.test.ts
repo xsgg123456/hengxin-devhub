@@ -1,3 +1,4 @@
+import { confirmProjectProposal } from './proposal-service'
 import { describe, expect, it } from 'vitest'
 import { createProject, reviewDemand, saveDemand, validateAttachment } from './workflow-service'
 import { PrototypeRepository, PROTOTYPE_STORAGE_KEY } from '@/repositories/prototype-repository'
@@ -6,9 +7,9 @@ describe('需求与立项事务', () => {
   it('草稿容许缺材料，正式提交校验必交材料、日期和说明', () => {
     const snapshot = fresh()
     expect(saveDemand(snapshot, { ...demandInput, submit: false, prd: null }).status).toBe('draft')
-    expect(() => saveDemand(snapshot, { ...demandInput, requestId: 'other', attachments: [] })).toThrow(
-      '至少上传一个文件'
-    )
+    expect(() =>
+      saveDemand(snapshot, { ...demandInput, requestId: 'other', attachments: [] })
+    ).toThrow('至少上传一个文件')
     expect(() =>
       saveDemand(snapshot, { ...demandInput, requestId: 'other', expectedLaunchDate: '2026-09-07' })
     ).toThrow('不得早于')
@@ -82,10 +83,13 @@ describe('需求与立项事务', () => {
       reviewDemand(snapshot, { demandId: demand.id, decision: 'establish', project: projectInput })
         .id
     ).toBe(first.id)
+    expect(snapshot.database.projects.filter((row) => row.demandId === demand.id)).toHaveLength(0)
+    snapshot.activeUserId = projectInput.primaryOwnerId
+    const accepted = confirmProjectProposal(snapshot, first.id, 1, 'accept')
     expect(snapshot.database.projects.filter((row) => row.demandId === demand.id)).toHaveLength(1)
     expect(
       snapshot.database.stageHistories.filter(
-        (row) => row.projectId === first.id && row.completedAt
+        (row) => row.projectId === accepted.projectId && row.completedAt
       )
     ).toHaveLength(2)
   })

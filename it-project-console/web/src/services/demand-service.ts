@@ -37,6 +37,13 @@ export function saveDemand(snapshot: PrototypeSnapshot, input: DemandInput) {
   if (repeated && (!existing || repeated.id !== existing.id)) return repeated
   if (existing && !['draft', 'pending', 'returned', 'withdrawn'].includes(existing.status))
     throw new WorkflowError('当前需求不可编辑')
+  if (
+    existing &&
+    snapshot.database.projectProposals?.some(
+      (p) => p.demandId === existing.id && p.status !== 'confirmed'
+    )
+  )
+    throw new WorkflowError('需求已进入工程师接单流程，不可编辑')
   const name = input.submit ? textValue(input.name, '项目名称', 100) : input.name.trim()
   const description = input.submit
     ? textValue(input.description, '项目说明')
@@ -49,7 +56,9 @@ export function saveDemand(snapshot: PrototypeSnapshot, input: DemandInput) {
   const materials = input.attachments ?? demandMaterials(input)
   validateMaterials(materials, input.submit || existing?.status === 'pending')
   const demand = {
-    code: existing?.code ?? nextDemandCode(snapshot.database, existing?.createdAt || existing?.submittedAt || now),
+    code:
+      existing?.code ??
+      nextDemandCode(snapshot.database, existing?.createdAt || existing?.submittedAt || now),
     createdAt: existing?.createdAt || existing?.submittedAt || now,
     id:
       existing?.id ??

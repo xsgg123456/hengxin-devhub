@@ -12,7 +12,7 @@ export async function demandStatistics(
 ) {
   const [rows, userRows] = await Promise.all([
     tx.demand.findMany({
-      include: { project: true },
+      include: { project: true, proposals: true },
       orderBy: [{ submittedAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }]
     }),
     tx.user.findMany({ where: { active: true }, orderBy: { name: 'asc' } })
@@ -27,7 +27,11 @@ export async function demandStatistics(
       (!q.completion || demandCompletion(d.project).completionStatus === q.completion) &&
       (!q.status ||
         q.status === 'all' ||
-        (d.status === 'APPROVED' ? 'established' : d.status.toLowerCase()) === q.status) &&
+        (q.status === 'pre_establishment'
+          ? ['PENDING', 'AWAITING_ENGINEER'].includes(d.status)
+          : q.status === 'returned_management'
+          ? d.status === 'PENDING' && d.proposals.some(row => row.status === 'returned')
+          : (d.status === 'APPROVED' ? 'established' : d.status.toLowerCase()) === q.status)) &&
       (!q.keyword || `${d.name} ${d.id}`.toLowerCase().includes(q.keyword.toLowerCase()))
   )
   const attachmentIds = filtered

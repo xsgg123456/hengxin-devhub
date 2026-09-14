@@ -34,7 +34,7 @@ export function buildGanttRows(
 ): GanttRow[] {
   const first = Date.parse(`${month}-01`) / DAY
   const last = first + monthDays(month)
-  return projects.flatMap((project): GanttRow[] => {
+  return [...projects].sort((a, b) => a.priority.localeCompare(b.priority)).flatMap((project): GanttRow[] => {
     if (!filters.includeArchived && (project.archived || project.status === 'cancelled')) return []
     if (filters.department && project.department !== filters.department) return []
     if (filters.ownerId && project.primaryOwnerId !== filters.ownerId) return []

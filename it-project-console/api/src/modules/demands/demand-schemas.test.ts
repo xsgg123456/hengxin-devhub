@@ -25,9 +25,10 @@ describe('业务输入边界', () => {
     expect(reviewSchema.safeParse({ ...review, reason: '补充材料' }).success).toBe(true)
     expect(reviewSchema.safeParse({ ...review, reason: '补充', primaryOwnerId: 'one' }).success).toBe(false)
   })
-  it('直接项目无需日期即可进入待排期，兼容日期若传入仍校验格式', () => {
+  it('直接创建必填审批日期，首次排期日期仍独立可选', () => {
     const input = { requestId: 'one', name: 'Project', department: 'IT', priority: 'P1', primaryOwnerId: 'one' }
-    expect(projectSchema.safeParse(input).success).toBe(true)
+    expect(projectSchema.safeParse(input).success).toBe(false)
+    expect(projectSchema.safeParse({ ...input, approvedLaunchDate: '2099-12-31' }).success).toBe(true)
     expect(projectSchema.safeParse({ ...input, originalDeliveryDate: '' }).success).toBe(false)
   })
 })

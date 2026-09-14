@@ -32,6 +32,7 @@ export function projectScenarioDatabase(
   if (scenario !== 'empty') return database
   return {
     ...database,
+    projectProposals: [],
     demands: [],
     projects: [],
     progressUpdates: [],

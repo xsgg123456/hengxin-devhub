@@ -45,7 +45,7 @@ export const demandQuery = z
     to: dateSchema.optional(),
     completion: z.enum(['', 'normal', 'late']).default(''),
     status: z
-      .enum(['', 'all', 'draft', 'pending', 'returned', 'rejected', 'established', 'withdrawn'])
+      .enum(['', 'all', 'draft', 'pending', 'awaiting_engineer', 'pre_establishment', 'returned_management', 'returned', 'rejected', 'established', 'withdrawn'])
       .default('')
   })
   .strict()

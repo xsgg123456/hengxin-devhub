@@ -16,6 +16,7 @@ enum Role {
 enum DemandStatus {
   DRAFT
   PENDING
+  AWAITING_ENGINEER
   RETURNED
   REJECTED
   APPROVED
@@ -74,6 +75,7 @@ model User {
   updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
   sessions         Session[]
   demands          Demand[]
+  proposals        ProjectProposal[]
   ownedProjects    Project[]
   memberships      ProjectMember[]
   attachments      Attachment[]
@@ -129,6 +131,7 @@ model Demand {
   ownerId       String               @map("owner_id")
   owner         User                 @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   attachments   Attachment[]
+  proposals     ProjectProposal[]
   project       Project?
   notifications NotificationOutbox[]
   createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -159,6 +162,7 @@ model Project {
   stage String @default("方案设计")
   simpleStatus String @default("not-started") @map("simple_status")
   overallProgress Float @default(0) @map("overall_progress")
+  approvedLaunchDate DateTime? @map("approved_launch_date") @db.Date
   originalLaunchDate DateTime? @map("original_launch_date") @db.Date
   currentLaunchDate DateTime? @map("current_launch_date") @db.Date
   originalDeliveryDate DateTime? @map("original_delivery_date") @db.Date
@@ -183,6 +187,7 @@ model Project {
   demand         Demand?              @relation(fields: [demandId], references: [id], onDelete: Restrict)
   primaryOwnerId String               @map("primary_owner_id")
   primaryOwner   User                 @relation(fields: [primaryOwnerId], references: [id], onDelete: Restrict)
+  proposal       ProjectProposal?
   members        ProjectMember[]
   notifications  NotificationOutbox[]
   createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -301,4 +306,28 @@ model ObjectDeletion {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
   @@map("object_deletions")
+}
+
+model ProjectProposal {
+  id String @id @default(cuid())
+  requestId String @map("request_id")
+  version Int @default(1)
+  name String
+  department String
+  demandId String? @unique @map("demand_id")
+  demand Demand? @relation(fields: [demandId], references: [id], onDelete: Cascade)
+  priority String
+  primaryOwnerId String @map("primary_owner_id")
+  primaryOwner User @relation(fields: [primaryOwnerId], references: [id], onDelete: Restrict)
+  collaboratorIds String[] @default([]) @map("collaborator_ids")
+  approvedLaunchDate DateTime @map("approved_launch_date") @db.Date
+  status String @default("pending")
+  reviewReason String @default("") @map("review_reason")
+  createdBy String @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  projectId String? @unique @map("project_id")
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@index([primaryOwnerId, status])
+  @@map("project_proposals")
 }

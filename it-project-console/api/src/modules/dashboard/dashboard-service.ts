@@ -48,6 +48,7 @@ export function filterProjects(
     })
     .sort(
       (a, b) =>
+        a.priority.localeCompare(b.priority) ||
         Number(matchesRisk(b, 'delayed')) - Number(matchesRisk(a, 'delayed')) ||
         b.risks.length - a.risks.length ||
         b.updatedAt.localeCompare(a.updatedAt)
@@ -122,13 +123,17 @@ export async function dashboard(tx: Prisma.TransactionClient, q: DashboardQuery,
   const attentionDays = Object.fromEntries(
     projects.map((p) => [p.id, attentionRank(p, blockedDays).days])
   )
-  const pending = await tx.demand.count({
+  const pendingDemands = await tx.demand.count({
     where: {
-      status: 'PENDING',
+      status: { in: ['PENDING', 'AWAITING_ENGINEER'] },
       ...(q.department ? { department: q.department } : {}),
       ...(q.scope === 'mine' ? { ownerId: actorId } : {})
     }
   })
+  const pendingDirect = await tx.projectProposal.count({ where: { demandId: null, status: { in: ['pending', 'returned'] },
+    ...(q.department ? { department: q.department } : {}),
+    ...(q.scope === 'mine' ? { OR: [{ primaryOwnerId: actorId }, { createdBy: actorId }] } : {}) } })
+  const pending = pendingDemands + pendingDirect
   const metrics = [
     {
       label: '在手项目',

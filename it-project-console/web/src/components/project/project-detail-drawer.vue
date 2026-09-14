@@ -15,6 +15,13 @@
         >{{ projectCode(project) }} · {{ project.source === 'direct' ? '直接创建' : '需求立项' }}</p
       >
       <RiskTag :risks="risks" />
+      <ElAlert
+        v-if="approvedLaunchOverrun(project.approvedLaunchDate, project.expectedLaunchDate) > 0"
+        class="mt-3"
+        type="warning"
+        :closable="false"
+        :title="`超出审批日期 ${approvedLaunchOverrun(project.approvedLaunchDate, project.expectedLaunchDate)} 天`"
+      />
       <ElDescriptions class="mt-5 mb-5" :column="2" border>
         <ElDescriptionsItem label="需求部门">{{ project.department }}</ElDescriptionsItem>
         <ElDescriptionsItem label="提出人">{{
@@ -32,6 +39,12 @@
         }}</ElDescriptionsItem>
         <ElDescriptionsItem label="原计划上线">{{
           project.originalLaunchDate || '—'
+        }}</ElDescriptionsItem>
+        <ElDescriptionsItem label="业务期望上线日期">{{
+          demand?.expectedLaunchDate || '未设置'
+        }}</ElDescriptionsItem>
+        <ElDescriptionsItem label="审批确认上线日期">{{
+          project.approvedLaunchDate || '未设置'
         }}</ElDescriptionsItem>
         <ElDescriptionsItem label="当前预计上线">{{
           project.expectedLaunchDate || '—'
@@ -99,6 +112,7 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
+  import { approvedLaunchOverrun } from '@/utils/approved-launch'
   import { projectCode } from '@/utils/project-code'
   import { computed, ref } from 'vue'
   import type { DemoProject } from '@/domain/prototype'

@@ -47,7 +47,7 @@ await isolatedIntegration(async ({ env }) => {
     web = start(resolve(webRoot, 'node_modules/vite/bin/vite.js'), ['--mode', 'live', '--host', '127.0.0.1', '--port', '4325', '--strictPort'], webRoot, webEnv)
     await ready(origin, web)
     await new Promise<void>((done, reject) => {
-      const test = start(resolve(webRoot, 'node_modules/@playwright/test/cli.js'), ['test', '--config=playwright.live.config.ts'], webRoot, webEnv)
+      const test = start(resolve(webRoot, 'node_modules/@playwright/test/cli.js'), ['test', '--config=playwright.live.config.ts', ...process.argv.slice(2)], webRoot, webEnv)
       test.on('error', reject)
       test.on('exit', code => code === 0 ? done() : reject(new Error(`真实浏览器验收失败 (${code})`)))
     })

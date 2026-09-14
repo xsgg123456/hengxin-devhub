@@ -30,6 +30,7 @@ export class DemandService {
     return command(this.db, actor, input.requestId, { operation: 'save-demand', id, input }, async tx => {
       const old = await lockedDemand(tx, id, input.version)
       assertOwner(actor, old)
+      if (old.proposals.some(row => ['pending', 'returned'].includes(row.status))) throw new AppError(409, 'READ_ONLY', '需求已进入工程师接单或管理重新评估，不可修改或撤回')
       if (old.project) throw new AppError(409, 'READ_ONLY', '已关联项目的需求不可编辑')
       const data = await demandData(tx, id, { ...input, submit: input.submit || old.status === 'PENDING' }, old)
       const row = await tx.demand.update({ where: { id }, data: {
@@ -48,6 +49,7 @@ export class DemandService {
     return command(this.db, actor, input.requestId, { operation: 'withdraw-demand', id, input }, async tx => {
       const old = await lockedDemand(tx, id, input.version)
       assertOwner(actor, old)
+      if (old.proposals.some(row => ['pending', 'returned'].includes(row.status))) throw new AppError(409, 'READ_ONLY', '需求已进入工程师接单或管理重新评估，不可修改或撤回')
       if (!['PENDING', 'RETURNED'].includes(old.status) || old.project)
         throw new AppError(409, 'INVALID_STATE', '仅待评估或退回补充需求可撤回')
       const row = await tx.demand.update({ where: { id }, data: { status: 'WITHDRAWN', version: { increment: 1 } } })

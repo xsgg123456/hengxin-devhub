@@ -235,3 +235,38 @@
   border-top: 1px solid #edf0f5;
   padding-top: 6px;
 }
+
+.priority-focus {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 4px 9px;
+  border: 1px solid #edc16b;
+  border-radius: 5px;
+  background: #fff1d4;
+  color: #865100;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+.priority-focus svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+.priority-row {
+  box-shadow: inset 3px 0 0 #dca339;
+  background: #fffaf0;
+}
+.priority-track {
+  background: #fffdf7;
+}
+.gantt-priority {
+  margin-bottom: 6px;
+}
+.gantt-priority .priority-focus {
+  padding: 1px 7px;
+  font-size: 11px;
+}

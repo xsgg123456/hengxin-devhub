@@ -23,8 +23,13 @@ export function useDemandPage() {
   watch(
     () => route.query,
     (query) => {
-      if (query.status === 'pending') {
-        status.value = 'pending'
+      if (
+        typeof query.status === 'string' &&
+        ['pending', 'awaiting_engineer', 'returned_management', 'pre_establishment'].includes(
+          query.status
+        )
+      ) {
+        status.value = query.status
         scope.value = query.scope === 'mine' ? 'mine' : 'all'
         department.value = typeof query.department === 'string' ? query.department : ''
       }
@@ -70,7 +75,14 @@ export function useDemandPage() {
       .filter(
         (d) =>
           (scope.value === 'all' || d.submitterId === prototypeStore.currentUser.id) &&
-          (!status.value || d.status === status.value) &&
+          (!status.value ||
+            (status.value === 'pre_establishment'
+              ? ['pending', 'awaiting_engineer'].includes(d.status)
+              : status.value === 'returned_management'
+                ? prototypeStore.database?.projectProposals?.some(
+                    (p) => p.demandId === d.id && p.status === 'returned'
+                  )
+                : d.status === status.value)) &&
           (!department.value || d.department === department.value) &&
           (!dateRange.value?.length ||
             (!!d.submittedAt &&
@@ -109,7 +121,17 @@ export function useDemandPage() {
     prototypeStore.database?.users.find((user) => user.id === id)?.name || id
   const canEdit = (demand: DemoDemand) =>
     demand.submitterId === prototypeStore.currentUser.id &&
-    ['draft', 'pending', 'returned', 'withdrawn'].includes(demand.status)
+    ['draft', 'pending', 'returned', 'withdrawn'].includes(demand.status) &&
+    !(prototypeStore.database?.projectProposals ?? []).some(
+      (p) => p.demandId === demand.id && p.status !== 'confirmed'
+    )
+  function openReview(demand: DemoDemand) {
+    const proposal = prototypeStore.database?.projectProposals?.find(
+      (p) => p.demandId === demand.id && p.status === 'returned'
+    )
+    if (proposal) void router.push({ path: '/today-tasks', query: { proposalId: proposal.id } })
+    else review.value = demand
+  }
   function openEditor(demand?: DemoDemand) {
     selected.value = demand
     editing.value = true
@@ -127,6 +149,11 @@ export function useDemandPage() {
   const metrics = computed(() => [
     { label: '当前范围需求', value: demands.value.length, icon: 'ri:file-list-3-line' },
     { label: '待评估', value: pendingCount.value, icon: 'ri:timer-line' },
+    {
+      label: '待工程师确认',
+      value: demands.value.filter((d) => d.status === 'awaiting_engineer').length,
+      icon: 'ri:user-follow-line'
+    },
     { label: '已立项', value: establishedCount.value, icon: 'ri:checkbox-circle-line' },
     {
       label: '关联在途项目',
@@ -139,7 +166,13 @@ export function useDemandPage() {
       icon: 'ri:git-branch-line'
     }
   ])
-  const demandStatusLabel: Record<DemandStatus, string> = {
+  const demandStatusLabel: Record<
+    DemandStatus | 'returned_management' | 'pre_establishment',
+    string
+  > = {
+    pre_establishment: '待立项（评估/确认）',
+    returned_management: '退回管理评估',
+    awaiting_engineer: '待工程师确认',
     draft: '草稿',
     rejected: '不予立项',
     pending: '待评估',
@@ -147,14 +180,29 @@ export function useDemandPage() {
     established: '已立项',
     withdrawn: '已撤回'
   }
-  const demandStatusText = (status: DemandStatus) => demandStatusLabel[status]
+  const demandStatusText = (status: DemandStatus, id?: string) =>
+    status === 'pending' &&
+    prototypeStore.database?.projectProposals?.some(
+      (p) => p.demandId === id && p.status === 'returned'
+    )
+      ? '退回管理评估'
+      : demandStatusLabel[status]
   const demandStatusType = (status: DemandStatus) =>
     status === 'established' ? 'success' : status === 'pending' ? 'warning' : 'info'
   const linkedProject = (demandId: string) =>
     (prototypeStore.database?.projects || []).find((project) => project.demandId === demandId)
   const projectResult = (demandId: string) => {
     const project = linkedProject(demandId)
-    if (!project) return '尚未转为项目'
+    if (!project) {
+      const proposal = prototypeStore.database?.projectProposals?.find(
+        (p) => p.demandId === demandId
+      )
+      return proposal?.status === 'returned'
+        ? '工程师退回管理评估：' + proposal.reviewReason
+        : proposal?.status === 'pending'
+          ? '待主负责工程师确认'
+          : '尚未转为项目'
+    }
     const state = { active: '进行中', completed: '已完成', cancelled: '已取消' }[project.status]
     return `已转 ${projectCode(project)} · ${project.stage} · ${state}${project.archived ? ' · 已归档' : ''}`
   }
@@ -183,6 +231,7 @@ export function useDemandPage() {
     userName,
     canEdit,
     openEditor,
+    openReview,
     openProject,
     demandStatusLabel,
     demandStatusText,

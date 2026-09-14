@@ -86,6 +86,30 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
     !rows(db.lifecycleEvents)
   )
     return false
+  if (
+    db.projectProposals !== undefined &&
+    (!rows(db.projectProposals) ||
+      !db.projectProposals.every(
+        (p) =>
+          strings(p, ['requestId', 'name', 'department', 'reviewReason', 'createdBy']) &&
+          Number.isInteger(p.version) &&
+          Number(p.version) > 0 &&
+          ['pending', 'returned', 'confirmed'].includes(String(p.status)) &&
+          ['P0', 'P1', 'P2'].includes(String(p.priority)) &&
+          date(p.approvedLaunchDate) &&
+          userIds.has(p.primaryOwnerId) &&
+          userIds.has(p.createdBy) &&
+          list(p.collaboratorIds) &&
+          p.collaboratorIds.every((id) => userIds.has(id) && id !== p.primaryOwnerId) &&
+          new Set(p.collaboratorIds).size === p.collaboratorIds.length &&
+          (p.demandId === null || (db.demands as Row[]).some((d) => d.id === p.demandId)) &&
+          (p.projectId === null ||
+            (db.projects as Row[]).some((project) => project.id === p.projectId)) &&
+          timestamp(p.createdAt) &&
+          timestamp(p.updatedAt)
+      ))
+  )
+    return false
   const projectIds = new Set(db.projects.map((p) => p.id)),
     demandIds = new Set(db.demands.map((d) => d.id))
   if (
@@ -100,9 +124,15 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
           'expectedLaunchDate',
           'submittedAt'
         ]) &&
-        ['draft', 'pending', 'returned', 'rejected', 'established', 'withdrawn'].includes(
-          String(d.status)
-        ) &&
+        [
+          'awaiting_engineer',
+          'draft',
+          'pending',
+          'returned',
+          'rejected',
+          'established',
+          'withdrawn'
+        ].includes(String(d.status)) &&
         userIds.has(d.submitterId) &&
         (d.expectedLaunchDate === '' || date(d.expectedLaunchDate)) &&
         (d.submittedAt === '' || timestamp(d.submittedAt)) &&
@@ -121,6 +151,9 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
         list(p.collaboratorIds) &&
         p.collaboratorIds.every((id) => userIds.has(id) && id !== p.primaryOwnerId) &&
         new Set(p.collaboratorIds).size === p.collaboratorIds.length &&
+        (p.approvedLaunchDate === undefined ||
+          p.approvedLaunchDate === null ||
+          date(p.approvedLaunchDate)) &&
         list(p.risks) &&
         stage(p.stage) &&
         status(p.simpleStatus) &&
@@ -203,9 +236,12 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
     return false
   return db.lifecycleEvents.every(
     (e) =>
-      ['project', 'demand', 'user'].includes(String(e.entityType)) &&
+      ['project', 'demand', 'user', 'proposal'].includes(String(e.entityType)) &&
       strings(e, ['entityId', 'reason']) &&
       [
+        'submit',
+        'accept',
+        'return',
         'plan',
         'complete',
         'cancel',

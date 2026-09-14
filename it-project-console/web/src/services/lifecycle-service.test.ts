@@ -1,3 +1,4 @@
+import { confirmProjectProposal } from './proposal-service'
 import { describe, expect, it } from 'vitest'
 import { actionDemand, actionProject } from './lifecycle-service'
 import { createProject, reviewDemand, saveDemand, updateProgress } from './workflow-service'
@@ -55,19 +56,40 @@ describe('项目生命周期', () => {
   it('验收完成自动完成项目但不归档，重开清除当前完成时间并保留历史', () => {
     const { snapshot, project } = projectFixture()
     snapshot.activeUserId = project.primaryOwnerId
-    for (const _stage of PROJECT_STAGES.slice(2)) updateProgress(snapshot, {
-      projectId: project.id, kind: 'overall', summary: '', status: 'completed', now
-    })
+    for (const _stage of PROJECT_STAGES.slice(2))
+      updateProgress(snapshot, {
+        projectId: project.id,
+        kind: 'overall',
+        summary: '',
+        status: 'completed',
+        now
+      })
     expect(project).toMatchObject({ status: 'completed', archived: false, actualCompletedAt: now })
-    expect(snapshot.database.lifecycleEvents[0]).toMatchObject({ action: 'complete', authorId: project.primaryOwnerId, createdAt: now })
-    expect(() => actionProject(snapshot, { projectId: project.id, action: 'complete' })).toThrow('自动完成')
+    expect(snapshot.database.lifecycleEvents[0]).toMatchObject({
+      action: 'complete',
+      authorId: project.primaryOwnerId,
+      createdAt: now
+    })
+    expect(() => actionProject(snapshot, { projectId: project.id, action: 'complete' })).toThrow(
+      '自动完成'
+    )
     snapshot.activeUserId = 'user-manager-chen'
     actionProject(snapshot, { projectId: project.id, action: 'reopen', now })
     expect(project.actualCompletedAt).toBeNull()
     const again = '2026-09-09T09:00:00+08:00'
-    updateProgress(snapshot, { projectId: project.id, kind: 'overall', summary: '', status: 'completed', now: again })
+    updateProgress(snapshot, {
+      projectId: project.id,
+      kind: 'overall',
+      summary: '',
+      status: 'completed',
+      now: again
+    })
     expect(project.actualCompletedAt).toBe(again)
-    expect(snapshot.database.lifecycleEvents.filter(e => e.entityId === project.id && e.action === 'complete')).toHaveLength(2)
+    expect(
+      snapshot.database.lifecycleEvents.filter(
+        (e) => e.entityId === project.id && e.action === 'complete'
+      )
+    ).toHaveLength(2)
   })
   it('取消必须填写原因；取消/归档只读，重开保留历史并恢复更新', () => {
     const { snapshot, project } = projectFixture()
@@ -113,11 +135,16 @@ describe('项目生命周期', () => {
     snapshot.activeUserId = 'user-business-li'
     const demand = saveDemand(snapshot, demandInput)
     snapshot.activeUserId = 'user-manager-chen'
-    const linked = reviewDemand(snapshot, {
+    const proposal = reviewDemand(snapshot, {
       demandId: demand.id,
       decision: 'establish',
       project: { ...projectInput, requestId: 'linked' }
-    }) as DemoProject
+    })
+    snapshot.activeUserId = projectInput.primaryOwnerId
+    const accepted = confirmProjectProposal(snapshot, proposal.id, 1, 'accept')
+    const linked = snapshot.database.projects.find(
+      (p) => p.id === accepted.projectId
+    ) as DemoProject
     linked.archived = true
     snapshot.activeUserId = linked.primaryOwnerId
     expect(() => actionProject(snapshot, { projectId: linked.id, action: 'delete' })).toThrow(

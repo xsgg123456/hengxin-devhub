@@ -1,3 +1,4 @@
+import { acceptProposal } from './review-helpers'
 import { expect, test } from '@playwright/test'
 import { card, date, identity, reset, row, select, snapshot, planProject } from './review-helpers'
 
@@ -26,8 +27,9 @@ test('领导评审从UI重置开始，四账号连续操作共享同一项目并
   await select(page, drawer, '主负责人', '王浩然')
   await select(page, drawer, '协作人员', '赵清越')
   await drawer.getByRole('combobox', { name: '协作人员', exact: true }).press('Escape')
-  await drawer.getByRole('button', { name: '通过并立项' }).click()
-  await expect(row(page, name)).toContainText('已立项')
+  await drawer.getByRole('button', { name: '提交工程师确认' }).click()
+  await expect(row(page, name)).toContainText('待工程师确认')
+  await acceptProposal(page, name)
   const project = (await snapshot(page)).database.projects.find((p) => p.demandId === demand.id)!
   await identity(page, '王浩然')
   await planProject(page, name)

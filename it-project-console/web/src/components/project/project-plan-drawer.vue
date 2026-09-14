@@ -36,9 +36,20 @@
           ></ElTableColumn>
         </ElTable>
         <ElDescriptions :column="2" border>
+          <ElDescriptionsItem label="审批确认上线日期" :span="2">{{
+            project.approvedLaunchDate || '未设置'
+          }}</ElDescriptionsItem>
           <ElDescriptionsItem label="计划上线">{{ milestone('上线部署') }}</ElDescriptionsItem>
           <ElDescriptionsItem label="计划交付">{{ milestone('验收交付') }}</ElDescriptionsItem>
         </ElDescriptions>
+        <ElAlert
+          v-if="overrun > 0"
+          class="mt-4"
+          type="warning"
+          :closable="false"
+          :title="`超出审批日期 ${overrun} 天`"
+          description="可继续保存计划，无需管理人员再次确认；审批确认日期保留作为对照基准。"
+        />
         <p class="mt-4 mb-5 text-sm text-g-600">上线和交付日期由对应环节的计划结束日期自动带出。</p>
         <template v-if="changed">
           <ElFormItem label="日期调整原因" required>
@@ -73,6 +84,7 @@
 </template>
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue'
+  import { approvedLaunchOverrun } from '@/utils/approved-launch'
   import { ElMessage } from 'element-plus'
   import {
     SCHEDULE_REASONS,
@@ -114,6 +126,9 @@
     plans.value.find((p) => p.stage === stage)?.endDate ||
     props.project?.stagePlans?.find((p) => p.stage === stage)?.endDate ||
     '—'
+  const overrun = computed(() =>
+    approvedLaunchOverrun(props.project?.approvedLaunchDate, milestone('上线部署'))
+  )
   watch(
     () => props.modelValue,
     (open) => {

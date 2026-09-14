@@ -7,7 +7,16 @@ export interface ResponsibilityTask {
   code?: string
   name: string
   reason: string
-  action: 'review' | 'supplement' | 'overall' | 'personal' | 'coordinate'
+  action:
+    | 'confirm'
+    | 'reassess'
+    | 'proposal'
+    | 'review'
+    | 'supplement'
+    | 'overall'
+    | 'personal'
+    | 'coordinate'
+  proposalId?: string
   projectId?: string
   demandId?: string
   severity: number
@@ -20,8 +29,28 @@ export function responsibilityTasks(
   now = new Date().toISOString()
 ): ResponsibilityTask[] {
   const tasks: ResponsibilityTask[] = []
+  for (const p of db.projectProposals ?? []) {
+    if (p.status === 'confirmed') continue
+    const confirm = user.id === p.primaryOwnerId && p.status === 'pending'
+    const manage = user.role === 'manager'
+    if (confirm || manage)
+      tasks.push({
+        id: p.id,
+        proposalId: p.id,
+        name: p.name,
+        reason:
+          p.status === 'returned' ? '工程师退回管理评估：' + p.reviewReason : '待主负责工程师确认',
+        action: confirm ? 'confirm' : p.status === 'returned' ? 'reassess' : 'proposal',
+        severity: 4,
+        days: 0
+      })
+  }
   for (const d of db.demands) {
-    if (user.role === 'manager' && d.status === 'pending') {
+    if (
+      user.role === 'manager' &&
+      d.status === 'pending' &&
+      !(db.projectProposals ?? []).some((p) => p.demandId === d.id && p.status === 'returned')
+    ) {
       tasks.push({
         id: d.id,
         demandId: d.id,
@@ -80,4 +109,34 @@ export function responsibilityTasks(
   return tasks.sort(
     (a, b) => a.severity - b.severity || b.days - a.days || a.id.localeCompare(b.id)
   )
+}
+
+export function filterPendingTasks(
+  tasks: ResponsibilityTask[],
+  db: PrototypeDatabase,
+  userId: string,
+  scope: string,
+  department: string
+) {
+  return tasks.filter((task) => {
+    if (task.proposalId) {
+      const p = db.projectProposals?.find((p) => p.id === task.proposalId)
+      if (!p) return false
+      const demand = db.demands.find((d) => d.id === p.demandId)
+      return (
+        (!department || p.department === department) &&
+        (scope !== 'mine' ||
+          (demand
+            ? demand.submitterId === userId
+            : p.primaryOwnerId === userId || p.createdBy === userId))
+      )
+    }
+    const demand =
+      task.action === 'review' ? db.demands.find((d) => d.id === task.demandId) : undefined
+    return (
+      !!demand &&
+      (!department || demand.department === department) &&
+      (scope !== 'mine' || demand.submitterId === userId)
+    )
+  })
 }

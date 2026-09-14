@@ -17,7 +17,7 @@
     <ElForm label-position="top" :disabled="saving">
       <ElFormItem label="处理结果" required>
         <ElRadioGroup v-model="decision">
-          <ElRadioButton value="establish">立项</ElRadioButton>
+          <ElRadioButton v-if="!excludeEstablish" value="establish">立项</ElRadioButton>
           <ElRadioButton value="return">退回补充</ElRadioButton>
           <ElRadioButton value="reject">不予立项</ElRadioButton>
         </ElRadioGroup>
@@ -37,7 +37,7 @@
       <ElButton :disabled="saving" @click="close">取消</ElButton>
       <ElButton type="primary" :loading="saving" :disabled="saving" @click="save">{{
         decision === 'establish'
-          ? '通过并立项'
+          ? '提交工程师确认'
           : decision === 'return'
             ? '确认退回补充'
             : '确认不予立项'
@@ -57,16 +57,19 @@
   import { ApiError } from '@/services/api-client'
   import { reviewLiveDemand, liveOperationKey } from '@/services/live-demand-service'
   import MaterialSummary from './material-summary.vue'
-  const props = defineProps<{ demand: DemoDemand }>()
+  const props = defineProps<{ demand: DemoDemand; excludeEstablish?: boolean }>()
   const emit = defineEmits<{ close: []; saved: [] }>()
   const store = usePrototypeStore()
   const operationKey = liveOperationKey()
-  const decision = ref<'establish' | 'return' | 'reject'>('establish')
+  const decision = ref<'establish' | 'return' | 'reject'>(
+    props.excludeEstablish ? 'return' : 'establish'
+  )
   const reason = ref('')
   const reasonError = ref('')
   const saving = ref(false)
   const failure = ref('')
   const project = ref<ProjectInput>({
+    approvedLaunchDate: props.demand.expectedLaunchDate,
     requestId: crypto.randomUUID(),
     name: props.demand.name,
     department: props.demand.department,
@@ -81,7 +84,9 @@
   const baseline = JSON.stringify(project.value)
   const dirty = computed(
     () =>
-      decision.value !== 'establish' || !!reason.value || JSON.stringify(project.value) !== baseline
+      decision.value !== (props.excludeEstablish ? 'return' : 'establish') ||
+      !!reason.value ||
+      JSON.stringify(project.value) !== baseline
   )
   watch(dirty, (value) => store.setDirty('demand-review', value))
   onBeforeUnmount(() => store.setDirty('demand-review', false))
@@ -144,7 +149,7 @@
       store.setDirty('demand-review', false)
       ElMessage.success(
         decision.value === 'establish'
-          ? '已立项，等待主负责人制定计划'
+          ? '已提交，等待主负责工程师接单'
           : decision.value === 'return'
             ? '已退回补充，提交人可以重新提交'
             : '已记录不予立项决定及原因'

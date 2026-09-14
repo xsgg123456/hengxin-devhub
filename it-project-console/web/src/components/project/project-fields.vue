@@ -39,7 +39,16 @@
         />
       </ElSelect>
     </ElFormItem>
-    <p class="text-sm text-g-600">立项后，由主负责人制定后续五个环节的计划。</p>
+    <ElFormItem label="审批确认上线日期" prop="approvedLaunchDate">
+      <ElDatePicker
+        v-model="model.approvedLaunchDate"
+        aria-label="审批确认上线日期"
+        type="date"
+        value-format="YYYY-MM-DD"
+        placeholder="选择审批确认上线日期"
+      />
+    </ElFormItem>
+    <p class="text-sm text-g-600">主负责人接单后，制定后续五个环节的计划。</p>
   </ElForm>
 </template>
 
@@ -57,7 +66,7 @@
   )
   const formRef = ref<FormInstance>()
   const rules: FormRules = Object.fromEntries(
-    ['name', 'department', 'primaryOwnerId', 'priority'].map((field) => [
+    ['name', 'department', 'primaryOwnerId', 'priority', 'approvedLaunchDate'].map((field) => [
       field,
       [{ required: true, message: '请填写此项', trigger: 'change' }]
     ])

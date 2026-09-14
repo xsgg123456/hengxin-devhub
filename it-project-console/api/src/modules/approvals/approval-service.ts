@@ -3,7 +3,7 @@ import type { Actor } from '../../plugins/auth.js'
 import { AppError } from '../../lib/errors.js'
 import { assertManager, command, lockedDemand } from '../../lib/business-command.js'
 import { reviewSchema } from '../projects/project-schemas.js'
-import { createProject } from '../projects/project-service.js'
+import { saveProposal, clearProposalNotifications, auditProposal } from '../projects/proposal-service.js'
 import { demandData } from '../demands/demand-materials.js'
 import { lifecycleEvent } from '../notifications/lifecycle-event-service.js'
 
@@ -13,6 +13,7 @@ export class ApprovalService {
     assertManager(actor)
     const input = reviewSchema.parse(body)
     return command(this.db, actor, input.requestId, { operation: 'review-demand', id, input }, async tx => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':notification-flush', 0))::text`
       const demand = await lockedDemand(tx, id, input.version)
       if (demand.status !== 'PENDING' || demand.project) throw new AppError(409, 'INVALID_STATE', '仅待评估需求可处理')
       const reviewedAt = new Date()
@@ -27,13 +28,16 @@ export class ApprovalService {
           prd: demand.prdAttachmentId ? { kind: 'file', attachmentId: demand.prdAttachmentId } : demand.prdUrl ? { kind: 'link', url: demand.prdUrl } : null,
           prototype: demand.prototypeAttachmentId ? { kind: 'file', attachmentId: demand.prototypeAttachmentId } : demand.prototypeUrl ? { kind: 'link', url: demand.prototypeUrl } : null
         })
-        const project = await createProject(tx, { ...input, name: demand.name, department: demand.department }, id)
+        const proposal = await saveProposal(tx, actor, { ...input, name: demand.name, department: demand.department }, id)
         const updated = await tx.demand.update({ where: { id }, data: {
-          status: 'APPROVED', reviewedAt, reviewedBy: actor.id, reviewReason: null, version: { increment: 1 }
+          status: 'AWAITING_ENGINEER', reviewedAt, reviewedBy: actor.id, reviewReason: null, version: { increment: 1 }
         } })
-        await lifecycleEvent(tx, { eventType: 'DEMAND_APPROVED', requestId: `${actor.id}:${input.requestId}`,
-          demandId: id, projectId: project.id, recipientIds: [demand.ownerId, input.primaryOwnerId, ...input.collaboratorIds] })
-        return { id, version: updated.version, projectId: project.id, status: updated.status }
+        return { id, version: updated.version, proposalId: proposal.id, status: updated.status }
+      }
+      for (const proposal of demand.proposals) {
+        await clearProposalNotifications(tx, proposal.id)
+        await auditProposal(tx, actor, proposal, 'delete', input.reason, proposal)
+        await tx.projectProposal.delete({ where: { id: proposal.id } })
       }
       const updated = await tx.demand.update({ where: { id }, data: {
         status: input.decision === 'return' ? 'RETURNED' : 'REJECTED', reviewReason: input.reason,

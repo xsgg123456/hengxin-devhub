@@ -37,7 +37,7 @@ test('业务点击待立项定位只读需求，需求双分布与趋势随表�
   await identity(page, '李思敏')
   await page.goto('/#/project-overview')
   await page.getByRole('button', { name: '待立项 1 个', exact: true }).click()
-  await expect(page).toHaveURL(/my-demands.*status=pending/)
+  await expect(page).toHaveURL(/my-demands.*status=pre_establishment/)
   await expect(page.locator('.el-table__body-wrapper .el-table__row')).toHaveCount(1)
   await expect(page.getByRole('button', { name: '评估', exact: true })).toHaveCount(0)
   await expect(page.locator('.quantity-row').filter({ hasText: '李思敏' })).toContainText('1 · 100%')

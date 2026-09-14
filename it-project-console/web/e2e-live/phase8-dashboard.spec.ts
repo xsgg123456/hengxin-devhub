@@ -46,11 +46,13 @@ test('真实看板筛选分页、三角色读取、甘特与需求统计、错�
   const [year, monthNumber] = month.split('-').map(Number)
   const monthEnd = new Date(Date.UTC(year, monthNumber, 0)).toISOString().slice(0, 10)
   const timings: number[] = []
+  const proposals: { id: string; version: number; index: number }[] = []
   for (let index = 0; index < 21; index++) {
     const start = Date.now()
     const response = await page.request.post('/api/projects', {
       headers,
       data: {
+        approvedLaunchDate: '2099-12-01',
         requestId: randomUUID(),
         name: `${prefix}-${index}`,
         department: '看板验收部',
@@ -61,7 +63,22 @@ test('真实看板筛选分页、三角色读取、甘特与需求统计、错�
     })
     expect(response.ok()).toBeTruthy()
     timings.push(Date.now() - start)
-    const project = (await response.json()).data
+    const proposal = (await response.json()).data
+    proposals.push({ id: proposal.proposalId ?? proposal.id, version: proposal.version, index })
+  }
+  await login(page, 'user-engineer-wang')
+  const projectIds = new Map<number, string>()
+  for (const proposal of proposals) {
+    const response = await page.request.post('/api/project-proposals/' + proposal.id + '/confirm', { headers, data: { requestId: randomUUID(), version: proposal.version, decision: 'accept' } })
+    expect(response.ok()).toBeTruthy()
+    projectIds.set(proposal.index, (await response.json()).data.projectId)
+  }
+  const workspaceResponse = await page.request.get('/api/workspace')
+  expect(workspaceResponse.ok()).toBeTruthy()
+  const workspace = (await workspaceResponse.json()).data as import('../src/domain/prototype').PrototypeSnapshot
+  for (let index = 0; index < 21; index++) {
+    const project = workspace.database.projects.find(p => p.id === projectIds.get(index))!
+    expect(project).toBeTruthy()
     const stages = ['方案设计', '开发编码', '联调测试', '上线部署', '验收交付']
     const planned = await page.request.post(`/api/projects/${project.id}/plan`, { headers, data: {
       requestId: randomUUID(), version: project.version,
@@ -72,6 +89,7 @@ test('真实看板筛选分页、三角色读取、甘特与需求统计、错�
     } })
     expect(planned.ok()).toBeTruthy()
   }
+  await login(page)
   await page.reload()
   const search = page.getByPlaceholder('项目名称、编号、负责人或部门')
   await search.fill(prefix)

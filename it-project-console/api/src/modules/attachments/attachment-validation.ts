@@ -31,9 +31,10 @@ export function assertActive(actor: AttachmentActor): void {
   if (!actor.active) throw new AppError(403, 'ACCOUNT_DISABLED', '账号已停用')
 }
 
-export function assertWritable(actor: AttachmentActor, demand: Demand): void {
+export function assertWritable(actor: AttachmentActor, demand: Demand & { proposals?: { status: string }[] }): void {
   assertActive(actor)
   if (demand.ownerId !== actor.id) throw new AppError(403, 'FORBIDDEN', '仅提交人可维护需求材料')
+  if (demand.proposals?.some(row => ['pending', 'returned'].includes(row.status))) throw new AppError(409, 'DEMAND_NOT_EDITABLE', '接单及管理重新评估期间不可修改材料')
   if (!['DRAFT', 'PENDING', 'RETURNED', 'WITHDRAWN'].includes(demand.status)) {
     throw new AppError(409, 'DEMAND_NOT_EDITABLE', '当前需求状态不可修改材料')
   }

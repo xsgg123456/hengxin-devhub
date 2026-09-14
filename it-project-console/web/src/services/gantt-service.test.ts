@@ -14,6 +14,21 @@ function project() {
   }
 }
 describe('月度甘特', () => {
+  it('P0优先于P1和P2，同级保持输入顺序且不改变源数组', () => {
+    const projects = [
+      { ...project(), id: 'low', priority: 'P2' as const },
+      { ...project(), id: 'high-first', priority: 'P0' as const },
+      { ...project(), id: 'middle', priority: 'P1' as const },
+      { ...project(), id: 'high-second', priority: 'P0' as const }
+    ]
+    expect(buildGanttRows(projects, '2026-09').map((row) => row.project.id)).toEqual([
+      'high-first',
+      'high-second',
+      'middle',
+      'low'
+    ])
+    expect(projects.map((p) => p.id)).toEqual(['low', 'high-first', 'middle', 'high-second'])
+  })
   it('上海立项日期与跨月累计进度裁剪，完成进度不重复铺满下月', () => {
     const [row] = buildGanttRows([project()], '2026-09', {}, [], now)
     expect(row.start).toBe('2026-08-21')

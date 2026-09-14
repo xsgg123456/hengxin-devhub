@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from '../../generated/prisma/client.js'
 import type { Actor } from '../../plugins/auth.js'
 import { command, lockedDemand } from '../../lib/business-command.js'
+import { clearProposalNotifications, auditProposal } from '../projects/proposal-service.js'
 import { AppError } from '../../lib/errors.js'
 import { lockedProject } from '../progress/progress-state.js'
 import { commandSchema } from './demand-schemas.js'
@@ -23,6 +24,11 @@ async function cancelNotification(tx: Prisma.TransactionClient, id: string) {
 async function deleteGroup(tx: Prisma.TransactionClient, actor: Actor, demandId: string | null,
   projectId: string | null, reason: string) {
   const references = [...(demandId ? [{ demandId }] : []), ...(projectId ? [{ projectId }] : [])]
+  const proposals = await tx.projectProposal.findMany({ where: { OR: references } })
+  for (const proposal of proposals) {
+    await clearProposalNotifications(tx, proposal.id)
+    await auditProposal(tx, actor, proposal, 'delete', reason, proposal)
+  }
   const notifications = await tx.notificationOutbox.findMany({ where: { OR: references }, include: { deliveryLog: true } })
   for (const row of notifications) {
     if (cancellable(row)) await cancelNotification(tx, row.id)

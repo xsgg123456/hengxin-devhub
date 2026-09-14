@@ -17,10 +17,13 @@ function call(path: string, body: Record<string, unknown>, user = owner) {
   return runtime.app.inject({ method: 'POST', url: path, payload: body, headers: { cookie: cookies[user], origin: env.WEB_ORIGIN } })
 }
 async function create() {
-  const response = await call('/api/projects', { requestId: key(), name: '排期集成项目', department: '财务部', priority: 'P1',
+  const response = await call('/api/projects', { requestId: key(), approvedLaunchDate: '2099-10-10', name: '排期集成项目', department: '财务部', priority: 'P1',
     primaryOwnerId: owner, collaboratorIds: [collab] }, manager)
   expect(response.statusCode, response.body).toBe(200)
-  return response.json<{ data: { id: string } }>().data.id
+  const proposalId = response.json<{ data: { id: string } }>().data.id
+  const accepted = await call(`/api/project-proposals/${proposalId}/confirm`, { requestId: key(), version: 1, decision: 'accept' })
+  expect(accepted.statusCode, accepted.body).toBe(200)
+  return accepted.json<{ data: { projectId: string } }>().data.projectId
 }
 const plans = () => PLAN_STAGES.map((stage, index) => ({ stage, startDate: `2099-10-${String(index * 2 + 1).padStart(2, '0')}`,
   endDate: `2099-10-${String(index * 2 + 3).padStart(2, '0')}` }))

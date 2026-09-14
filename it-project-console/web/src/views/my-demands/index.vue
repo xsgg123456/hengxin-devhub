@@ -136,7 +136,7 @@
           <ElTableColumn label="需求状态" min-width="100"
             ><template #default="{ row }"
               ><ElTag :type="demandStatusType(row.status)" effect="light" round>{{
-                demandStatusText(row.status)
+                demandStatusText(row.status, row.id)
               }}</ElTag></template
             ></ElTableColumn
           >
@@ -201,7 +201,7 @@
                 v-if="prototypeStore.currentUser.role === 'manager' && row.status === 'pending'"
                 link
                 type="primary"
-                @click="review = row"
+                @click="openReview(row)"
                 >评估</ElButton
               >
             </template>
@@ -258,6 +258,7 @@
     userName,
     canEdit,
     openEditor,
+    openReview,
     openProject,
     demandStatusLabel,
     demandStatusText,
