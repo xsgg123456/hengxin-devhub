@@ -166,7 +166,7 @@ test('真实看板筛选分页、三角色读取、甘特与需求统计、错�
   }
   await page.goto('/#/monthly-gantt')
   await select(page, '甘特部门', '看板验收部')
-  await expect(page.getByText('21 个项目', { exact: true })).toBeVisible()
+  await expect(page.getByText('正式项目 21 个 · 项目优化 0 项', { exact: true })).toBeVisible()
   const riskTrack = page.getByRole('button', { name: `查看${prefix}-0详情`, exact: true })
   await riskTrack.hover()
   await expect.poll(async () => {
@@ -179,7 +179,7 @@ test('真实看板筛选分页、三角色读取、甘特与需求统计、错�
   await expect(page.locator('.original-marker')).toHaveCount(1)
   await page.screenshot({ path: resolve('../output/phase8-gantt-risk-progress.png'), fullPage: true })
   await page.getByRole('button', { name: '下一月', exact: true }).click()
-  await expect(page.getByText('20 个项目', { exact: true })).toBeVisible()
+  await expect(page.getByText('正式项目 20 个 · 项目优化 0 项', { exact: true })).toBeVisible()
   for (const width of [1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 1000 })
     const frozen = page.locator('.project-cell').first()

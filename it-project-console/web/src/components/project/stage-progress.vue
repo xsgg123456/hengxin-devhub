@@ -1,28 +1,29 @@
 <template>
-  <div class="stage-progress" :aria-label="project.parentProjectId ? '优化交付' : '项目七阶段'">
+  <div class="stage-progress" :aria-label="project.parentProjectId ? '优化完成验收' : '项目七阶段'">
     <div class="stage-blocks" :style="project.parentProjectId ? { gridTemplateColumns: '1fr' } : undefined">
-      <ElTooltip v-for="item in stages" :key="item.stage" :content="stageExplanation(item).replace('验收交付', project.parentProjectId ? '优化交付' : '验收交付')">
+      <ElTooltip v-for="item in stages" :key="item.stage" :content="stageExplanation(item).replace('验收交付', project.parentProjectId ? '优化完成验收' : '验收交付')">
         <div
           class="stage-block"
           :class="item.state"
           tabindex="0"
-          :aria-label="stageExplanation(item).replace('验收交付', project.parentProjectId ? '优化交付' : '验收交付')"
+          :aria-label="stageExplanation(item).replace('验收交付', project.parentProjectId ? '优化完成验收' : '验收交付')"
         >
           <span class="stage-number">0{{ project.parentProjectId ? 1 : item.index + 1 }}</span>
-          <b>{{ project.parentProjectId ? '优化' : item.stage.slice(0, 2) }}<br />{{ project.parentProjectId ? '交付' : item.stage.slice(2) }}</b>
-          <small>{{ item.label }}</small>
+          <b>{{ project.parentProjectId ? '优化完成' : item.stage.slice(0, 2) }}<br />{{ project.parentProjectId ? '验收' : item.stage.slice(2) }}</b>
+          <small>{{ project.parentProjectId ? optimizationStatus(project, today) : item.label }}</small>
         </div>
       </ElTooltip>
     </div>
     <p v-if="lateStages.length" class="delay-note">
       <template v-for="(item, i) in lateStages" :key="item.stage">
-        {{ i ? '；' : '' }}{{ project.parentProjectId ? '优化交付' : item.stage }}{{ item.label }} {{ item.lateDays }} 天
+        {{ i ? '；' : '' }}{{ project.parentProjectId ? '优化完成验收' : item.stage }}{{ project.parentProjectId ? optimizationStatus(project, today) : item.label }} {{ item.lateDays }} 天
       </template>
     </p>
     <p v-else class="normal-note">蓝色：进行中　绿色：按时完成　红色：延期</p>
   </div>
 </template>
 <script setup lang="ts">
+  import { optimizationStatus } from '@/utils/optimization-display'
   import { computed } from 'vue'
   import type { DemoProject, DemoStageHistory } from '@/domain/prototype'
   import { stageExecutions, stageExplanation } from '@/services/stage-execution'

@@ -99,7 +99,7 @@ export function useProgressForm(
     if (stale.value) { error.value = stale.value; return }
     if (busy.value || !(await formRef.value?.validate().catch(() => false))) return
     if (overall.value && !props.correction && unplanned.value) {
-      error.value = '请先完整制定当前及后续环节计划'
+      error.value = props.project?.parentProjectId ? '请先制定优化完成验收计划' : '请先完整制定当前及后续环节计划'
       return
     }
     busy.value = true
@@ -139,7 +139,7 @@ export function useProgressForm(
         props.correction
           ? '管理纠正已保存'
           : overall.value
-            ? '项目整体进度已更新'
+            ? props.project?.parentProjectId ? '优化进度已更新' : '项目整体进度已更新'
             : '个人进展已保存'
       )
     } catch (cause) {

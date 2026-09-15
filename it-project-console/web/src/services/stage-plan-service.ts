@@ -34,18 +34,19 @@ export function validatePlans(project: DemoProject, input: PlanInput) {
     input.plans.length !== stages.length ||
     stages.some((stage, index) => input.plans[index]?.stage !== stage)
   )
-    throw new WorkflowError('请完整填写当前及后续环节计划，不得修改已完成环节')
+    throw new WorkflowError(project.parentProjectId ? '请完整填写优化完成验收计划' : '请完整填写当前及后续环节计划，不得修改已完成环节')
   let previous =
     project.stagePlans?.find(
       (p) => p.stage === PROJECT_STAGES[PROJECT_STAGES.indexOf(stages[0]) - 1]
     )?.endDate ?? ''
   for (const plan of input.plans) {
-    dateValue(plan.startDate, `${plan.stage}计划开始日期`)
-    dateValue(plan.endDate, `${plan.stage}计划结束日期`)
+    const label = project.parentProjectId ? '优化完成验收' : plan.stage
+    dateValue(plan.startDate, `${label}计划开始日期`)
+    dateValue(plan.endDate, `${label}计划结束日期`)
     if (plan.startDate > plan.endDate)
-      throw new WorkflowError(`${plan.stage}开始日期不得晚于结束日期`)
+      throw new WorkflowError(`${label}开始日期不得晚于结束日期`)
     if (previous && plan.startDate < previous)
-      throw new WorkflowError(`${plan.stage}不得早于前一环节结束日期`)
+      throw new WorkflowError(`${label}不得早于前一环节结束日期`)
     previous = plan.endDate
   }
   const changed = input.plans.some((plan) => {

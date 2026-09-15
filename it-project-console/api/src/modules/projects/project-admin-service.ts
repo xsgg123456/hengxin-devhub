@@ -11,7 +11,7 @@ export class ProjectAdminService {
   constructor(private readonly db: PrismaClient, private readonly onProjectChanged: ProjectChanged = unchanged) {}
   async action(actor: Actor, id: string, body: unknown) {
     const input = actionSchema.parse(body)
-    if (input.action === 'complete') invalid('请通过验收交付阶段更新完成项目')
+    if (input.action === 'complete') invalid('请提交完成验收，由指定业务负责人确认')
     if (input.action !== 'delete') assertManager(actor)
     return command(this.db, actor, input.requestId, { operation: 'project-action', id, input }, async tx => {
       await notificationLock(tx)
@@ -52,8 +52,8 @@ export class ProjectAdminService {
       const project = await lockedProject(tx, id, input.version)
       writable(project)
       if (project.acceptanceStatus === 'pending') invalid('待业务验收期间请先撤回验收再纠正阶段')
-      if (project.parentProjectId && input.stage !== '验收交付') invalid('优化项目只有优化交付节点')
-      if (project.parentProjectId) assertScheduled(project.stage, project.stagePlans)
+      if (project.parentProjectId && input.stage !== '验收交付') invalid('项目优化只有优化完成验收节点')
+      if (project.parentProjectId) assertScheduled(project.stage, project.stagePlans, !!project.parentProjectId)
       const index = STAGES.indexOf(input.stage), oldIndex = STAGES.indexOf(project.stage as typeof STAGES[number])
       if (index < 2) invalid('受理与立项由系统记录，不能纠正为工程执行阶段')
       if (index > oldIndex + 1) invalid('不得跳过固定阶段')

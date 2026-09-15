@@ -39,16 +39,16 @@
         />
       </ElSelect>
     </ElFormItem>
-    <ElFormItem label="审批确认上线日期" prop="approvedLaunchDate">
+    <ElFormItem :label="optimization ? '审批确认完成日期' : '审批确认上线日期'" prop="approvedLaunchDate">
       <ElDatePicker
         v-model="model.approvedLaunchDate"
-        aria-label="审批确认上线日期"
+        :aria-label="optimization ? '审批确认完成日期' : '审批确认上线日期'"
         type="date"
         value-format="YYYY-MM-DD"
-        placeholder="选择审批确认上线日期"
+        :placeholder="optimization ? '选择审批确认完成日期' : '选择审批确认上线日期'"
       />
     </ElFormItem>
-    <p class="text-sm text-g-600">主负责人接单后，制定后续五个环节的计划。</p>
+    <p class="text-sm text-g-600">{{ optimization ? '主负责人接单后，只安排一个“优化完成验收”节点，完成后提交业务验收。' : '主负责人接单后，制定后续五个环节的计划。' }}</p>
   </ElForm>
 </template>
 
@@ -59,7 +59,7 @@
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { isEngineerEligible } from '@/utils/engineer-eligibility'
   const model = defineModel<ProjectInput>({ required: true })
-  defineProps<{ hideIdentity?: boolean; disabled?: boolean }>()
+  defineProps<{ hideIdentity?: boolean; disabled?: boolean; optimization?: boolean }>()
   const store = usePrototypeStore()
   const engineers = computed(
     () => store.database?.users.filter((user) => isEngineerEligible(user)) ?? []

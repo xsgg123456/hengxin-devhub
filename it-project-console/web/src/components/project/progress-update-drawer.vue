@@ -2,7 +2,7 @@
   <ElDrawer
     :model-value="modelValue"
     :title="
-      correction ? '管理纠正' : acceptanceMode ? '业务验收' : overall ? '更新环节' : '填写协作进展'
+      correction ? '管理纠正' : acceptanceMode ? (project?.parentProjectId ? '优化完成验收' : '业务验收') : overall ? (project?.parentProjectId ? '更新优化进度' : '更新环节') : '填写协作进展'
     "
     size="min(760px, 95vw)"
     :before-close="closeDrawer"
@@ -15,7 +15,7 @@
         acceptanceMode
           ? '主负责人提交交付，指定业务负责人确认验收结果'
           : overall
-            ? '按既定计划更新当前环节的完成情况'
+            ? project.parentProjectId ? '按既定计划更新优化进度，完成后提交业务验收' : '按既定计划更新当前环节的完成情况'
             : '只记录自己的进展与阻塞，不修改项目整体进度'
       }}</p>
       <AcceptancePanel
@@ -38,9 +38,9 @@
               ><ElOption
                 v-for="stage in (project.parentProjectId ? ['验收交付'] : correctionStages)"
                 :key="stage"
-                :label="project.parentProjectId ? '优化交付' : stage"
+                :label="project.parentProjectId ? '优化完成验收' : stage"
                 :value="stage" /></ElSelect
-            ><ElInput v-else :model-value="project.parentProjectId ? '优化交付' : project.stage" readonly
+            ><ElInput v-else :model-value="project.parentProjectId ? '优化完成验收' : project.stage" readonly
           /></ElFormItem>
           <ElFormItem v-if="!correction" label="计划区间">
             <p>{{
@@ -58,7 +58,7 @@
           <ElAlert
             v-if="!correction && unplanned"
             class="mb-5"
-            title="请先制定当前及后续环节计划，再更新完成情况。"
+            :title="project.parentProjectId ? '请先制定优化完成验收计划，再更新完成情况。' : '请先制定当前及后续环节计划，再更新完成情况。'"
             type="warning"
             :closable="false"
           />

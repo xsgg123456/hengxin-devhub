@@ -1,8 +1,8 @@
 <template>
   <section class="optimization-section">
     <template v-if="project.parentProjectId">
-      <ElTag size="small">优化项目</ElTag>
-      <ElButton link type="primary" @click="openProject(project.parentProjectId)">返回原项目：{{ parent?.name || project.parentProjectId }}</ElButton>
+      <span class="text-xs text-g-500">所属原项目</span>
+      <ElButton link type="primary" @click="openProject(project.parentProjectId)">{{ parent?.name || '查看原项目' }}</ElButton>
     </template>
     <template v-else>
       <div class="section-heading">
@@ -11,7 +11,7 @@
       </div>
       <p v-if="!records.length" class="empty">暂无优化需求</p>
       <div v-for="row in records" :key="row.id" class="optimization-row">
-        <div><strong>{{ row.name || '未命名草稿' }}</strong><p>期望上线 {{ row.expectedLaunchDate || '未填写' }}</p></div>
+        <div><strong>{{ row.name || '未命名草稿' }}</strong><p>期望完成 {{ row.expectedLaunchDate || '未填写' }}</p></div>
         <ElTag>{{ linkedProject(row.id) ? optimizationStatus(linkedProject(row.id)!) : demandLabels[row.status] }}</ElTag>
         <ElButton link type="primary" @click="inspect(row)">查看</ElButton>
       </div>
@@ -31,7 +31,7 @@ const store = usePrototypeStore(), router = useRouter(), editing = ref(false)
 const records = computed(() => store.visibleDemands.filter(d => d.parentProjectId === props.project.id))
 const parent = computed(() => store.visibleProjects.find(p => p.id === props.project.parentProjectId))
 const linkedProject = (id: string) => store.visibleProjects.find(p => p.demandId === id)
-const demandLabels = { draft: '草稿', pending: '待评估', returned: '退回补充', rejected: '不予立项', established: '已立项', withdrawn: '已撤回', awaiting_engineer: '待工程师接单' }
+const demandLabels = { draft: '草稿', pending: '待优化审批', returned: '退回补充', rejected: '未通过', established: '优化已批准', withdrawn: '已撤回', awaiting_engineer: '待工程师接单' }
 function openProject(id: string) { void router.push({ path: '/project-overview', query: { projectId: id } }) }
 function inspect(row: DemoDemand) {
   const project = linkedProject(row.id)

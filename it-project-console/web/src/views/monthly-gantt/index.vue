@@ -11,9 +11,9 @@
           <h3 class="text-base font-medium">{{ month }} 甘特图</h3>
           <ElButton aria-label="下一月" @click="month = shiftMonth(month, 1)">下一月</ElButton>
           <ElButton @click="month = today.slice(0, 7)">返回本月</ElButton>
-          <span class="text-sm text-g-500">{{ rows.length }} 个项目</span>
+          <span class="text-sm text-g-500">正式项目 {{ rows.filter(r => !r.project.parentProjectId).length }} 个 · 项目优化 {{ rows.filter(r => r.project.parentProjectId).length }} 项</span>
         </div>
-        <ElForm inline label-position="top">
+        <ElForm inline label-position="top"><ElFormItem label="项目类型"><ElSelect v-model="projectType" aria-label="甘特项目类型" style="width:150px"><ElOption label="全部类型" value="all" /><ElOption label="正式项目" value="formal" /><ElOption label="项目优化" value="optimization" /></ElSelect></ElFormItem>
           <ElFormItem label="部门"
             ><ElSelect
               v-model="department"
@@ -119,6 +119,7 @@
   const department = ref('')
   const ownerId = ref('')
   const risk = ref('all')
+  const projectType = ref('all')
   const includeArchived = ref(false)
   const updateId = ref('')
   const updateOpen = ref(false)
@@ -144,13 +145,14 @@
   )
   const { data, loading, error, retry } = useLiveQuery<GanttRow[]>('/gantt', () => ({
     month: month.value,
+    projectType: projectType.value === 'formal' ? 'normal' : projectType.value === 'optimization' ? 'optimization' : undefined,
     department: department.value,
     ownerId: ownerId.value,
     risk: risk.value,
     includeArchived: includeArchived.value
   }))
   const rows = computed(() =>
-    runtimeConfig.isPrototype ? prototypeRows.value : (data.value ?? [])
+    (runtimeConfig.isPrototype ? prototypeRows.value : (data.value ?? [])).filter(row => projectType.value === 'all' || (projectType.value === 'optimization') === !!row.project.parentProjectId)
   )
   const detailOpen = computed(() => typeof route.query.projectId === 'string')
   const selected = computed(
@@ -174,6 +176,7 @@
   }
   function clearFilters(): void {
     department.value = ''
+    projectType.value = 'all'
     ownerId.value = ''
     risk.value = 'all'
     includeArchived.value = false

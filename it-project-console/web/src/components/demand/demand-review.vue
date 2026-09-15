@@ -1,7 +1,7 @@
 <template>
   <ElDrawer
     :model-value="true"
-    :title="`需求评估 · ${demand.name}`"
+    :title="`${demand.parentProjectId ? '优化审批' : '立项审批'} · ${demand.name}`"
     size="760px"
     :before-close="close"
     append-to-body
@@ -10,18 +10,18 @@
     <ElAlert v-if="failure" :title="failure" type="error" :closable="false" class="mb-5" />
     <PrototypeSaveRecovery v-if="failure && runtimeConfig.isPrototype" />
     <p class="mb-2 text-g-500"
-      >{{ demand.department }} · 期望上线 {{ demand.expectedLaunchDate }}</p
+      >{{ demand.department }} · {{ demand.parentProjectId ? '期望完成' : '期望上线' }} {{ demand.expectedLaunchDate }}</p
     >
     <p class="mb-5 whitespace-pre-wrap break-all">{{ demand.description }}</p>
     <p v-if="demand.parentProjectId" class="mb-5 whitespace-pre-wrap">期望效果 / 验收标准：{{ demand.optimizationOutcome }}</p>
-    <MaterialSummary :demand="demand" />
+    <ElTag :type="demand.parentProjectId ? 'warning' : 'primary'" class="mb-3">{{ demand.parentProjectId ? '项目优化' : '正式项目' }}</ElTag><p v-if="demand.parentProjectId" class="mb-4 text-sm">所属原项目：<ElButton link type="primary" @click="router.push({ path: '/project-overview', query: { projectId: demand.parentProjectId! } })">{{ store.visibleProjects.find(p => p.id === demand.parentProjectId)?.name || '查看原项目' }}</ElButton></p><MaterialSummary :demand="demand" />
     <ElDivider />
     <ElForm label-position="top" :disabled="saving">
       <ElFormItem label="处理结果" required>
         <ElRadioGroup v-model="decision">
-          <ElRadioButton v-if="!excludeEstablish" value="establish">立项</ElRadioButton>
+          <ElRadioButton v-if="!excludeEstablish" value="establish">{{ demand.parentProjectId ? '批准优化' : '批准立项' }}</ElRadioButton>
           <ElRadioButton value="return">退回补充</ElRadioButton>
-          <ElRadioButton value="reject">不予立项</ElRadioButton>
+          <ElRadioButton value="reject">{{ demand.parentProjectId ? '不予通过' : '不予立项' }}</ElRadioButton>
         </ElRadioGroup>
       </ElFormItem>
       <ElFormItem v-if="decision !== 'establish'" label="处理原因" required :error="reasonError">
@@ -29,6 +29,7 @@
       </ElFormItem>
     </ElForm>
     <ProjectFields
+      :optimization="!!demand.parentProjectId"
       hide-identity
       v-if="decision === 'establish'"
       ref="projectFields"
@@ -42,7 +43,7 @@
           ? '提交工程师确认'
           : decision === 'return'
             ? '确认退回补充'
-            : '确认不予立项'
+            : demand.parentProjectId ? '确认不予通过' : '确认不予立项'
       }}</ElButton>
     </template>
   </ElDrawer>
@@ -55,6 +56,7 @@
   import { ElMessage, ElMessageBox } from 'element-plus'
   import type { DemoDemand } from '@/domain/prototype'
   import { reviewDemand, type ProjectInput } from '@/services/workflow-service'
+  import { useRouter } from 'vue-router'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { useRecordStaleness } from '@/hooks/business/use-record-staleness'
   import ProjectFields from '@/components/project/project-fields.vue'
@@ -64,6 +66,7 @@
   const props = defineProps<{ demand: DemoDemand; excludeEstablish?: boolean }>()
   const emit = defineEmits<{ close: []; saved: [] }>()
   const store = usePrototypeStore()
+  const router = useRouter()
   const baselineVersion = props.demand.version
   const stale = useRecordStaleness('demand', () => props.demand.id, () => baselineVersion)
   const operationKey = liveOperationKey()
@@ -156,10 +159,10 @@
       store.setDirty('demand-review', false)
       ElMessage.success(
         decision.value === 'establish'
-          ? '已提交，等待主负责工程师接单'
+          ? props.demand.parentProjectId ? '优化审批通过，等待主负责工程师接单' : '立项审批通过，等待主负责工程师接单'
           : decision.value === 'return'
             ? '已退回补充，提交人可以重新提交'
-            : '已记录不予立项决定及原因'
+            : props.demand.parentProjectId ? '已记录优化不予通过决定及原因' : '已记录不予立项决定及原因'
       )
       emit('saved')
     } catch (cause) {

@@ -12,8 +12,8 @@
       :title="
         (proposal?.demandId ? '来源：业务需求。' : '来源：直接创建。') +
         (proposal?.status === 'confirmed'
-          ? '已接单并正式立项。'
-          : '等待指定主负责工程师接单，接单后正式立项。')
+          ? isOptimization ? '优化已接单，请制定优化计划。' : '已接单并正式立项。'
+          : isOptimization ? '等待指定主负责工程师接单，接单后制定优化计划。' : '等待指定主负责工程师接单，接单后正式立项。')
       "
       type="info"
       :closable="false"
@@ -26,10 +26,11 @@
       :closable="false"
     />
     <p v-if="demand" class="mb-4 whitespace-pre-wrap"
-      >业务期望上线：{{ demand.expectedLaunchDate }}<br />{{ demand.description }}</p
+      >{{ isOptimization ? '业务期望完成' : '业务期望上线' }}：{{ demand.expectedLaunchDate }}<br />{{ demand.description }}</p
     >
+    <p v-if="demand?.parentProjectId" class="mb-4"><ElTag type="warning">项目优化</ElTag> 所属原项目：<ElButton link type="primary" @click="router.push({ path: '/project-overview', query: { projectId: demand.parentProjectId } })">{{ store.visibleProjects.find(p => p.id === demand!.parentProjectId)?.name || '查看原项目' }}</ElButton></p>
     <MaterialSummary v-if="demand" :demand="demand" />
-    <ProjectFields ref="fields" v-model="form" :disabled="busy || !canApproveProjects(store.currentUser) || (!!proposal && !canReassess)" />
+    <ProjectFields :optimization="isOptimization" ref="fields" v-model="form" :disabled="busy || !canApproveProjects(store.currentUser) || (!!proposal && !canReassess)" />
     <ElForm v-if="canConfirm" label-position="top"
       ><ElFormItem label="退回评估原因（退回时必填）"
         ><ElInput v-model="reason" type="textarea" :rows="3" maxlength="300" /></ElFormItem
@@ -47,7 +48,7 @@
     <ElAlert v-if="error" :title="error" type="error" :closable="false" show-icon role="alert" />
     <PrototypeSaveRecovery v-if="error && runtimeConfig.isPrototype" />
     <ElButton v-if="canReassess && demand" class="mt-5" @click="reviewOpen = true"
-      >退回业务补充 / 不予立项</ElButton
+      >{{ isOptimization ? '退回业务补充 / 不予通过' : '退回业务补充 / 不予立项' }}</ElButton
     >
     <DemandReview
       v-if="reviewOpen && demand"
@@ -64,7 +65,7 @@
         >退回管理评估</ElButton
       >
       <ElButton v-if="canConfirm" type="primary" :loading="busy" @click="confirm('accept')"
-        >确认接单并立项</ElButton
+        >{{ isOptimization ? '确认接单优化' : '确认接单并立项' }}</ElButton
       >
       <ElButton v-if="(!proposal && canApproveProjects(store.currentUser)) || canReassess" type="primary" :loading="busy" @click="save"
         >提交工程师确认</ElButton
@@ -118,6 +119,7 @@
     () => props.proposal?.status === 'returned' && canApproveProjects(store.currentUser)
   )
   const demand = computed(() => store.visibleDemands.find((d) => d.id === props.proposal?.demandId))
+  const isOptimization = computed(() => !!demand.value?.parentProjectId)
   const emptyForm = (): ProjectInput => ({
     approvedLaunchDate: '',
     requestId: crypto.randomUUID(),
@@ -234,7 +236,7 @@
       initial.value = JSON.stringify(form.value)
       emit('update:modelValue', false)
       ElMessage.success(
-        decision === 'accept' ? '已接单并正式立项，请制定计划' : '已退回管理人员重新评估'
+        decision === 'accept' ? isOptimization.value ? '优化已接单，请制定优化计划' : '已接单并正式立项，请制定计划' : '已退回管理人员重新评估'
       )
       if (projectId) void router.push({ path: '/project-overview', query: { projectId } })
     } catch (cause) {

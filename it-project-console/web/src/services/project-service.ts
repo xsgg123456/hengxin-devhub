@@ -78,7 +78,7 @@ export function createFormalProject(
   backfillProjectCodes(snapshot.database)
   const project: DemoProject = {
     approvedLaunchDate: input.approvedLaunchDate,
-    code: nextProjectCode(snapshot.database, now),
+    code: nextProjectCode(snapshot.database, now, !!parentProjectId),
     id: nextId(
       'P',
       snapshot.database.projects,

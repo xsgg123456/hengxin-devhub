@@ -40,6 +40,8 @@ export function defaultStagePlans(
   })
   return {
     plans,
-    notice: `${review ? `根据立项评审完成日 ${anchor}` : `历史立项评审完成日缺失，暂以今天 ${anchor} 为基准`}，从下一工作日开始，每环节预填3个工作日（跳过周末）。可修改，保存后生效。`
+    notice: project.parentProjectId
+      ? `根据${review ? '优化审批记录' : '今天'} ${anchor}，从下一工作日开始，优化完成验收预填3个工作日（跳过周末）。可修改，保存后生效。`
+      : `${review ? `根据立项评审完成日 ${anchor}` : `历史立项评审完成日缺失，暂以今天 ${anchor} 为基准`}，从下一工作日开始，每环节预填3个工作日（跳过周末）。可修改，保存后生效。`
   }
 }

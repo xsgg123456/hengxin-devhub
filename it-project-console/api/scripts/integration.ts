@@ -11,6 +11,7 @@ await isolatedIntegration(async ({ run }) => {
     'src/modules/demands/deletion.integration.test.ts',
     'src/modules/progress/progress.integration.test.ts',
     'src/modules/projects/project-code.integration.test.ts',
+    'src/modules/projects/optimization-code.integration.test.ts',
     'src/modules/projects/proposal.integration.test.ts',
     'src/modules/projects/acceptance.integration.test.ts',
     'src/modules/risks/risks.integration.test.ts',

@@ -78,7 +78,7 @@ test('真实多格式多文件失败重试→提交→跨角色立项→刷新�
   await page.screenshot({ path: resolve('../output/phase6-live-submit.png'), fullPage: true })
   await drawer.getByRole('button', { name: '提交评估' }).click()
   await expect(drawer).not.toBeVisible()
-  await expect(row(page, name)).toContainText('待评估')
+  await expect(row(page, name)).toContainText('待立项审批')
   const createdWorkspace = await (await page.request.get('/api/workspace')).json()
   const createdDemand = createdWorkspace.data.database.demands.find(
     (item: { name: string }) => item.name === name
@@ -96,12 +96,12 @@ test('真实多格式多文件失败重试→提交→跨角色立项→刷新�
   await expect(demandDetail).toContainText(createdDemand.code)
   await demandDetail.screenshot({ path: resolve('../output/demand-code-live-detail.png') })
   await demandDetail.getByRole('button', { name: '关闭', exact: true }).click()
-  await expect(row(page, name).getByRole('button', { name: '评估', exact: true })).toHaveCount(0)
+  await expect(row(page, name).getByRole('button', { name: '立项审批', exact: true })).toHaveCount(0)
   await switchUser(page, '陈立峰')
   await expect(page).toHaveURL(/#\/project-overview$/)
   await page.goto('/#/my-demands')
-  await row(page, name).getByRole('button', { name: '评估', exact: true }).click()
-  drawer = page.getByRole('dialog', { name: `需求评估 · ${name}` })
+  await row(page, name).getByRole('button', { name: '立项审批', exact: true }).click()
+  drawer = page.getByRole('dialog', { name: `立项审批 · ${name}` })
   await expect(drawer.getByText('需求.pdf', { exact: false }).first()).toBeVisible()
   await drawer
     .locator('.el-select')

@@ -158,7 +158,15 @@ model ProjectCodeCounter {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
   @@map("project_code_counters")
 }
+model OptimizationCodeCounter {
+  year Int @id
+  lastValue BigInt @map("last_value")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@map("optimization_code_counters")
+}
 model Project {
+  legacyCode String? @unique @map("legacy_code")
   parentProjectId String? @map("parent_project_id")
   parentProject Project? @relation("OptimizationProjects", fields: [parentProjectId], references: [id], onDelete: Restrict)
   optimizationProjects Project[] @relation("OptimizationProjects")

@@ -17,7 +17,7 @@ export class ProjectPlanService {
       if (project.acceptanceStatus === 'pending') invalid('待验收期间请先撤回验收再调整排期')
       const required = remainingStages(project.stage), old = readStagePlans(project.stagePlans)
       if (input.plans.length !== required.length || input.plans.some((plan, index) => plan.stage !== required[index]))
-        invalid('须按顺序一次提交当前和全部后续阶段；已完成阶段不可改写')
+        invalid(project.parentProjectId ? '请提交优化完成验收节点的排期' : '须按顺序一次提交当前和全部后续阶段；已完成阶段不可改写')
       const changes: { stage: string; field: 'startDate' | 'endDate'; oldValue: string; newValue: string }[] = []
       const updated = input.plans.map(plan => {
         const previous = old.find(item => item.stage === plan.stage)

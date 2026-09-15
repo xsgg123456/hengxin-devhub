@@ -3,7 +3,7 @@
     ><h4 class="font-medium mb-4">状态与管理历史</h4>
     <p v-if="!events.length" class="text-sm text-g-600">暂无状态与管理操作</p>
     <div v-for="event in events" :key="event.id" class="history-row">
-      <p>{{ actionLabel(event) }} · {{ event.reason || '—' }}</p>
+      <p>{{ typeText(actionLabel(event)) }} · {{ event.reason || '—' }}</p>
       <p v-if="event.before || event.after" class="mt-1"
         >{{ describe(event.before, event.after, event.entityType) }} → {{ describe(event.after, event.before, event.entityType) }}</p
       >
@@ -23,6 +23,14 @@
   import type { DemoLifecycleEvent } from '@/domain/prototype'
   const props = defineProps<{ projectId?: string; proposalId?: string; demandId?: string }>()
   const store = usePrototypeStore()
+  const optimization = computed(() => {
+    const db = store.database
+    const proposal = db?.projectProposals?.find(p => p.id === props.proposalId)
+    return Boolean(db?.projects.find(p => p.id === props.projectId)?.parentProjectId || db?.demands.find(d => d.id === (props.demandId || proposal?.demandId))?.parentProjectId)
+  })
+  const typeText = (value: unknown) => optimization.value && typeof value === 'string'
+    ? value.replaceAll('不予立项', '优化不予通过').replaceAll('已接单立项', '优化已接单').replaceAll('已立项', '优化已批准').replaceAll('未立项', '未批准优化').replaceAll('验收交付', '优化完成验收').replaceAll('上线', '完成').replaceAll('保存项目计划', '保存优化计划').replaceAll('完成项目', '完成优化').replaceAll('取消项目', '取消优化').replaceAll('归档项目', '归档优化')
+    : value
   const actions: Record<DemoLifecycleEvent['action'], string> = {
     submit: '提交工程师确认',
     resubmit: '重新提交需求',
@@ -110,7 +118,8 @@
       return project ? projectCode(project) : value ? '关联项目已删除' : '未立项'
     }
     if (key === 'stage') return stageLabel(value)
-    if (key === 'stagePlans' && Array.isArray(value)) return value.map(plan => `${stageLabel(plan?.stage)}：${plan?.startDate || '—'} 至 ${plan?.endDate || '—'}`).join('；') || '未填写'
+    if (key === 'stagePlans' && typeof value === 'string') return optimization.value ? value.replaceAll('验收交付', '优化完成验收') : value
+    if (key === 'stagePlans' && Array.isArray(value)) return value.map(plan => `${typeText(stageLabel(plan?.stage))}：${plan?.startDate || '—'} 至 ${plan?.endDate || '—'}`).join('；') || '未填写'
     if (value === '' || value == null) return '未填写'
     if (['status', 'simpleStatus', 'archived', 'deleted', 'migrationVerified'].includes(key))
       return values[String(value)] ?? values[String(value).toLowerCase()] ?? '未知状态'
@@ -131,7 +140,7 @@
     const previous = fields(other)
     return Object.entries(fields(data))
       .filter(([key, value]) => labels[key] && JSON.stringify(value) !== JSON.stringify(previous[key]))
-      .map(([key, value]) => `${labels[key]}：${displayValue(key, value, entityType)}`)
+      .map(([key, value]) => `${typeText(labels[key])}：${['status', 'simpleStatus', 'stage', 'projectId'].includes(key) ? typeText(displayValue(key, value, entityType)) : displayValue(key, value, entityType)}`)
       .join(' · ') || '无字段变更'
   }
   const events = computed(

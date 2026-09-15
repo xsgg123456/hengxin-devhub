@@ -37,11 +37,11 @@ export class AcceptanceService {
             throw new AppError(403, 'FORBIDDEN', '仅指定业务验收人可通过或退回')
           await validAcceptanceOwner(tx, project.acceptanceOwnerId)
         }
-        if (project.stage !== '验收交付') invalid('仅验收交付阶段可操作验收')
+        if (project.stage !== '验收交付') invalid(project.parentProjectId ? '请在优化完成验收节点操作验收' : '仅验收交付阶段可操作验收')
         if (action === 'submit') {
           if (project.acceptanceStatus === 'pending') invalid('已提交验收，请等待业务确认或撤回')
           await validAcceptanceOwner(tx, project.acceptanceOwnerId)
-          assertScheduled(project.stage, project.stagePlans)
+          assertScheduled(project.stage, project.stagePlans, !!project.parentProjectId)
         } else if (project.acceptanceStatus !== 'pending') invalid('当前没有待业务验收的提交')
       }
       const round = project.acceptanceRound + (action === 'submit' ? 1 : 0)
@@ -58,7 +58,7 @@ export class AcceptanceService {
         acceptanceStatus: action === 'return' ? 'returned' : 'none', simpleStatus: 'in-progress', lastOverallUpdatedAt: now
       })
       if (action === 'accept') {
-        const plan = assertScheduled(project.stage, project.stagePlans).find(row => row.stage === project.stage)!
+        const plan = assertScheduled(project.stage, project.stagePlans, !!project.parentProjectId).find(row => row.stage === project.stage)!
         await finishAcceptanceStage(tx, project, now, plan)
         Object.assign(data, { acceptanceStatus: 'accepted', status: 'COMPLETED', simpleStatus: 'completed', actualCompletedAt: now })
       }

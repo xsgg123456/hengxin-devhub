@@ -33,8 +33,8 @@
                 /></svg
               >P0 · 重点项目</span
             ></div
-          ><strong>{{ row.project.name }}</strong>
-          <small>{{ teamSummary(row.project) }} · {{ row.project.stage }}</small>
+          ><ElTag size="small" :type="row.project.parentProjectId ? 'warning' : 'primary'">{{ row.project.parentProjectId ? '项目优化' : '正式项目' }}</ElTag><strong>{{ row.project.name }}</strong><small>{{ projectCode(row.project) }}</small><small v-if="row.project.parentProjectId">所属：{{ store.visibleProjects.find(p => p.id === row.project.parentProjectId)?.name || '原项目' }}</small>
+          <small>{{ teamSummary(row.project) }} · {{ row.project.parentProjectId ? '优化完成验收' : row.project.stage }}</small>
           <small :class="{ 'risk-text': row.risks.length }">{{
             row.risks.join('；') || statusText(row)
           }}</small>
@@ -69,13 +69,13 @@
               ...barStyle(segment.left, segment.width),
               top: `${43 + segment.lane * 29}px`
             }"
-            :aria-label="stageExplanation(segment).replace('验收交付', row.project.parentProjectId ? '优化交付' : '验收交付')"
+            :aria-label="stageExplanation(segment).replace('验收交付', row.project.parentProjectId ? '优化完成验收' : '验收交付')"
             @mousemove.stop="showTip($event, row, segment)"
             @focus="showFocus($event, row, segment)"
             @blur="hideTip"
             @click="emit('detail', row.project.id)"
           >
-            {{ row.project.parentProjectId ? '优化交付' : segment.width < 1.6 ? segment.stage.slice(2) : segment.stage }}
+            {{ row.project.parentProjectId ? '优化完成验收' : segment.width < 1.6 ? segment.stage.slice(2) : segment.stage }}
           </button>
           <span class="progress-label"
             >{{
@@ -117,13 +117,13 @@
   >
     <template #content>
       <div v-if="tip" class="gantt-tip">
-        <strong>{{ tip.row.project.name }}</strong>
+        <strong>{{ tip.row.project.parentProjectId ? '项目优化' : '正式项目' }} · {{ tip.row.project.name }}</strong><p v-if="tip.row.project.parentProjectId">所属原项目：{{ store.visibleProjects.find(p => p.id === tip!.row.project.parentProjectId)?.name || '原项目' }}</p>
         <p>{{ projectCode(tip.row.project) }} · {{ tip.row.project.priority }}</p>
         <template v-if="tip.segment">
           <p
-            ><b>{{ tip.row.project.parentProjectId ? '优化交付' : tip.segment.stage }}</b> ·
+            ><b>{{ tip.row.project.parentProjectId ? '优化完成验收' : tip.segment.stage }}</b> ·
             <span :class="{ 'risk-text': tip.segment.lateDays }"
-              >{{ tip.segment.label
+              >{{ tip.row.project.parentProjectId ? optimizationStatus(tip.row.project, today) : tip.segment.label
               }}{{ tip.segment.lateDays ? ` ${tip.segment.lateDays} 天` : '' }}</span
             ></p
           >
@@ -137,7 +137,7 @@
           >
         </template>
         <template v-else>
-          <p>当前环节：{{ tip.row.project.stage }} · {{ statusText(tip.row) }}</p>
+          <p>当前环节：{{ tip.row.project.parentProjectId ? '优化完成验收' : tip.row.project.stage }} · {{ statusText(tip.row) }}</p>
           <p>整体计划：{{ tip.row.start }} → {{ tip.row.project.expectedDeliveryDate }}</p>
           <p>原计划交付：{{ tip.row.project.originalDeliveryDate || '—' }}</p>
           <p>已完成环节：{{ completedNames(tip.row.project) }}</p>
@@ -159,11 +159,14 @@
   >
 </template>
 <script setup lang="ts">
+  import { usePrototypeStore } from '@/store/modules/prototype'
+  const store = usePrototypeStore()
   import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
   import type { DemoProject, DemoStageHistory, DemoUser } from '@/domain/prototype'
   import { monthDays, type GanttRow } from '@/services/gantt-service'
   import { ganttStageSegments, type GanttSegment } from '@/services/gantt-stage-segments'
   import { stageExecutions, stageExplanation } from '@/services/stage-execution'
+  import { optimizationStatus, projectStageLabel } from '@/utils/optimization-display'
   import { projectCode } from '@/utils/project-code'
   import { displayTime } from '@/utils/project-display'
   const props = defineProps<{
@@ -178,7 +181,7 @@
   const displayRows = computed(() =>
     props.rows.map((row) => {
       const segments = ganttStageSegments(row.project, props.histories, props.month, props.today)
-      return { ...row, segments, height: 108 + Math.max(0, ...segments.map((s) => s.lane)) * 29 }
+      return { ...row, segments, height: (row.project.parentProjectId ? 158 : 128) + Math.max(0, ...segments.map((s) => s.lane)) * 29 }
     })
   )
   const todayIndex = computed(() =>
@@ -199,7 +202,7 @@
     width: `${(width / days.value) * 100}%`
   })
   const statusText = (row: GanttRow) =>
-    row.project.status === 'completed'
+    row.project.parentProjectId ? optimizationStatus(row.project, props.today) : row.project.status === 'completed'
       ? '已完成'
       : row.project.status === 'cancelled'
         ? '已取消'
@@ -213,7 +216,7 @@
   const completedNames = (project: DemoProject) =>
     stageExecutions(project, props.histories, props.today)
       .filter((s) => s.completed)
-      .map((s) => s.stage)
+      .map((s) => projectStageLabel(project, s.stage))
       .join('、') || '暂无可靠完成记录'
   const tip = shallowRef<{ row: GanttRow; segment?: GanttSegment } | null>(null)
   const cursor = shallowRef(new DOMRect())

@@ -809,3 +809,6 @@ D. 联动与验收：复用既有项目人员、待办、负载与通知分发�
 执行 [本轮四步计划](it-project-console/docs/LIVE-SYNC-CHINESE-ITERATION.md)，保留现有前端交互，隔离测试后独立审查，本轮不自动发布。
 
 中文提示与同步已完成实现：复用原表单/抽屉和查询，补中文校验与历史映射，事务版本+SSE及30秒兜底，冻结编辑版本并保留输入。验证详情见 [本轮验收记录](it-project-console/docs/LIVE-SYNC-CHINESE-VERIFICATION.md)。
+
+## 管理待办与类型区分整改
+已确认，执行 [TASK-TYPE-ITERATION.md](it-project-console/docs/TASK-TYPE-ITERATION.md) A/B/C 顺序和验证；原位复用已确认预览，保留既有权限和实时同步。

@@ -32,6 +32,7 @@ async function source(recipientId: string, projectId: string, at: Date) {
 }
 afterAll(async () => {
   await db.notificationOutbox.deleteMany({ where: { recipientId: { in: users } } })
+  await db.project.deleteMany({ where: { primaryOwnerId: { in: users }, parentProjectId: { not: null } } })
   await db.project.deleteMany({ where: { primaryOwnerId: { in: users } } })
   await db.user.deleteMany({ where: { id: { in: users } } })
   await db.systemSetting.deleteMany({ where: { key: { in: [...new Set(days)].map(day => `manager-risk-digest:${day}`) } } })
@@ -44,7 +45,7 @@ afterAll(async () => {
 it('管理人员按工作日合并变化项目并隔离收件人，工程师实时发送，原事件原子消费且并发不重复', async () => {
   const manager = await user('MANAGER'), otherManager = await user('MANAGER'), engineer = await user('ENGINEER')
   const first = await db.project.create({ data: { name: '风险项目甲', primaryOwnerId: engineer.id, risks: ['交付延期 2 天'] } })
-  const second = await db.project.create({ data: { name: '风险项目乙', primaryOwnerId: engineer.id, risks: ['存在阻塞'] } })
+  const second = await db.project.create({ data: { name: '风险项目乙', parentProjectId: first.id, stage: '验收交付', primaryOwnerId: engineer.id, risks: ['存在阻塞', '验收交付延期 2 天'] } })
   const sample = await db.project.create({ data: { id: `sample-${randomUUID()}`, name: '样例不可外发', primaryOwnerId: engineer.id, risks: ['存在阻塞'] } })
   const before = instant('2030-01-07', '08:59')
   const originals = await Promise.all([source(manager.id, first.id, before), source(manager.id, second.id, before),
@@ -63,6 +64,10 @@ it('管理人员按工作日合并变化项目并隔离收件人，工程师实�
   const text = managerCalls[0]![1].msg.text.content
   expect(text).toContain('风险项目甲')
   expect(text).toContain('风险项目乙')
+  expect(text).toContain('项目优化：风险项目乙')
+  expect(text).toContain('阶段：优化完成验收')
+  expect(text).toContain('优化完成验收延期 2 天')
+  expect(text).not.toContain('验收交付')
   expect(text).toContain('负责人：工程师甲')
   expect(text).toContain('存在阻塞')
   expect(text).toContain(`/#/project-overview?projectId=${first.id}`)

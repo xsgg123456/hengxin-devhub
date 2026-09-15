@@ -92,7 +92,7 @@ test('统一部门、提出时间及完成筛选同步指标、图表和清单�
     '1 · 100%'
   )
   await page.getByText('全部状态', { exact: true }).click()
-  await page.getByRole('option', { name: '待评估', exact: true }).click()
+  await page.getByRole('option', { name: '待审批', exact: true }).click()
   await expect(rows).toHaveCount(0)
   await expect(page.getByText('没有符合筛选条件的需求')).toBeVisible()
   await expect(

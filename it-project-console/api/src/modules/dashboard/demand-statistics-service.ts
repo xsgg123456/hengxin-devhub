@@ -4,6 +4,7 @@ import { shiftMonth } from '../workload/workload-service.js'
 import type { DemandQuery } from './query-schemas.js'
 import { businessDate } from '../calendar/workday.js'
 import { demandCompletion } from './demand-completion.js'
+import { projectTypeCounts } from './dashboard-service.js'
 const shanghaiDay = (value: string) => businessDate(new Date(value))
 export async function demandStatistics(
   tx: Prisma.TransactionClient,
@@ -33,7 +34,7 @@ export async function demandStatistics(
           : q.status === 'returned_management'
           ? d.status === 'PENDING' && d.proposals.some(row => row.status === 'returned')
           : (d.status === 'APPROVED' ? 'established' : d.status.toLowerCase()) === q.status)) &&
-      (!q.keyword || `${d.name} ${d.id}`.toLowerCase().includes(q.keyword.toLowerCase()))
+      (!q.keyword || `${d.name} ${d.code} ${d.project?.code ?? ''} ${d.project?.legacyCode ?? ''}`.toLowerCase().includes(q.keyword.toLowerCase()))
   )
   const attachmentIds = filtered
     .flatMap((d) => [...d.attachmentIds, d.prdAttachmentId, d.prototypeAttachmentId])
@@ -48,6 +49,7 @@ export async function demandStatistics(
   const users = userRows.map(mapUser)
   return {
     demands,
+    typeCounts: projectTypeCounts(filtered),
     activeProjectCount: filtered.filter(d => d.project?.status === 'ACTIVE' && !d.project.archived).length,
     submitters: demandDistribution(demands, users, 'submitter'),
     departments: demandDistribution(demands, users, 'department'),

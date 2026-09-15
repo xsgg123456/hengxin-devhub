@@ -1,6 +1,7 @@
 import type { ReadProject, ReadUser } from '../workspace/read-model.js'
 import { STAGES } from '../progress/progress-schemas.js'
 import { businessDate } from '../calendar/workday.js'
+import { projectTypeCounts } from '../dashboard/dashboard-service.js'
 const shanghaiDay = (value: string) => businessDate(new Date(value))
 export function monthBounds(month: string) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('月份格式应为 YYYY-MM')
@@ -85,11 +86,12 @@ export function personWorkload(
         primary,
         collaboration,
         projects: assigned,
+        typeCounts: projectTypeCounts(assigned),
         overlap: maximumOverlap(primary, month, today),
-        stages: STAGES.map((stage) => ({
+        stages: [...STAGES.map((stage) => ({
           stage,
-          count: assigned.filter((p) => p.stage === stage).length
-        })).filter((s) => s.count),
+          count: assigned.filter((p) => !p.parentProjectId && p.stage === stage).length
+        })), { stage: '优化完成验收', count: assigned.filter(p => !!p.parentProjectId).length }].filter((s) => s.count),
         delayed: assigned.filter((p) => p.risks.some((r) => r.includes('延期'))),
         blocked: assigned.filter((p) => p.simpleStatus === 'blocked'),
         stale: assigned.filter((p) => p.risks.some((r) => r.includes('未更新')))

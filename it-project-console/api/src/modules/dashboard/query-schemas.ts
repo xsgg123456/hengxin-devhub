@@ -34,7 +34,7 @@ export const workloadQuery = z
   .strict()
   .refine(dateOrder, '起始日期不得晚于结束日期')
 export const ganttQuery = z
-  .object({ scope, risk, includeArchived, month: monthSchema, ownerId: text, department: text })
+  .object({ projectType: projectFields.projectType, scope, risk, includeArchived, month: monthSchema, ownerId: text, department: text })
   .strict()
 export const demandQuery = z
   .object({

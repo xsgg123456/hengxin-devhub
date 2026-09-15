@@ -1,7 +1,7 @@
 <template>
   <ElDrawer
     :model-value="modelValue"
-    title="项目详情"
+    :title="project?.parentProjectId ? '优化详情' : '项目详情'"
     size="min(760px, 95vw)"
     :before-close="closeDetail"
     @update:model-value="$emit('update:modelValue', $event)"
@@ -10,11 +10,11 @@
     <ElEmpty v-if="!project" description="项目不存在或已移除" />
     <template v-else>
       <div class="flex-cb gap-3 mb-3"
-        ><h3 class="text-lg font-medium">{{ project.name }}</h3
+        ><h3 :aria-label="project.name" class="text-lg font-medium"><ElTag class="mr-2" :type="project.parentProjectId ? 'warning' : 'primary'">{{ project.parentProjectId ? '项目优化' : '正式项目' }}</ElTag>{{ project.name }}</h3
         ><ElTag>{{ project.priority }}</ElTag></div
       >
       <p class="mb-4 text-xs text-g-600"
-        >{{ projectCode(project) }} · {{ project.source === 'direct' ? '直接创建' : '需求立项' }}</p
+        >{{ projectCode(project) }} · {{ project.parentProjectId ? '优化审批通过' : project.source === 'direct' ? '直接创建' : '正式项目立项' }}</p
       >
       <RiskTag :risks="risks" />
       <OptimizationPreview v-if="project.parentProjectId || project.status === 'completed'" :project="project" />
@@ -41,17 +41,17 @@
         <ElDescriptionsItem label="阶段状态">{{
           project.parentProjectId ? optimizationStatus(project) : statusLabel[project.simpleStatus]
         }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="原计划上线">{{
+        <ElDescriptionsItem :label="project.parentProjectId ? '原计划完成' : '原计划上线'">{{
           project.originalLaunchDate || '—'
         }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="业务期望上线日期">{{
+        <ElDescriptionsItem :label="project.parentProjectId ? '业务期望完成日期' : '业务期望上线日期'">{{
           demand?.expectedLaunchDate || '未设置'
         }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="审批确认上线日期">{{
+        <ElDescriptionsItem :label="project.parentProjectId ? '审批确认完成日期' : '审批确认上线日期'">{{
           project.approvedLaunchDate || '未设置'
         }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="当前预计上线">{{
-          project.expectedLaunchDate || '—'
+        <ElDescriptionsItem :label="project.parentProjectId ? '计划开始' : '当前预计上线'">{{
+          (project.parentProjectId ? project.stagePlans?.[0]?.startDate : project.expectedLaunchDate) || '—'
         }}</ElDescriptionsItem>
         <ElDescriptionsItem label="原计划交付">{{
           project.originalDeliveryDate || '—'
@@ -90,7 +90,7 @@
       <h4 class="mt-6 mb-4 font-medium">日期调整记录</h4>
       <p v-if="!changes.length" class="text-sm text-g-600">暂无日期调整</p>
       <div v-for="change in changes" :key="change.id" class="history-row"
-        ><p>{{ fieldLabel(change.field) }}：{{ change.oldValue }} → {{ change.newValue }}</p
+        ><p>{{ fieldLabel(change.field).replace('上线', project.parentProjectId ? '完成' : '上线').replace('验收交付', project.parentProjectId ? '优化完成验收' : '验收交付') }}：{{ change.oldValue }} → {{ change.newValue }}</p
         ><p>{{ change.reason }} · {{ change.description }}</p
         ><small>{{ userName(change.authorId) }} · {{ displayTime(change.createdAt) }}</small></div
       >
@@ -102,16 +102,16 @@
       /></template>
     </template>
     <template #footer
-      ><ElButton v-if="project && canEditProject(store.currentUser, project)" @click="editOpen = true">编辑项目</ElButton><ElButton @click="closeDetail(() => emit('update:modelValue', false))">关闭</ElButton
+      ><ElButton v-if="project && canEditProject(store.currentUser, project)" @click="editOpen = true">{{ project.parentProjectId ? '编辑优化' : '编辑项目' }}</ElButton><ElButton @click="closeDetail(() => emit('update:modelValue', false))">关闭</ElButton
       ><ElButton v-if="canUpdate && isOverall" @click="planOpen = true">{{
-        needsPlan(project!) ? '制定计划' : '调整计划'
+        needsPlan(project!) ? '制定计划' : project?.parentProjectId ? '调整优化计划' : '调整计划'
       }}</ElButton
       ><ElButton
         v-if="canUpdate && (!isOverall || !needsPlan(project!))"
         type="primary"
         @click="$emit('edit', project!.id)"
         >{{
-          isOverall ? (project?.stage === '验收交付' ? '业务验收' : '更新环节') : '填写协作进展'
+          isOverall ? (project?.parentProjectId ? '更新优化进度' : project?.stage === '验收交付' ? '业务验收' : '更新环节') : '填写协作进展'
         }}</ElButton
       ></template
     >

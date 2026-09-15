@@ -25,12 +25,12 @@
             :key="project.id"
             text
             @click="emit('select', project.id)"
-            >{{ project.name }} · {{ owner(project) }}</ElButton
+            >{{ project.parentProjectId ? '项目优化' : '正式项目' }} · {{ project.name }} · {{ owner(project) }}</ElButton
           ></div
         >
       </ElPopover>
     </div>
-    <p class="text-xs text-g-500 mt-3">柱高 = 项目数；各指标可重叠，统计范围与下方项目明细一致。</p>
+    <p class="text-xs text-g-500 mt-3">统计包含正式项目与项目优化；各指标可重叠，范围与下方明细一致。</p>
   </section>
 </template>
 

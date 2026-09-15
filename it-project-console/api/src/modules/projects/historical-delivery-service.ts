@@ -33,7 +33,7 @@ export class HistoricalDeliveryService {
         (user.role === 'ENGINEER' && isEngineerEligible(user) && user.id === project.primaryOwnerId && !project.migrationVerified)))
         throw new AppError(403, 'PROJECT_EDIT_FORBIDDEN', '仅指定管理员或待核实项目的主负责工程师可登记历史交付')
       writable(project)
-      if (project.parentProjectId) invalid('优化项目必须通过指定验收人确认完成')
+      if (project.parentProjectId) invalid('项目优化必须通过指定验收人确认完成')
       if (project.firstRequestedOn && input.deliveredOn < project.firstRequestedOn.toISOString().slice(0, 10))
         invalid('实际交付日期不能早于需求首次提出日期')
       const now = new Date(), deliveredAt = new Date(`${input.deliveredOn}T00:00:00.000Z`)

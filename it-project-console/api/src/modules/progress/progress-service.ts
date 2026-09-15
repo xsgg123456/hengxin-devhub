@@ -24,7 +24,7 @@ export class ProgressService {
       if (input.kind === 'overall' && project.acceptanceStatus === 'pending') invalid('待业务验收期间请先撤回验收再更新整体进度')
       if (input.kind === 'overall' && project.stage === '验收交付' && status === 'completed') invalid('请提交验收，由指定业务负责人确认通过')
       if (input.kind === 'overall') {
-        const plans = assertScheduled(project.stage, project.stagePlans)
+        const plans = assertScheduled(project.stage, project.stagePlans, !!project.parentProjectId)
         const next = STAGES[STAGES.indexOf(project.stage as typeof STAGES[number]) + 1]
         await tx.project.update({ where: { id }, data: {
           simpleStatus: status, blocker: status === 'blocked' ? blocker : '', lastOverallUpdatedAt: now

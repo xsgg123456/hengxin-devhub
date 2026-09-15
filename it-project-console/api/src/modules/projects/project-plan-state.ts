@@ -26,9 +26,10 @@ export function validatePlanOrder(plans: ReadonlyArray<{ stage: string; startDat
     if (index && item.startDate < plans[index - 1]!.endDate) invalid('后阶段开始不得早于前阶段结束')
   }
 }
-export function assertScheduled(stage: string, value: unknown) {
+export function assertScheduled(stage: string, value: unknown, optimization = false) {
   const plans = readStagePlans(value), required = remainingStages(stage)
-  if (!required.length || required.some(item => !plans.some(plan => plan.stage === item))) invalid('请先完整保存当前及后续阶段排期')
+  if (!required.length || required.some(item => !plans.some(plan => plan.stage === item)))
+    invalid(optimization ? '请先保存优化完成验收的排期' : '请先完整保存当前及后续阶段排期')
   validatePlanOrder(plans)
   return plans
 }

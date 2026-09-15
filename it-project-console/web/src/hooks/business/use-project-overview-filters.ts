@@ -56,7 +56,7 @@ export function useProjectOverviewFilters(personal = false) {
         const owner = store.database?.users.find((u) => u.id === p.primaryOwnerId)?.name ?? ''
         if (
           keyword.value.trim() &&
-          !`${p.name} ${projectCode(p)} ${owner} ${p.department}`
+          !`${p.name} ${projectCode(p)} ${p.legacyCode || ''} ${owner} ${p.department}`
             .toLowerCase()
             .includes(keyword.value.trim().toLowerCase())
         )
@@ -106,7 +106,7 @@ export function useProjectOverviewFilters(personal = false) {
       ).length
     },
     {
-      label: '待立项',
+      label: '待审批 / 待接单',
       key: 'pending',
       value:
         store.visibleDemands.filter(
@@ -162,6 +162,9 @@ export function useProjectOverviewFilters(personal = false) {
   const total = computed(() =>
     runtimeConfig.isPrototype ? projects.value.length : (data.value?.total ?? 0)
   )
+  const typeCounts = computed(() => data.value?.typeCounts && !runtimeConfig.isPrototype
+    ? data.value.typeCounts
+    : {formal: projects.value.filter(p => !p.parentProjectId).length, optimization: projects.value.filter(p => p.parentProjectId).length, total: projects.value.length})
   const metrics = computed(() =>
     runtimeConfig.isPrototype ? prototypeMetrics.value : (data.value?.metrics ?? [])
   )
@@ -187,7 +190,8 @@ export function useProjectOverviewFilters(personal = false) {
         query: {
           status: store.currentUser.role === 'business' ? 'pre_establishment' : 'pending',
           scope: scope.value,
-          department: department.value
+          department: department.value,
+          projectType: projectType.value === 'all' ? '' : projectType.value
         }
       })
       return
@@ -251,6 +255,7 @@ export function useProjectOverviewFilters(personal = false) {
     }
   )
   return {
+    typeCounts,
     distribution: computed(() => data.value?.distribution),
     query,
     page,

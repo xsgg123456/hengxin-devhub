@@ -44,7 +44,7 @@ export class ProjectEditService {
         !input.expectedLaunchDate || !input.expectedDeliveryDate)) invalid('完成核实前请补齐首次提出日期、业务人员及预计上线交付日期')
       if (input.simpleStatus === 'blocked' && !input.blocker) invalid('请填写阻塞说明')
       if (project.parentProjectId && (input.stage !== '验收交付' || input.stagePlans.some(p => p.stage !== '验收交付')))
-        invalid('优化项目只有优化交付节点')
+        invalid('项目优化只有优化完成验收节点')
       if (project.parentProjectId && (input.expectedLaunchDate !== input.expectedDeliveryDate || input.originalLaunchDate !== input.originalDeliveryDate))
         invalid('优化上线和交付日期须保持一致')
       if (project.acceptanceStatus === 'pending' && JSON.stringify(input.stagePlans) !== JSON.stringify(readStagePlans(project.stagePlans).map(({ stage, startDate, endDate }) => ({ stage, startDate, endDate }))))
@@ -64,7 +64,7 @@ export class ProjectEditService {
         return { ...plan, originalStartDate: old?.originalStartDate ?? plan.startDate, originalEndDate: old?.originalEndDate ?? plan.endDate }
       }).sort((a, b) => STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage))
       if (project.parentProjectId && (oldPlans.length || progressChanged) && plans.length !== 1)
-        invalid('优化项目开始执行后必须保留完整优化交付排期')
+        invalid('项目优化开始执行后必须保留优化完成验收排期')
       validatePlanOrder(plans)
       const launch = plans.find(p => p.stage === (project.parentProjectId ? '验收交付' : '上线部署')), delivery = plans.find(p => p.stage === '验收交付')
       if ((launch && input.expectedLaunchDate !== launch.endDate) || (delivery && input.expectedDeliveryDate !== delivery.endDate))

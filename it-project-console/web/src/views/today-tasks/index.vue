@@ -4,32 +4,38 @@
       <div class="mb-5"
         ><h2 class="text-xl font-medium">{{ heading }}</h2
         ><p class="mt-1.5 text-sm text-g-500"
-          >按职责处理评估、项目异常及补充事项；无需每日重复填报</p
+          >{{ store.currentUser.role === 'manager' ? '优先处理立项与优化审批，其次处理其他事项及项目异常' : '按职责处理验收、项目进展及补充事项；无需每日重复填报' }}</p
         ></div
       >
-      <div class="art-card p-5">
-        <div class="art-card-header mb-4"
-          ><div class="title"><h4>待处理事项</h4></div
-          ><ElTag>{{ tasks.length }} 项</ElTag></div
-        >
-        <ElAlert v-if="error" :title="error" type="error" :closable="false"
-          ><ElButton @click="retry">重新加载</ElButton></ElAlert
-        >
-        <ElSkeleton v-if="loading" :rows="4" animated />
-        <ElEmpty v-if="!loading && !error && !tasks.length" description="当前无待处理事项" />
-        <div v-for="task in tasks" :key="task.id" class="task-row" :data-task-id="task.id">
-          <div
-            ><h3 class="font-medium">{{ task.name }}</h3
-            ><p class="text-xs text-g-500 mt-1">{{ task.code || task.id }}</p
-            ><p class="text-sm mt-2" :class="task.severity < 3 ? 'text-danger' : 'text-g-600'">{{
-              task.reason
-            }}</p></div
-          >
-          <ElButton type="primary" plain @click="act(task)">{{
-            actionLabels[task.action]
-          }}</ElButton>
+      <ElTabs v-model="category" v-if="store.currentUser.role === 'manager'">
+        <ElTabPane :label="'全部 ' + actionable.length" name="all" />
+        <ElTabPane v-for="group in groups" :key="group.key" :label="group.label + ' ' + group.rows.length" :name="group.key" />
+      </ElTabs>
+      <ElAlert v-if="error" :title="error" type="error" :closable="false"><ElButton @click="retry">重新加载</ElButton></ElAlert>
+      <ElSkeleton v-if="loading" :rows="4" animated />
+      <div v-for="group in visibleGroups" :key="group.key" class="art-card p-5 mb-5">
+        <div class="art-card-header mb-3"><div class="title"><h4>{{ group.label }} <ElTag size="small">{{ group.rows.length }}</ElTag></h4><p class="text-xs text-g-500 mt-2">{{ group.hint }}</p></div></div>
+        <p v-if="!group.rows.length && !loading" class="py-3 text-sm text-g-500">{{ store.currentUser.role === 'manager' ? '当前分类暂无待处理事项' : '当前无待处理事项' }}</p>
+        <div v-for="task in group.rows" :key="task.action + task.id" class="task-row" :data-task-id="task.id">
+          <div>
+            <h3 class="font-medium"><ElTag size="small" :type="isOptimization(task) ? 'warning' : 'primary'" class="mr-2">{{ isOptimization(task) ? '项目优化' : '正式项目' }}</ElTag>{{ task.name }}</h3>
+            <p class="text-xs text-g-500 mt-2">{{ metadata(task) }}</p>
+            <p v-if="parentName(task)" class="text-xs text-g-500 mt-2">所属原项目：{{ parentName(task) }}</p>
+            <p v-if="group.key === 'approval'" class="text-sm mt-2 text-g-600">{{ task.action === 'reassess' ? '重新评估 · ' : '' }}{{ isOptimization(task) ? '待优化审批' : '待立项审批' }} · 已等待 {{ waitingDays(task) }} 个工作日</p>
+            <div v-else-if="group.key === 'risk'" class="mt-2">
+              <div class="flex flex-wrap gap-2"><ElTag v-for="reason in task.reason.split('；')" :key="reason" :type="reason.includes('延期') || reason.includes('阻塞') ? 'danger' : 'warning'" size="small">{{ reason.length > 32 ? reason.slice(0, 32) + '…' : reason }}</ElTag></div>
+              <details v-if="task.reason.split('；').some(reason => reason.length > 32)" class="mt-2 text-sm text-g-600"><summary class="cursor-pointer">展开异常说明</summary><p class="mt-2">{{ task.reason }}</p></details>
+            </div>
+            <p v-else class="text-sm mt-2 text-g-600">{{ task.reason }}</p>
+          </div>
+          <ElButton type="primary" :plain="group.key !== 'approval'" @click="act(task)">{{ task.action === 'review' ? isOptimization(task) ? '优化审批' : '立项审批' : actionLabels[task.action] }}</ElButton>
         </div>
       </div>
+      <ElCollapse v-if="followups.length && category === 'all'" class="art-card px-5 mb-5">
+        <ElCollapseItem name="followup" :title="'跟进信息 ' + followups.length + ' · 等待工程师接单，不计入待处理数量'">
+          <div v-for="task in followups" :key="task.id" class="task-row"><div><h3><ElTag size="small" class="mr-2" :type="isOptimization(task) ? 'warning' : 'primary'">{{ isOptimization(task) ? '项目优化' : '正式项目' }}</ElTag>{{ task.name }}</h3><p class="text-sm text-g-500 mt-2">{{ task.reason }}</p></div><ElButton @click="act(task)">查看待接单</ElButton></div>
+        </ElCollapseItem>
+      </ElCollapse>
       <ElAlert v-if="proposalError" :title="proposalError" type="warning" :closable="false" />
       <ProjectCreateDrawer
         v-if="proposal"
@@ -51,6 +57,9 @@
   </BusinessPageState>
 </template>
 <script setup lang="ts">
+  import { workdaysBetween } from '@/services/risk-service'
+  import { shanghaiDay } from '@/services/workflow-validation'
+  import { currentDate } from '@/utils/project-display'
   import { runtimeConfig } from '@/config/runtime'
   import { useLiveQuery } from '@/hooks/business/use-live-query'
   import { useRetainedSelection } from '@/hooks/business/use-retained-selection'
@@ -60,6 +69,8 @@
   import { usePrototypeStore } from '@/store/modules/prototype'
   import {
     responsibilityTasks,
+    compareTasks,
+    taskCategory,
     filterPendingTasks,
     type ResponsibilityTask
   } from '@/services/task-service'
@@ -108,7 +119,7 @@
         ...task,
         days: task.projectId ? (data.value!.attentionDays[task.projectId] ?? task.days) : task.days
       }))
-      .sort((a, b) => a.severity - b.severity || b.days - a.days || a.id.localeCompare(b.id))
+      .sort((a, b) => compareTasks(a, b, store.currentUser.role === 'manager'))
   })
   const tasks = computed(() =>
     route.query.status === 'pending' && store.database
@@ -117,10 +128,31 @@
           store.database,
           store.currentUser.id,
           String(route.query.scope ?? 'all'),
-          String(route.query.department ?? '')
+          String(route.query.department ?? ''),
+          String(route.query.projectType ?? '')
         )
       : taskRows.value
   )
+  const category = ref('all')
+  const taskDemand = (task: ResponsibilityTask) => store.visibleDemands.find(d => d.id === task.demandId || d.id === store.database?.projectProposals?.find(p => p.id === task.proposalId)?.demandId)
+  const taskProject = (task: ResponsibilityTask) => store.visibleProjects.find(p => p.id === task.projectId)
+  const isOptimization = (task: ResponsibilityTask) => !!(taskDemand(task)?.parentProjectId || taskProject(task)?.parentProjectId)
+  const parentName = (task: ResponsibilityTask) => store.visibleProjects.find(p => p.id === (taskDemand(task)?.parentProjectId || taskProject(task)?.parentProjectId))?.name
+  const enteredAt = (task: ResponsibilityTask) => task.enteredAt || ''
+  const waitingDays = (task: ResponsibilityTask) => enteredAt(task) ? workdaysBetween(shanghaiDay(enteredAt(task)), currentDate()) : 0
+  const metadata = (task: ResponsibilityTask) => {
+    const demand = taskDemand(task), project = taskProject(task)
+    if (demand) return demand.department + ' · 提出人：' + (store.database?.users.find(u => u.id === demand.submitterId)?.name || '未设置') + ' · 提交于 ' + demand.submittedAt.slice(0,10)
+    return (project?.code || '') + ' · 主负责人：' + (store.database?.users.find(u => u.id === project?.primaryOwnerId)?.name || '未设置')
+  }
+  const followups = computed(() => store.currentUser.role === 'manager' ? tasks.value.filter(t => t.action === 'proposal') : [])
+  const actionable = computed(() => tasks.value.filter(t => !followups.value.includes(t)))
+  const groups = computed(() => store.currentUser.role !== 'manager' ? [{key:'personal',label:'待处理事项',hint:'按职责处理，无需每日重复填报',rows:tasks.value}] : [
+    {key:'approval', label:'待审批事项', hint:'正式项目立项与项目优化分开标识，按等待时间排序', rows:actionable.value.filter(t => taskCategory(t) === 'approval')},
+    {key:'other', label:'其他待处理', hint:'需要你验收确认或补充的事项', rows:actionable.value.filter(t => taskCategory(t) === 'other')},
+    {key:'risk', label:'项目异常', hint:'按延期、阻塞、未更新、临期排序', rows:actionable.value.filter(t => taskCategory(t) === 'risk')}
+  ])
+  const visibleGroups = computed(() => groups.value.filter(g => category.value === 'all' || category.value === g.key))
   const detailId = ref(''),
     updateId = ref(''),
     reviewId = ref(''),
@@ -165,6 +197,7 @@
   watch(
     () => store.currentUser.id,
     () => {
+      category.value = 'all'
       proposalId.value = ''
       detailOpen.value = false
       updateOpen.value = false

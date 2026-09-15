@@ -10,6 +10,7 @@ export interface DashboardResult {
   projects: DemoProject[]
   items: DemoProject[]
   total: number
+  typeCounts?: { formal: number; optimization: number; total: number }
   metrics: { label: string; key: string; value: number }[]
   distribution: ReturnType<typeof projectDistribution>
   attention: DemoProject[]

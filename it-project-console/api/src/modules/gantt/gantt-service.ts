@@ -3,6 +3,7 @@ import { businessDate } from '../calendar/workday.js'
 const shanghaiDay = (value: string) => businessDate(new Date(value))
 const DAY = 86400000
 export interface GanttFilters {
+  projectType?: '' | 'normal' | 'optimization'
   department?: string
   ownerId?: string
   risk?: string
@@ -35,6 +36,7 @@ export function buildGanttRows(
   const first = Date.parse(`${month}-01`) / DAY
   const last = first + monthDays(month)
   return [...projects].sort((a, b) => a.priority.localeCompare(b.priority)).flatMap((project): GanttRow[] => {
+    if (filters.projectType && !!project.parentProjectId !== (filters.projectType === 'optimization')) return []
     if (!filters.includeArchived && (project.archived || project.status === 'cancelled')) return []
     if (filters.department && project.department !== filters.department) return []
     if (filters.ownerId && project.primaryOwnerId !== filters.ownerId) return []

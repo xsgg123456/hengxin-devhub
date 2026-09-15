@@ -936,3 +936,6 @@ MVP 完成条件：
 
 ## 2026-09-15 中文提示与实时同步
 用户授权本地实现，需求与验收以 [本轮规则](it-project-console/docs/LIVE-SYNC-CHINESE-ITERATION.md) 为准。
+
+## 2026-09-15 管理待办与项目优化业务区分
+用户已确认前端预览并授权正式整改，以 [TASK-TYPE-ITERATION.md](it-project-console/docs/TASK-TYPE-ITERATION.md) 的验收标准为准，覆盖旧优化沿用XM和管理待办异常优先规则。

@@ -1,8 +1,8 @@
 <template>
   <section class="mt-6">
-    <h4 class="mb-4 font-medium">{{ project?.parentProjectId ? '优化交付计划与执行' : '七环节计划与执行' }}</h4>
+    <h4 class="mb-4 font-medium">{{ project?.parentProjectId ? '优化完成验收计划与执行' : '七环节计划与执行' }}</h4>
     <ElTable :data="rows" size="small">
-      <ElTableColumn label="环节" min-width="90"><template #default="{ row }">{{ project?.parentProjectId ? '优化交付' : row.stage }}</template></ElTableColumn>
+      <ElTableColumn label="环节" min-width="90"><template #default="{ row }">{{ project?.parentProjectId ? '优化完成验收' : row.stage }}</template></ElTableColumn>
       <ElTableColumn label="计划区间" min-width="220"
         ><template #default="{ row }">
           <span>{{ row.plan ? `${row.plan.startDate} → ${row.plan.endDate}` : '—' }}</span>
@@ -32,7 +32,7 @@
                     ? 'primary'
                     : 'info'
             "
-            >{{ row.label }}{{ row.lateDays ? ` ${row.lateDays}天` : '' }}</ElTag
+            >{{ project?.parentProjectId ? optimizationStatus(project) : row.label }}{{ row.lateDays ? ` ${row.lateDays}天` : '' }}</ElTag
           ></template
         ></ElTableColumn
       >
@@ -45,7 +45,7 @@
     <details v-if="histories.length" class="mt-3 text-sm">
       <summary class="cursor-pointer text-g-600">查看全部阶段历史</summary>
       <p v-for="(history, index) in histories" :key="index" class="mt-2">
-        {{ project?.parentProjectId ? '优化交付' : history.stage }} · 进入 {{ displayTime(history.startedAt) }} ·
+        {{ project?.parentProjectId ? '优化完成验收' : history.stage }} · 进入 {{ displayTime(history.startedAt) }} ·
         {{
           history.interruptedAt
             ? `纠正离开，未完成（${displayTime(history.interruptedAt)}）`
@@ -84,6 +84,7 @@
 </template>
 <script setup lang="ts">
   import { deliveryHref } from '@/utils/delivery-url'
+  import { optimizationStatus } from '@/utils/optimization-display'
   import { computed } from 'vue'
   import { stageExecutions } from '@/services/stage-execution'
   import { usePrototypeStore } from '@/store/modules/prototype'

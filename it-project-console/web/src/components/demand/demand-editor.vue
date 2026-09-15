@@ -15,7 +15,7 @@
     />
     <ElAlert v-if="failure" :title="failure" type="error" :closable="false" class="mb-5" />
     <PrototypeSaveRecovery v-if="failure && runtimeConfig.isPrototype" />
-    <p v-if="isOptimization" class="mb-4 text-sm text-g-600">原项目：{{ store.database?.projects.find(p => p.id === form.parentProjectId)?.name || form.parentProjectId }}</p>
+    <p v-if="isOptimization" class="mb-4 text-sm text-g-600">原项目：<ElButton link type="primary" @click="router.push({ path: '/project-overview', query: { projectId: form.parentProjectId! } })">{{ store.visibleProjects.find(p => p.id === form.parentProjectId)?.name || '查看原项目' }}</ElButton></p>
     <ElAlert v-if="stale" :title="stale" type="warning" :closable="false" class="mb-5" />
     <ElForm ref="formRef" :model="form" :rules="rules" label-position="top" :disabled="saving" scroll-to-error>
       <ElFormItem :label="isOptimization ? '优化标题' : '项目名称'" prop="name" :error="errors.name" required>
@@ -49,7 +49,7 @@
         <ElInput v-model="form.optimizationOutcome" type="textarea" :rows="3" maxlength="300" show-word-limit />
       </ElFormItem>
       <ElFormItem
-        label="期望上线日期"
+        :label="isOptimization ? '期望完成日期' : '期望上线日期'"
         prop="expectedLaunchDate"
         :error="errors.expectedLaunchDate"
         required
@@ -83,7 +83,7 @@
           :disabled="busy"
           :loading="saving && submitting"
           @click="save(true)"
-          >{{ demand ? '重新提交' : '提交评估' }}</ElButton
+          >{{ isOptimization ? '提交优化审批' : demand ? '重新提交' : '提交评估' }}</ElButton
         >
       </div>
     </template>
@@ -99,6 +99,7 @@
   import { saveDemand } from '@/services/workflow-service'
   import { validateMaterials } from '@/services/workflow-validation'
   import { demandMaterials } from '@/services/demand-materials'
+  import { useRouter } from 'vue-router'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { currentDate } from '@/utils/project-display'
   import { ApiError } from '@/services/api-client'
@@ -111,6 +112,7 @@
   const props = defineProps<{ demand?: DemoDemand; parentProjectId?: string }>()
   const emit = defineEmits<{ close: []; saved: [] }>()
   const store = usePrototypeStore()
+  const router = useRouter()
   const formRef = ref<FormInstance>()
   const materialField = ref<{ releaseCleanup: () => void }>()
   const form = reactive({
@@ -126,7 +128,7 @@
     name: [{ required: true, whitespace: true, message: isOptimization.value ? '请填写优化标题' : '请填写项目名称', trigger: 'blur' }],
     description: [{ required: true, whitespace: true, message: '请说明要解决的问题', trigger: 'blur' }],
     optimizationOutcome: [{ required: true, whitespace: true, message: '请填写期望效果 / 验收标准', trigger: 'blur' }],
-    expectedLaunchDate: [{ required: true, message: '请选择期望上线日期', trigger: 'change' }],
+    expectedLaunchDate: [{ required: true, message: isOptimization.value ? '请选择期望完成日期' : '请选择期望上线日期', trigger: 'change' }],
     attachments: [{ type: 'array', required: !isOptimization.value, message: '请上传需求附件', trigger: 'change' }]
   }))
   function input(): LiveDemandInput {
@@ -199,11 +201,11 @@
     if (stale.value) { failure.value = stale.value; return }
     Object.keys(errors).forEach((key) => delete errors[key])
     const requiresMaterials = submit || props.demand?.status === 'pending'
-    if (requiresMaterials && !form.name.trim()) errors.name = '请填写项目名称'
+    if (requiresMaterials && !form.name.trim()) errors.name = isOptimization.value ? '请填写优化标题' : '请填写项目名称'
     if (requiresMaterials && isOptimization.value && !form.optimizationOutcome.trim()) errors.optimizationOutcome = '请填写期望效果 / 验收标准'
     if (requiresMaterials && !form.description.trim()) errors.description = '请说明要解决的问题'
     if (requiresMaterials && (!form.expectedLaunchDate || form.expectedLaunchDate < currentDate()))
-      errors.expectedLaunchDate = '期望上线日期不能早于今天'
+      errors.expectedLaunchDate = isOptimization.value ? '期望完成日期不能早于今天' : '期望上线日期不能早于今天'
     try {
       validateMaterials(form.attachments, !isOptimization.value && requiresMaterials)
     } catch (cause) {
@@ -248,7 +250,7 @@
       const code = demandCode(store.database?.demands.find(demand => demand.id === demandId) ?? {})
       ElMessage.success(
         submit
-          ? `${code} 已提交，等待管理人员评估`
+          ? `${code} 已提交，${isOptimization.value ? '等待优化审批' : '等待管理人员评估'}`
           : props.demand?.status === 'pending'
             ? `${code} 修改已保存，仍待评估`
             : `${code} 草稿已保存`

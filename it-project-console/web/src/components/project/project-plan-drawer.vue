@@ -1,7 +1,7 @@
 <template>
   <ElDrawer
     :model-value="modelValue"
-    :title="adjustment ? '调整项目计划' : '制定项目计划'"
+    :title="project?.parentProjectId ? (adjustment ? '调整优化计划' : '制定优化计划') : adjustment ? '调整项目计划' : '制定项目计划'"
     size="min(760px, 95vw)"
     :before-close="beforeClose"
     @update:model-value="emit('update:modelValue', $event)"
@@ -10,21 +10,21 @@
     <template v-if="project">
       <h3 class="mb-2 text-lg font-medium">{{ project.name }}</h3>
       <p class="mb-5 text-g-600">{{
-        project.parentProjectId ? '只安排优化交付的开始和交付日期，完成后提交业务验收。' : project.stage === '方案设计'
+        project.parentProjectId ? '只安排优化完成验收的开始和交付日期，完成后提交业务验收。' : project.stage === '方案设计'
           ? '需求受理、立项评审已完成，请安排后续五个环节。'
           : '只安排当前及后续未完成环节，已完成环节保持原记录。'
       }}</p>
       <p v-if="defaultNotice" class="mb-5 text-sm text-g-600">{{ defaultNotice }}</p>
       <ElForm :disabled="busy" label-position="top" @submit.prevent="save">
         <ElTable :data="plans" class="mb-6">
-          <ElTableColumn label="环节" width="108"><template #default="{ row }">{{ project.parentProjectId ? '优化交付' : row.stage }}</template></ElTableColumn>
+          <ElTableColumn label="环节" width="108"><template #default="{ row }">{{ project.parentProjectId ? '优化完成验收' : row.stage }}</template></ElTableColumn>
           <ElTableColumn label="计划开始日期" min-width="205"
             ><template #default="{ row }">
               <ElDatePicker
                 v-model="row.startDate"
                 type="date"
                 value-format="YYYY-MM-DD"
-                :aria-label="`${project.parentProjectId ? '优化交付' : row.stage}计划开始日期`"
+                :aria-label="`${project.parentProjectId ? '优化完成验收' : row.stage}计划开始日期`"
               /> </template
           ></ElTableColumn>
           <ElTableColumn label="计划结束日期" min-width="205"
@@ -33,12 +33,12 @@
                 v-model="row.endDate"
                 type="date"
                 value-format="YYYY-MM-DD"
-                :aria-label="`${project.parentProjectId ? '优化交付' : row.stage}计划结束日期`"
+                :aria-label="`${project.parentProjectId ? '优化完成验收' : row.stage}计划结束日期`"
               /> </template
           ></ElTableColumn>
         </ElTable>
         <ElDescriptions :column="2" border>
-          <ElDescriptionsItem label="审批确认上线日期" :span="2">{{
+          <ElDescriptionsItem :label="project.parentProjectId ? '审批确认完成日期' : '审批确认上线日期'" :span="2">{{
             project.approvedLaunchDate || '未设置'
           }}</ElDescriptionsItem>
           <ElDescriptionsItem v-if="!project.parentProjectId" label="计划上线">{{ milestone('上线部署') }}</ElDescriptionsItem>
@@ -52,7 +52,7 @@
           :title="`超出审批日期 ${overrun} 天`"
           description="可继续保存计划，无需管理人员再次确认；审批确认日期保留作为对照基准。"
         />
-        <p class="mt-4 mb-5 text-sm text-g-600">{{ project.parentProjectId ? '计划交付日期由优化交付节点的结束日期带出。' : '上线和交付日期由对应环节的计划结束日期自动带出。' }}</p>
+        <p class="mt-4 mb-5 text-sm text-g-600">{{ project.parentProjectId ? '计划交付日期由优化完成验收节点的结束日期带出。' : '上线和交付日期由对应环节的计划结束日期自动带出。' }}</p>
         <template v-if="changed">
           <ElFormItem label="日期调整原因" required>
             <ElSelect v-model="reason" aria-label="日期调整原因"
@@ -173,7 +173,7 @@
         )
       initial.value = snapshot()
       emit('update:modelValue', false)
-      ElMessage.success('项目计划已保存')
+      ElMessage.success(props.project.parentProjectId ? '优化计划已保存' : '项目计划已保存')
     } catch (cause) {
       error.value = cause instanceof Error ? cause.message : '保存失败，请重试'
       if (cause instanceof ApiError && cause.status === 409) {
@@ -191,6 +191,3 @@
     width: 100%;
   }
 </style>
-
-
-

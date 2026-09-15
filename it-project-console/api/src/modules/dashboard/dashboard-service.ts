@@ -40,7 +40,7 @@ export function filterProjects(
       const owner = users.find((u) => u.id === p.primaryOwnerId)?.name ?? ''
       if (
         q.keyword &&
-        !`${p.name} ${p.code} ${owner} ${p.department}`
+        !`${p.name} ${p.code} ${p.legacyCode ?? ''} ${owner} ${p.department}`
           .toLowerCase()
           .includes(q.keyword.toLowerCase())
       )
@@ -151,7 +151,7 @@ export async function dashboard(tx: Prisma.TransactionClient, q: DashboardQuery,
       key,
       value: projects.filter((p) => matchesRisk(p, key!)).length
     })),
-    { label: '待立项', key: 'pending', value: pending }
+    { label: '待审批 / 待接单', key: 'pending', value: pending }
   ]
   const attention = projects
     .filter(
@@ -165,6 +165,7 @@ export async function dashboard(tx: Prisma.TransactionClient, q: DashboardQuery,
     })
   return {
     projects,
+    typeCounts: projectTypeCounts(projects),
     distribution: projectDistribution(projects),
     items: projects.slice((q.page - 1) * q.pageSize, q.page * q.pageSize),
     total: projects.length,
@@ -172,6 +173,11 @@ export async function dashboard(tx: Prisma.TransactionClient, q: DashboardQuery,
     attention,
     attentionDays
   }
+}
+
+export function projectTypeCounts(projects: { parentProjectId: string | null }[]) {
+  const optimization = projects.filter(p => p.parentProjectId !== null).length
+  return { formal: projects.length - optimization, optimization, total: projects.length }
 }
 
 export function projectDistribution(projects: ReadProject[]) {

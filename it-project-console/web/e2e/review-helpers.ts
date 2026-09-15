@@ -61,7 +61,7 @@ export async function acceptProposal(page: Page, name: string) {
   await page.goto('/#/today-tasks')
   await page.locator('.task-row').filter({ hasText: name }).getByRole('button', { name: '确认接单', exact: true }).click()
   const drawer = page.getByRole('dialog', { name: '接单详情 · ' + name, exact: true })
-  await drawer.getByRole('button', { name: '确认接单并立项', exact: true }).click()
+  await drawer.getByRole('button', { name: /^(确认接单并立项|确认接单优化)$/, exact: true }).click()
   await expect(drawer).not.toBeVisible()
   await page.goto('/#/my-projects')
   await expect(card(page, name)).toBeVisible()

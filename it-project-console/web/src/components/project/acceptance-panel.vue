@@ -1,7 +1,7 @@
 <template>
   <section class="mt-5" style="overflow-wrap: anywhere">
-    <h4 class="font-medium mb-3">业务验收</h4>
-    <ElTag>{{ acceptanceLabel(project) }}</ElTag>
+    <h4 class="font-medium mb-3">{{ project.parentProjectId ? '优化完成验收' : '业务验收' }}</h4>
+    <ElTag>{{ project.parentProjectId ? optimizationStatus(project) : acceptanceLabel(project) }}</ElTag>
     <ElDescriptions :column="1" border class="mt-3 mb-4">
       <ElDescriptionsItem label="业务验收负责人">{{
         userName(project.acceptanceOwnerId)
@@ -130,6 +130,7 @@
   </section>
 </template>
 <script setup lang="ts">
+  import { optimizationStatus } from '@/utils/optimization-display'
   import { deliveryHref } from '@/utils/delivery-url'
   import { computed } from 'vue'
   import { useAcceptanceDraft } from '@/hooks/business/use-acceptance-draft'

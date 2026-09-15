@@ -5,7 +5,7 @@
         <div
           ><h2 class="text-xl font-medium text-g-900">我的需求 / 需求池</h2
           ><p class="mt-1.5 text-sm text-g-500"
-            >查看需求材料、评估结果，以及立项后的推进状态</p
+            >查看正式项目与优化需求的材料、审批结果及推进状态</p
           ></div
         >
         <ElRadioGroup v-model="scope" aria-label="需求范围">
@@ -16,7 +16,7 @@
       <div class="art-card p-5 mb-5">
         <h3 class="font-medium mb-3">需求提交通道</h3>
         <ElAlert
-          title="填写业务目标与材料，提交后进入待评估；管理人员立项后将生成正式项目。"
+          title="填写业务目标与材料后提交审批；正式项目走立项流程，项目优化走优化审批流程。"
           type="info"
           :closable="false"
           class="mb-4"
@@ -26,10 +26,10 @@
       <div class="art-card p-5 mb-5">
         <div class="art-card-header mb-4"
           ><div class="title"><h4>需求池</h4><p>筛选条件统一作用于统计、图表和需求清单</p></div
-          ><ElTag effect="plain" round>共 {{ demands.length }} 条</ElTag></div
+          ><ElTag effect="plain" round>正式项目 {{ demands.filter(d => !d.parentProjectId).length }} 条 · 项目优化 {{ demands.filter(d => d.parentProjectId).length }} 条 · 合计 {{ demands.length }} 条</ElTag></div
         >
         <ElForm inline label-position="top" class="mb-3">
-          <ElFormItem label="需求类型"><ElSelect v-model="projectType" clearable placeholder="全部类型" style="width: 150px"><ElOption label="普通需求" value="normal" /><ElOption label="优化需求" value="optimization" /></ElSelect></ElFormItem>
+          <ElFormItem label="需求类型"><ElSelect v-model="projectType" clearable placeholder="全部类型" style="width: 150px"><ElOption label="正式项目" value="normal" /><ElOption label="项目优化" value="optimization" /></ElSelect></ElFormItem>
           <ElFormItem label="需求部门"
             ><ElSelect
               v-model="department"
@@ -130,7 +130,7 @@
               ></template
             ></ElTableColumn
           >
-          <ElTableColumn label="类型 / 归属" min-width="150"><template #default="{ row }">{{ row.parentProjectId ? '优化 · ' + (prototypeStore.database?.projects.find(p => p.id === row.parentProjectId)?.name || row.parentProjectId) : '普通需求' }}</template></ElTableColumn>
+          <ElTableColumn label="类型 / 归属" min-width="150"><template #default="{ row }">{{ row.parentProjectId ? '项目优化 · ' + (prototypeStore.database?.projects.find(p => p.id === row.parentProjectId)?.name || row.parentProjectId) : '正式项目' }}</template></ElTableColumn>
           <ElTableColumn prop="department" label="提出部门" min-width="105" />
           <ElTableColumn label="提出人" min-width="80"
             ><template #default="{ row }">{{ userName(row.submitterId) }}</template></ElTableColumn
@@ -205,7 +205,7 @@
                 link
                 type="primary"
                 @click="openReview(row)"
-                >评估</ElButton
+                >{{ row.parentProjectId ? '优化审批' : '立项审批' }}</ElButton
               >
             </template>
           </ElTableColumn>

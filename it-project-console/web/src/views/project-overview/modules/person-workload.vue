@@ -3,7 +3,7 @@
     <div class="workload-header mb-4"
       ><div
         ><h4 class="font-medium">月度人员负载</h4
-        ><p class="text-xs text-g-500 mt-1">主责与协作分开统计，按人员顺序展示</p></div
+        ><p class="text-xs text-g-500 mt-1">负载包含正式项目与项目优化，主责与协作分开统计</p></div
       >
       <div class="month-actions"
         ><ElButton aria-label="负载上一月" @click="month = shiftMonth(month, -1)">上一月</ElButton
@@ -25,6 +25,7 @@
     />
     <ElTable v-if="rows.length" :data="rows" size="small" style="width: 100%">
       <ElTableColumn label="人员" prop="user.name" min-width="100" />
+      <ElTableColumn label="正式 / 优化" min-width="100"><template #default="{ row }">{{ row.typeCounts?.formal ?? row.projects.filter((p: DemoProject) => !p.parentProjectId).length }} / {{ row.typeCounts?.optimization ?? row.projects.filter((p: DemoProject) => p.parentProjectId).length }}</template></ElTableColumn>
       <ElTableColumn label="主责 / 协作" min-width="110"
         ><template #default="{ row }"
           ><ElPopover trigger="click" :width="340"
@@ -111,7 +112,7 @@
       const button = document.createElement('button')
       button.style.cssText =
         'display:block;white-space:normal;text-align:left;padding:8px 0;width:100%;cursor:pointer;border-bottom:1px solid #eee'
-      button.textContent = `${p.primaryOwnerId === row.user.id ? '主责' : '协作'} · ${p.name} · ${p.stage} · 预计交付 ${p.expectedDeliveryDate}${p.risks.length ? ' · ' + p.risks.join('；') : ''}`
+      button.textContent = `${p.primaryOwnerId === row.user.id ? '主责' : '协作'} · ${p.parentProjectId ? '项目优化' : '正式项目'} · ${p.name} · ${p.parentProjectId ? '优化完成验收' : p.stage} · 预计交付 ${p.expectedDeliveryDate}${p.risks.length ? ' · ' + p.risks.join('；') : ''}`
       button.onclick = () => emit('detail', p.id)
       root.append(button)
     })

@@ -48,7 +48,7 @@ test.describe('浏览器时区与上海提交日不一致', () => {
     await drawer.locator('input[type=file]').setInputFiles({ name: '需求.txt', mimeType: 'text/plain', buffer: Buffer.from('需求说明') })
     await drawer.getByRole('button', { name: '提交评估' }).click()
     await expect(page.getByRole('row').filter({ hasText: '跨时区当天需求' })).toContainText(
-      '待评估'
+      '待立项审批'
     )
   })
 })

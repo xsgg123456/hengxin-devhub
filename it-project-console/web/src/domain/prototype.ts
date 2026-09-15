@@ -100,6 +100,7 @@ export interface AcceptanceHistory {
   ownerId: string | null
 }
 export interface DemoProject {
+  legacyCode?: string | null
   parentProjectId?: string | null
   firstRequestedOn?: string
   businessOwnerId?: string
@@ -184,6 +185,7 @@ export interface PrototypeDatabase {
   projectProposals?: ProjectProposal[]
   demandCodeCounters?: Record<string, number>
   projectCodeCounters?: Record<string, number>
+  optimizationCodeCounters?: Record<string, number>
   schemaVersion: 2
   users: DemoUser[]
   demands: DemoDemand[]

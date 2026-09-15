@@ -1,6 +1,6 @@
 <template>
   <section class="mt-6">
-    <h4 class="font-medium mb-3">项目状态与管理</h4>
+    <h4 class="font-medium mb-3">{{ project.parentProjectId ? '项目优化状态与管理' : '正式项目状态与管理' }}</h4>
     <p class="text-sm mb-3">{{ stateLabel }}{{ project.archived ? ' · 已归档' : '' }}</p>
     <div class="actions">
       <template v-if="manager">
@@ -14,7 +14,7 @@
           v-if="!project.archived"
           :disabled="store.saving || confirming"
           @click="act('archive')"
-          >归档项目</ElButton
+          >{{ labels.archive }}</ElButton
         >
         <ElButton v-if="!active" :disabled="store.saving || confirming" @click="act('reopen')"
           >重新打开</ElButton
@@ -28,7 +28,7 @@
         plain
         :disabled="store.saving || confirming"
         @click="act('cancel')"
-        >取消项目</ElButton
+        >{{ labels.cancel }}</ElButton
       >
       <ElButton
         v-if="canDelete"
@@ -36,7 +36,7 @@
         plain
         :disabled="store.saving || confirming"
         @click="act('delete')"
-        >删除项目</ElButton
+        >{{ labels.delete }}</ElButton
       >
     </div>
     <ElAlert v-if="error" class="mt-3" type="error" :title="error" :closable="false" />
@@ -44,6 +44,7 @@
   </section>
 </template>
 <script setup lang="ts">
+  import { optimizationStatus } from '@/utils/optimization-display'
   import { computed, ref } from 'vue'
   import { runtimeConfig } from '@/config/runtime'
   import { ApiError } from '@/services/api-client'
@@ -64,7 +65,7 @@
   const manager = computed(() => store.currentUser.role === 'manager')
   const active = computed(() => props.project.status === 'active' && !props.project.archived)
   const stateLabel = computed(
-    () => ({ active: '进行中', completed: '已完成', cancelled: '已取消' })[props.project.status]
+    () => props.project.parentProjectId ? optimizationStatus(props.project) : ({ active: '进行中', completed: '已完成', cancelled: '已取消' })[props.project.status]
   )
   const canDelete = computed(
     () =>
@@ -75,13 +76,13 @@
             demand.id === props.project.demandId && demand.submitterId === store.currentUser.id
         ))
   )
-  const labels = {
-    cancel: '取消项目',
-    archive: '归档项目',
+  const labels = computed(() => ({
+    cancel: props.project.parentProjectId ? '取消优化' : '取消项目',
+    archive: props.project.parentProjectId ? '归档优化' : '归档项目',
     reopen: '重新打开',
-    delete: '删除项目'
-  }
-  async function act(action: keyof typeof labels) {
+    delete: props.project.parentProjectId ? '删除优化' : '删除项目'
+  }))
+  async function act(action: keyof typeof labels.value) {
     if (store.saving || confirming.value || (action === 'delete' && !canDelete.value)) return
     confirming.value = true
     const target = { ...props.project }
@@ -90,20 +91,20 @@
     try {
       if (action === 'cancel' || action === 'delete') {
         const result = await ElMessageBox.prompt(
-          `项目「${target.name}」：` +
+          `${target.parentProjectId ? '项目优化' : '正式项目'}「${target.name}」：` +
             (action === 'delete'
               ? target.demandId
                 ? '将永久删除此项目及原需求、全部进度记录和附件，并取消待发送通知，无法恢复。请填写删除原因。'
                 : '将永久删除此项目及全部进度记录，并取消待发送通知，无法恢复。请填写删除原因。'
               : '取消后保留全部历史和材料。请填写原因。'),
-          labels[action],
+          labels.value[action],
           {
             inputType: 'textarea',
             inputValue: reason,
             inputValidator: (v) =>
               (Boolean(v?.trim()) && v.trim().length <= 300) || '请填写 1～300 字原因',
-            confirmButtonText: '确认' + labels[action],
-            cancelButtonText: '保留项目',
+            confirmButtonText: '确认' + labels.value[action],
+            cancelButtonText: target.parentProjectId ? '保留优化' : '保留项目',
             type: 'warning'
           }
         )
@@ -111,13 +112,13 @@
         reasons.set(action, reason)
       } else
         await ElMessageBox.confirm(
-          `项目「${target.name}」：` +
+          `${target.parentProjectId ? '项目优化' : '正式项目'}「${target.name}」：` +
             (action === 'reopen'
               ? '恢复为进行中，保留全部历史。'
               : '归档后从默认活跃列表移除，可在含归档范围中查看。'),
-          labels[action],
+          labels.value[action],
           {
-            confirmButtonText: '确认' + labels[action],
+            confirmButtonText: '确认' + labels.value[action],
             cancelButtonText: '暂不操作',
             type: 'warning'
           }
@@ -140,7 +141,7 @@
         })
       operationKey = liveOperationKey()
       reasons.delete(action)
-      ElMessage.success(labels[action] + '成功')
+      ElMessage.success(labels.value[action] + '成功')
     } catch (cause) {
       error.value = cause instanceof Error ? cause.message : '保存失败，请重试'
       if (cause instanceof ApiError && cause.status === 409) {

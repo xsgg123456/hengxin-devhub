@@ -14,7 +14,7 @@ test('旧需求补号，新需求创建后列表与详情一致，刷新编辑�
   await date(editor, '期望上线日期', '2099-10-20')
   await editor.locator('input[type=file]').setInputFiles({ name: '需求.txt', mimeType: 'text/plain', buffer: Buffer.from('编号验证') })
   await editor.getByRole('button', { name: '提交评估' }).click()
-  await expect(row(page, name)).toContainText('待评估')
+  await expect(row(page, name)).toContainText('待立项审批')
   const demand = (await snapshot(page)).database.demands.find(d => d.name === name)!
   expect(demand.firstRequestedOn).toBe(new Date(new Date(demand.submittedAt).getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10))
   expect(demand.code).toMatch(/^XQ-\d{4}-\d{4,}$/)

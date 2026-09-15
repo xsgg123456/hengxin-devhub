@@ -43,7 +43,7 @@
   const menuLabel = import.meta.env.MODE === 'prototype' ? '切换演示身份' : '当前用户'
   const modeLabel =
     import.meta.env.MODE === 'prototype'
-      ? '演示模式'
+      ? (new URLSearchParams(window.location.search).get('taskTypePreview') === '1' ? '方案预览 · 示例数据' : '演示模式')
       : import.meta.env.MODE === 'live'
         ? '本地联调'
         : ''

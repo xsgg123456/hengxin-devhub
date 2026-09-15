@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import { identity, select } from './review-helpers'
 
-export const acceptanceDetail = (page: Page) => page.getByRole('dialog', { name: '项目详情', exact: true })
+export const acceptanceDetail = (page: Page) => page.getByRole('dialog', { name: /^(项目详情|优化详情)$/, exact: true })
 export async function acceptanceIdentity(page: Page, name: string, live = false) {
   const detail = acceptanceDetail(page)
   if (await detail.isVisible()) {
@@ -38,7 +38,7 @@ export async function completeBusinessAcceptance(page: Page, id: string, summary
   await openAcceptance(page, id)
   await acceptanceDetail(page).getByLabel('交付说明', { exact: true }).fill(summary)
   await acceptanceDetail(page).getByRole('button', { name: '提交验收', exact: true }).click()
-  await expect(acceptanceDetail(page)).toContainText('待业务验收')
+  await expect(acceptanceDetail(page)).toContainText(/待业务验收|待验收/)
   await acceptanceIdentity(page, '李思敏', live)
   await openAcceptance(page, id)
   await acceptanceDetail(page).getByRole('button', { name: '验收通过', exact: true }).click()

@@ -9,7 +9,7 @@
     :data-project-id="project.id"
   >
     <div class="card-heading"
-      ><h3>{{ project.name }}</h3
+      ><h3 :aria-label="project.name"><ElTag size="small" :type="project.parentProjectId ? 'warning' : 'primary'" class="mr-2">{{ project.parentProjectId ? '项目优化' : '正式项目' }}</ElTag>{{ project.name }}</h3
       ><template v-if="project.priority === 'P0'"
         ><span class="priority-focus"
           ><svg viewBox="0 0 24 24" aria-hidden="true">
@@ -20,15 +20,15 @@
         ></template
       ><ElTag v-else size="small" type="info">{{ project.priority }}</ElTag></div
     >
-    <p class="project-id">{{ projectCode(project) }}</p>
+    <p class="project-id">{{ projectCode(project) }}</p><OptimizationPreview v-if="project.parentProjectId" :project="project" />
     <div class="tags"
       ><ElTag size="small">{{
-        project.status === 'active'
+        project.parentProjectId ? optimizationStatus(project) : project.status === 'active'
           ? needsPlan(project)
             ? '待排期'
             : project.parentProjectId ? optimizationStatus(project) : statusLabel[project.simpleStatus]
           : project.status === 'completed'
-            ? '项目已完成'
+            ? project.parentProjectId ? '优化已完成' : '项目已完成'
             : '已取消'
       }}</ElTag
       ><ElTag size="small" type="info">{{ projectStageLabel(project, project.stage) }}</ElTag
@@ -52,13 +52,13 @@
         ><dd>{{ project.collaboratorIds.map(userName).join('、') || '无' }}</dd></div
       >
       <div
-        ><dt>预计上线</dt><dd>{{ project.expectedLaunchDate || '—' }}</dd></div
+        ><dt>{{ project.parentProjectId ? '计划开始' : '预计上线' }}</dt><dd>{{ (project.parentProjectId ? project.stagePlans?.[0]?.startDate : project.expectedLaunchDate) || '—' }}</dd></div
       >
       <div
-        ><dt>预计交付</dt><dd>{{ project.expectedDeliveryDate || '—' }}</dd></div
+        ><dt>{{ project.parentProjectId ? '计划交付' : '预计交付' }}</dt><dd>{{ project.expectedDeliveryDate || '—' }}</dd></div
       >
       <div
-        ><dt>原计划上线</dt><dd>{{ project.originalLaunchDate || '—' }}</dd></div
+        ><dt>{{ project.parentProjectId ? '业务期望完成' : '原计划上线' }}</dt><dd>{{ (project.parentProjectId ? demand?.expectedLaunchDate : project.originalLaunchDate) || '—' }}</dd></div
       >
       <div
         ><dt>原计划交付</dt><dd>{{ project.originalDeliveryDate || '—' }}</dd></div
@@ -78,22 +78,22 @@
         v-if="canUpdate && (!isOverall || !needsPlan(project))"
         type="primary"
         @click="$emit('update', project.id)"
-        >{{ isOverall ? '更新环节' : '填写协作进展' }}</ElButton
+        >{{ isOverall ? project.parentProjectId ? '更新优化进度' : '更新环节' : '填写协作进展' }}</ElButton
       ><ElButton
         v-if="canUpdate && isOverall"
         :type="needsPlan(project) ? 'primary' : 'default'"
         @click="planOpen = true"
-        >{{ needsPlan(project) ? '制定计划' : '调整计划' }}</ElButton
-      ><ElButton @click="$emit('detail', project.id)">详情</ElButton><ElButton v-if="canEditProject(store.currentUser, project)" @click="editOpen = true">编辑项目</ElButton></div
+        >{{ needsPlan(project) ? '制定计划' : project.parentProjectId ? '调整优化计划' : '调整计划' }}</ElButton
+      ><ElButton @click="$emit('detail', project.id)">详情</ElButton><ElButton v-if="canEditProject(store.currentUser, project)" @click="editOpen = true">{{ project.parentProjectId ? '编辑优化' : '编辑项目' }}</ElButton></div
     >
     <p class="relation-note">{{
       canUpdate
         ? isOverall
-          ? '按计划更新环节完成情况'
+          ? project.parentProjectId ? '按计划更新优化进度，完成后提交业务验收' : '按计划更新环节完成情况'
           : '仅填写个人进展，不改变整体进度'
         : '当前项目仅可查看'
     }}</p>
-    <OptimizationPreview v-if="project.parentProjectId || project.status === 'completed'" :project="project" />
+    <OptimizationPreview v-if="!project.parentProjectId && project.status === 'completed'" :project="project" />
     <ProjectEditDrawer v-if="project" v-model="editOpen" :project="project" />
     <ProjectPlanDrawer v-model="planOpen" :project="project" />
   </article>
@@ -241,6 +241,7 @@
   .actions {
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
     margin-top: 12px;
   }
   .actions .el-button {
@@ -252,4 +253,3 @@
     margin: 10px 0 0;
   }
 </style>
-

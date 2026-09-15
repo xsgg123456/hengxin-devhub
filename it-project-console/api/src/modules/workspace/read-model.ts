@@ -58,7 +58,7 @@ export const mapDemand = (demand: Demand & { attachments: Attachment[] }) => {
 }
 export const mapProject = (project: Project & { members: ProjectMember[] }) => ({
   id: project.id,
-  code: project.code,
+  code: project.code, legacyCode: project.legacyCode,
   requestId: project.requestId ?? project.id,
   version: project.version,
   demandId: project.demandId, parentProjectId: project.parentProjectId,

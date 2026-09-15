@@ -1,5 +1,5 @@
 <template>
-  <ElDrawer :model-value="modelValue" title="编辑项目" size="min(960px, 95vw)" :before-close="beforeClose" append-to-body @update:model-value="emit('update:modelValue', $event)">
+  <ElDrawer :model-value="modelValue" :title="project.parentProjectId ? '编辑优化' : '编辑项目'" size="min(960px, 95vw)" :before-close="beforeClose" append-to-body @update:model-value="emit('update:modelValue', $event)">
     <template v-if="form">
       <ElAlert v-if="stale" :title="stale" type="warning" :closable="false" class="mb-4" />
       <div class="edit-heading"><div><h3>{{ project.name }}</h3><p>{{ projectCode(project) }} · 全局编辑</p></div><ElTag :type="pending ? 'warning' : 'success'">{{ pending ? '迁移待核实' : '正常项目' }}</ElTag></div>
@@ -14,7 +14,7 @@
       <ElForm label-position="top" :disabled="busy" class="edit-form">
         <section v-show="tab === 'basic'">
           <ElFormItem label="项目名称" required><ElInput v-model="form.name" aria-label="项目名称" maxlength="100" /></ElFormItem>
-          <ElFormItem label="需求首次提出日期"><ElDatePicker v-model="form.firstRequestedOn" aria-label="需求首次提出日期" type="date" value-format="YYYY-MM-DD" placeholder="未知可暂留空，待核实后补录" :disabled-date="futureDate" /><p class="hint">业务实际首次提出需求的日期。退回重提、立项和迁移不改变该日期。</p></ElFormItem>
+          <ElFormItem label="需求首次提出日期"><ElDatePicker v-model="form.firstRequestedOn" aria-label="需求首次提出日期" type="date" value-format="YYYY-MM-DD" placeholder="未知可暂留空，待核实后补录" :disabled-date="futureDate" /><p class="hint">业务实际首次提出需求的日期。退回重提、审批和迁移不改变该日期。</p></ElFormItem>
           <div class="edit-grid"><ElFormItem label="需求部门" required><ElInput v-model="form.department" aria-label="需求部门" /></ElFormItem><ElFormItem label="优先级"><ElRadioGroup v-model="form.priority"><ElRadioButton v-for="p in ['P0','P1','P2']" :key="p" :value="p">{{ p }}</ElRadioButton></ElRadioGroup></ElFormItem></div>
           <ElFormItem label="项目描述"><ElInput v-model="form.description" aria-label="项目描述" type="textarea" :rows="5" maxlength="3000" show-word-limit /></ElFormItem>
           <ElFormItem label="交付访问链接"><ElInput v-model="form.acceptanceUrl" aria-label="交付访问链接" placeholder="填写项目访问地址" /></ElFormItem>
@@ -29,13 +29,13 @@
           <ElEmpty v-if="!users.length" description="暂无可选人员" />
         </section>
         <section v-show="tab === 'schedule'">
-          <div class="edit-grid"><ElFormItem label="当前环节"><ElSelect v-model="form.stage" aria-label="当前环节"><ElOption v-for="s in (project.parentProjectId ? ['验收交付'] : PROJECT_STAGES)" :key="s" :label="project.parentProjectId ? '优化交付' : s" :value="s" /></ElSelect></ElFormItem><ElFormItem label="环节状态"><ElSelect v-model="form.simpleStatus" aria-label="环节状态"><ElOption v-for="s in editableStatuses" :key="s" :label="statusLabel[s]" :value="s" /></ElSelect></ElFormItem></div>
+          <div class="edit-grid"><ElFormItem label="当前环节"><ElSelect v-model="form.stage" aria-label="当前环节"><ElOption v-for="s in (project.parentProjectId ? ['验收交付'] : PROJECT_STAGES)" :key="s" :label="project.parentProjectId ? '优化完成验收' : s" :value="s" /></ElSelect></ElFormItem><ElFormItem label="环节状态"><ElSelect v-model="form.simpleStatus" aria-label="环节状态"><ElOption v-for="s in editableStatuses" :key="s" :label="statusLabel[s]" :value="s" /></ElSelect></ElFormItem></div>
           <ElAlert title="业务验收结果继续沿用原验收入口；本表单不会直接标记项目验收通过。" type="info" :closable="false" class="mb-4" />
           <ElFormItem v-if="form.simpleStatus === 'blocked'" label="阻塞说明" required><ElInput v-model="form.blocker" aria-label="阻塞说明" type="textarea" /></ElFormItem>
-          <div class="edit-grid"><ElFormItem v-for="item in (project.parentProjectId ? dateFields.filter(d => d.key === 'approvedLaunchDate') : dateFields)" :key="item.key" :label="item.label"><ElDatePicker v-model="form[item.key]" :aria-label="item.label" value-format="YYYY-MM-DD" type="date" /></ElFormItem></div>
-          <h4 class="mb-3">{{ project.parentProjectId ? '优化交付计划' : '七个环节计划' }}</h4>
-          <div v-for="plan in form.stagePlans" :key="plan.stage" class="plan-row"><span>{{ project.parentProjectId ? '优化交付' : plan.stage }}</span><ElDatePicker v-model="plan.startDate" :aria-label="plan.stage + '计划开始'" value-format="YYYY-MM-DD" placeholder="计划开始" /><ElDatePicker v-model="plan.endDate" :aria-label="plan.stage + '计划结束'" value-format="YYYY-MM-DD" placeholder="计划结束" /></div>
-          <p class="hint">历史实际发生记录保留；计划日期修改将记录本次原因。各环节计划须按顺序衔接；已填写上线部署或验收交付计划时，预计上线、交付须与对应计划结束日期一致。</p>
+          <div class="edit-grid"><ElFormItem v-for="item in (project.parentProjectId ? dateFields.filter(d => d.key === 'approvedLaunchDate') : dateFields)" :key="item.key" :label="dateLabel(item.label)"><ElDatePicker v-model="form[item.key]" :aria-label="dateLabel(item.label)" value-format="YYYY-MM-DD" type="date" /></ElFormItem></div>
+          <h4 class="mb-3">{{ project.parentProjectId ? '优化完成验收计划' : '七个环节计划' }}</h4>
+          <div v-for="plan in form.stagePlans" :key="plan.stage" class="plan-row"><span>{{ project.parentProjectId ? '优化完成验收' : plan.stage }}</span><ElDatePicker v-model="plan.startDate" :aria-label="(project.parentProjectId ? '优化完成验收' : plan.stage) + '计划开始'" value-format="YYYY-MM-DD" placeholder="计划开始" /><ElDatePicker v-model="plan.endDate" :aria-label="(project.parentProjectId ? '优化完成验收' : plan.stage) + '计划交付'" value-format="YYYY-MM-DD" placeholder="计划结束" /></div>
+          <p class="hint">{{ project.parentProjectId ? '历史实际发生记录保留；计划日期修改将记录本次原因，计划交付日期与优化完成验收节点的结束日期一致。' : '历史实际发生记录保留；计划日期修改将记录本次原因。各环节计划须按顺序衔接；已填写上线部署或验收交付计划时，预计上线、交付须与对应计划结束日期一致。' }}</p>
         </section>
         <section v-show="tab === 'migration'">
           <ElAlert title="核实完成后，项目恢复正常管理" type="success" :closable="false">保存修改可分次整理；完成核实将去掉项目名称中的迁移标记，真实延期和阻塞仍保留。</ElAlert>
@@ -99,6 +99,7 @@ const editableStatuses = computed<SimpleStatus[]>(() => props.project.simpleStat
 const dateFields = [
   { key: 'approvedLaunchDate', label: '审批确认上线日期' }, { key: 'expectedLaunchDate', label: '预计上线' }, { key: 'expectedDeliveryDate', label: '预计交付' }, { key: 'originalLaunchDate', label: '原计划上线' }, { key: 'originalDeliveryDate', label: '原计划交付' }
 ] as const
+const dateLabel = (label: string) => props.project.parentProjectId ? label.replace('上线', '完成') : label
 const name = (id?: string | null) => users.value.find(u => u.id === id)?.name || '未指定'
 const peopleChanges = computed(() => {
   if (!form.value) return []
@@ -114,9 +115,9 @@ const changes = computed(() => {
   if ((form.value.firstRequestedOn || '') !== originalDate) lines.push(`需求首次提出日期：${originalDate || '待核实'} → ${form.value.firstRequestedOn || '待核实'}`)
   for (const [key, label] of [['name','项目名称'], ['department','需求部门'], ['priority','优先级'], ['stage','当前环节'], ['simpleStatus','环节状态'], ...dateFields.map(d => [d.key, d.label])] as [keyof DemoProject, string][]) {
     const display = (value: unknown) => key === 'simpleStatus' ? statusLabel[value as SimpleStatus] || '未知状态' : value || '未填写'
-    if (form.value[key] !== props.project[key]) lines.push(`${label}：${display(props.project[key])} → ${display(form.value[key])}`)
+    if (form.value[key] !== props.project[key]) lines.push(`${dateLabel(label)}：${display(props.project[key])} → ${display(form.value[key])}`)
   }
-  if (JSON.stringify(form.value.stagePlans) !== JSON.stringify((JSON.parse(initialForm.value) as DemoProject).stagePlans)) lines.push('七环节计划已调整，请核对日期')
+  if (JSON.stringify(form.value.stagePlans) !== JSON.stringify((JSON.parse(initialForm.value) as DemoProject).stagePlans)) lines.push(props.project.parentProjectId ? '优化完成验收计划已调整，请核对日期' : '七环节计划已调整，请核对日期')
   if (['description','acceptanceUrl','acceptanceSummary','blocker'].some(k => form.value![k as keyof DemoProject] !== props.project[k as keyof DemoProject])) lines.push('项目描述、交付资料或阻塞说明已修改')
   return lines
 })
@@ -125,7 +126,7 @@ const checks = computed(() => [
   { label: '项目名称与需求部门', ok: !!form.value?.name.trim() && !!form.value.department.trim() },
   { label: '主负责工程师', ok: !!form.value?.primaryOwnerId },
   { label: '业务负责人及验收人', ok: !!form.value?.businessOwnerId && !!form.value.acceptanceOwnerId },
-  { label: '预计上线与交付日期', ok: !!form.value?.expectedLaunchDate && !!form.value.expectedDeliveryDate }
+  { label: props.project.parentProjectId ? '预计完成与交付日期' : '预计上线与交付日期', ok: !!form.value?.expectedLaunchDate && !!form.value.expectedDeliveryDate }
 ])
 watch(() => props.modelValue, open => {
   if (!open) return
@@ -158,7 +159,7 @@ async function save() {
     initialForm.value = JSON.stringify(form.value)
     confirmOpen.value = false
     emit('update:modelValue', false)
-    ElMessage.success(verifying.value ? '核实完成，项目已恢复正常管理' : '项目已保存，相关页面已同步')
+    ElMessage.success(verifying.value ? '核实完成，项目已恢复正常管理' : props.project.parentProjectId ? '项目优化已保存，相关页面已同步' : '正式项目已保存，相关页面已同步')
   } catch (e) { error.value = e instanceof Error ? e.message : '保存失败，请重试' }
 }
 </script>
@@ -178,4 +179,3 @@ async function save() {
 .change-row { padding:8px 0; border-bottom:1px solid var(--el-border-color-lighter); overflow-wrap:anywhere; }
 @media(max-width:600px) { .edit-grid { grid-template-columns:1fr; } .plan-row { grid-template-columns:1fr 1fr; } .plan-row > span { grid-column:1 / -1; } }
 </style>
-

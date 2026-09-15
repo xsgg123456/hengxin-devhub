@@ -23,6 +23,23 @@ export interface ResponsibilityTask {
   demandId?: string
   severity: number
   days: number
+  enteredAt?: string
+}
+
+export const taskCategory = (task: ResponsibilityTask) =>
+  ['review', 'reassess'].includes(task.action) ? 'approval' : task.action === 'proposal' ? 'followup' : task.action === 'coordinate' ? 'risk' : 'other'
+
+export function compareTasks(a: ResponsibilityTask, b: ResponsibilityTask, manager: boolean) {
+  if (manager) {
+    const rank = { approval: 0, other: 1, risk: 2, followup: 3 }
+    const category = taskCategory(a), order = rank[category] - rank[taskCategory(b)]
+    if (order) return order
+    if (category !== 'risk') {
+      const time = (task: ResponsibilityTask) => task.enteredAt && Number.isFinite(Date.parse(task.enteredAt)) ? Date.parse(task.enteredAt) : Infinity
+      return time(a) - time(b) || a.id.localeCompare(b.id)
+    }
+  }
+  return a.severity - b.severity || b.days - a.days || a.id.localeCompare(b.id)
 }
 
 export function responsibilityTasks(
@@ -39,6 +56,7 @@ export function responsibilityTasks(
       tasks.push({
         id: p.id,
         proposalId: p.id,
+        enteredAt: p.status === 'returned' ? p.updatedAt : p.createdAt,
         name: p.name,
         reason:
           p.status === 'returned' ? '工程师退回管理评估：' + p.reviewReason : '待主负责工程师确认',
@@ -56,6 +74,7 @@ export function responsibilityTasks(
       tasks.push({
         id: d.id,
         demandId: d.id,
+        enteredAt: d.submittedAt,
         name: d.name,
         reason: '需求待评估',
         action: 'review',
@@ -69,6 +88,7 @@ export function responsibilityTasks(
         name: d.name,
         reason: d.reviewReason || '材料需要补充',
         action: 'supplement',
+        enteredAt: d.reviewedAt || d.submittedAt,
         severity: 4,
         days: 0
       })
@@ -88,6 +108,7 @@ export function responsibilityTasks(
         name: p.name,
         reason: '待我验收：请确认交付结果',
         action: 'acceptance',
+        enteredAt: p.acceptanceSubmittedAt || p.updatedAt,
         severity: 3,
         days: 0
       })
@@ -96,8 +117,9 @@ export function responsibilityTasks(
   for (const p of db.projects) {
     if (p.status !== 'active' || p.archived) continue
     if (p.acceptanceStatus === 'pending' && (user.role === 'engineer' || p.acceptanceOwnerId === user.id)) continue
-    const risks =
+    const allRisks =
       p.riskVersion !== undefined ? p.risks : computeProjectRisks(p, db.scheduleChanges, now)
+    const risks = user.role === 'manager' ? allRisks.filter(r => !r.includes('存在日期调整历史')) : allRisks
     const delay = risks.filter((r) => r.includes('延期'))
     const stale = risks.filter((r) => r.includes('未更新'))
     const severity = delay.length
@@ -140,9 +162,7 @@ export function responsibilityTasks(
       days
     })
   }
-  return tasks.sort(
-    (a, b) => a.severity - b.severity || b.days - a.days || a.id.localeCompare(b.id)
-  )
+  return tasks.sort((a, b) => compareTasks(a, b, user.role === 'manager'))
 }
 
 export function filterPendingTasks(
@@ -150,7 +170,8 @@ export function filterPendingTasks(
   db: PrototypeDatabase,
   userId: string,
   scope: string,
-  department: string
+  department: string,
+  projectType = ''
 ) {
   return tasks.filter((task) => {
     if (task.proposalId) {
@@ -158,6 +179,7 @@ export function filterPendingTasks(
       if (!p) return false
       const demand = db.demands.find((d) => d.id === p.demandId)
       return (
+        (!projectType || (projectType === 'optimization') === !!demand?.parentProjectId) &&
         (!department || p.department === department) &&
         (scope !== 'mine' ||
           (demand
@@ -169,6 +191,7 @@ export function filterPendingTasks(
       task.action === 'review' ? db.demands.find((d) => d.id === task.demandId) : undefined
     return (
       !!demand &&
+      (!projectType || (projectType === 'optimization') === !!demand.parentProjectId) &&
       (!department || demand.department === department) &&
       (scope !== 'mine' || demand.submitterId === userId)
     )

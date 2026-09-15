@@ -116,11 +116,12 @@ export function personWorkload(
         primary,
         collaboration,
         projects: assigned,
+        typeCounts: { formal: assigned.filter(p => !p.parentProjectId).length, optimization: assigned.filter(p => p.parentProjectId).length, total: assigned.length },
         overlap: maximumOverlap(primary, month),
-        stages: PROJECT_STAGES.map((stage) => ({
+        stages: [...PROJECT_STAGES.map((stage) => ({
           stage,
-          count: assigned.filter((p) => p.stage === stage).length
-        })).filter((s) => s.count),
+          count: assigned.filter((p) => !p.parentProjectId && p.stage === stage).length
+        })), {stage: '优化完成验收', count: assigned.filter(p => p.parentProjectId).length}].filter((s) => s.count),
         delayed: assigned.filter((p) => p.risks.some((r) => r.includes('延期'))),
         blocked: assigned.filter((p) => p.simpleStatus === 'blocked'),
         stale: assigned.filter((p) => p.risks.some((r) => r.includes('未更新')))

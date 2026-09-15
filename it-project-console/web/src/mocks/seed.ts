@@ -1,3 +1,4 @@
+import { applyTaskTypePreview } from './task-type-preview'
 import type { PrototypeSnapshot } from '@/domain/prototype'
 import { migratePrototypeSnapshot } from '@/repositories/prototype-migration'
 import { computeProjectRisks } from '@/services/risk-service'
@@ -180,6 +181,7 @@ export function createInitialPrototypeSnapshot(): PrototypeSnapshot {
       lastOverallUpdatedAt: '2026-09-15T13:26:00+08:00', risks: [], blocker: ''
     })
   }
+  if (import.meta.env.MODE === 'prototype' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('taskTypePreview') === '1') applyTaskTypePreview(snapshot)
   return snapshot
 }
 import { initializeAcceptance } from '@/services/acceptance-service'

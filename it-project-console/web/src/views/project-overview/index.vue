@@ -27,7 +27,7 @@
       <div class="art-card p-5 mb-5">
         <div class="art-card-header mb-4"
           ><div class="title"><h4>项目总览</h4></div
-          ><span class="text-xs text-g-500">共 {{ total }} 个项目</span></div
+          ><span class="text-xs text-g-500">正式项目 {{ typeCounts.formal }} 个 · 项目优化 {{ typeCounts.optimization }} 项 · 合计 {{ total }} 项</span></div
         >
         <ElForm inline label-position="top" class="filters">
           <ElFormItem label="搜索项目"
@@ -37,7 +37,7 @@
               clearable
               style="width: 250px"
           /></ElFormItem>
-<ElFormItem label="项目类型"><ElSelect v-model="projectType" aria-label="项目类型" placeholder="全部类型" style="width: 140px"><ElOption label="全部类型" value="" /><ElOption label="普通项目" value="normal" /><ElOption label="优化项目" value="optimization" /></ElSelect></ElFormItem>
+<ElFormItem label="项目类型"><ElSelect v-model="projectType" aria-label="项目类型" placeholder="全部类型" style="width: 140px"><ElOption label="全部类型" value="" /><ElOption label="正式项目" value="normal" /><ElOption label="项目优化" value="optimization" /></ElSelect></ElFormItem>
           <ElFormItem label="需求部门"
             ><ElSelect
               v-model="department"
@@ -193,6 +193,7 @@
   const route = useRoute()
   const router = useRouter()
   const {
+    typeCounts,
     distribution,
     query,
     page,
@@ -260,6 +261,3 @@
   )
 </script>
 <style scoped src="./style.css"></style>
-
-
-

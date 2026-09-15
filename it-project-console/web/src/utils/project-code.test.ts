@@ -7,6 +7,20 @@ import { PrototypeRepository } from '@/repositories/prototype-repository'
 import { actionProject } from '@/services/lifecycle-service'
 
 describe('原型项目编号', () => {
+  it('旧优化迁移为YH且保留旧编号，独立序列重载删除后不复用', () => {
+    const snapshot=createInitialPrototypeSnapshot(), db=snapshot.database
+    db.projects[0].parentProjectId=db.projects[1].id
+    const old=db.projects[0].code
+    backfillProjectCodes(db)
+    expect(db.projects[0]).toMatchObject({code:'YH-2026-0001',legacyCode:old})
+    backfillProjectCodes(db)
+    expect(db.projects[0].legacyCode).toBe(old)
+    expect(nextProjectCode(db,'2026-09-15',true)).toBe('YH-2026-0002')
+    expect(nextProjectCode(db,'2026-09-15')).toBe('XM-2026-0004')
+    db.projects=[]
+    backfillProjectCodes(db)
+    expect(nextProjectCode(db,'2026-09-15',true)).toBe('YH-2026-0003')
+  })
   it('删除和重新加载快照仍保留已分配高水位', () => {
     const storage = new Map<string, string>()
     const repository = new PrototypeRepository({

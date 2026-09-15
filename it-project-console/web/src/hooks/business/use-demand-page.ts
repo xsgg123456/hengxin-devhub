@@ -34,6 +34,7 @@ export function useDemandPage() {
         status.value = query.status
         scope.value = query.scope === 'mine' ? 'mine' : 'all'
         department.value = typeof query.department === 'string' ? query.department : ''
+        projectType.value = query.projectType === 'optimization' ? 'optimization' : query.projectType === 'normal' ? 'normal' : ''
       }
     },
     { immediate: true }
@@ -154,13 +155,13 @@ export function useDemandPage() {
   )
   const metrics = computed(() => [
     { label: '当前范围需求', value: demands.value.length, icon: 'ri:file-list-3-line' },
-    { label: '待评估', value: pendingCount.value, icon: 'ri:timer-line' },
+    { label: '待审批', value: pendingCount.value, icon: 'ri:timer-line' },
     {
       label: '待工程师确认',
       value: demands.value.filter((d) => d.status === 'awaiting_engineer').length,
       icon: 'ri:user-follow-line'
     },
-    { label: '已立项', value: establishedCount.value, icon: 'ri:checkbox-circle-line' },
+    { label: '已批准', value: establishedCount.value, icon: 'ri:checkbox-circle-line' },
     {
       label: '关联在途项目',
       value: !runtimeConfig.isPrototype
@@ -176,14 +177,14 @@ export function useDemandPage() {
     DemandStatus | 'returned_management' | 'pre_establishment',
     string
   > = {
-    pre_establishment: '待立项（评估/确认）',
+    pre_establishment: '待审批 / 待接单',
     returned_management: '退回管理评估',
     awaiting_engineer: '待工程师确认',
     draft: '草稿',
-    rejected: '不予立项',
-    pending: '待评估',
+    rejected: '未通过',
+    pending: '待审批',
     returned: '退回补充',
-    established: '已立项',
+    established: '已批准',
     withdrawn: '已撤回'
   }
   const demandStatusText = (status: DemandStatus, id?: string) =>
@@ -192,7 +193,7 @@ export function useDemandPage() {
       (p) => p.demandId === id && p.status === 'returned'
     )
       ? '退回管理评估'
-      : demandStatusLabel[status]
+      : prototypeStore.visibleDemands.find(d => d.id === id)?.parentProjectId ? ({pending:'待优化审批',established:'优化已批准',rejected:'优化未通过'} as Partial<Record<DemandStatus,string>>)[status] || demandStatusLabel[status] : ({pending:'待立项审批',established:'已立项',rejected:'不予立项'} as Partial<Record<DemandStatus,string>>)[status] || demandStatusLabel[status]
   const demandStatusType = (status: DemandStatus) =>
     status === 'established' ? 'success' : status === 'pending' ? 'warning' : 'info'
   const linkedProject = (demandId: string) =>
@@ -210,7 +211,7 @@ export function useDemandPage() {
           : '尚未转为项目'
     }
     const state = { active: '进行中', completed: '已完成', cancelled: '已取消' }[project.status]
-    return `已转 ${projectCode(project)} · ${project.parentProjectId ? '优化交付' : project.stage} · ${state}${project.stage === '验收交付' ? ' · ' + acceptanceLabel(project) : ''}${project.archived ? ' · 已归档' : ''}`
+    return `已转 ${projectCode(project)} · ${project.parentProjectId ? '优化完成验收' : project.stage} · ${state}${project.stage === '验收交付' ? ' · ' + acceptanceLabel(project) : ''}${project.archived ? ' · 已归档' : ''}`
   }
   const formatDate = (value: string) => value || '—'
   const formatDateTime = displayTime

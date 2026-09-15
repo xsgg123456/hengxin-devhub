@@ -5,6 +5,7 @@ import { sendWorkMessage, workMessageResult, type MessageClient } from '../dingt
 import { prepareManagerRiskDigest } from './manager-risk-digest.js'
 import { sendRobotMessage, robotMessageResult, type RobotClient } from '../dingtalk/dingtalk-robot-message.js'
 import { recipientScope, skipHistoricalNotifications, type NotificationScope } from './notification-scope.js'
+import { notificationProjectLabels } from './notification-project.js'
 
 const supported = new Set(['DEMAND_SUBMITTED', 'ACCEPTANCE_SUBMITTED', 'ACCEPTANCE_RETURNED', 'PROPOSAL_ASSIGNED', 'PROPOSAL_RETURNED', 'MANAGER_RISK_DIGEST', 'PROJECT_RISKS_CHANGED', 'DEMAND_RETURNED', 'DEMAND_APPROVED', 'PROJECT_ASSIGNED', 'PROJECT_COMPLETED'])
 const samples = new Set(['user-manager-chen', 'user-business-li', 'user-engineer-wang', 'user-engineer-zhao'])
@@ -24,8 +25,11 @@ export function notificationContent(item: Omit<Item, 'project'> & { project: Omi
     const projects = Array.isArray(payload.projects) ? payload.projects : []
     const blocks = projects.flatMap(project => {
       if (!project || typeof project !== 'object' || Array.isArray(project) || typeof project.projectId !== 'string') return []
-      return [[`项目：${project.name}`, `负责人：${project.owner}`,
-        ...(Array.isArray(project.risks) ? project.risks.filter(risk => typeof risk === 'string') : []),
+      const labels = notificationProjectLabels(typeof project.parentProjectId === 'string' ? project.parentProjectId : null,
+        typeof project.stage === 'string' ? project.stage : '',
+        Array.isArray(project.risks) ? project.risks.filter((risk): risk is string => typeof risk === 'string') : [])
+      return [[`${labels.type}：${project.name}`, `负责人：${project.owner}`, ...(labels.stage ? [`阶段：${labels.stage}`] : []),
+        ...labels.risks,
         `查看详情：${new URL(`/#/project-overview?projectId=${encodeURIComponent(project.projectId)}`, origin).href}`].join('\n')]
     })
     const overview = `查看全部：${new URL('/#/project-overview', origin).href}`
@@ -49,12 +53,28 @@ export function notificationContent(item: Omit<Item, 'project'> & { project: Omi
     title.DEMAND_APPROVED = '需求已正式立项，请制定计划'
     title.PROJECT_ASSIGNED = '项目已正式立项，请制定计划'
   }
+  const optimization = !!(item.project?.parentProjectId ?? item.demand?.parentProjectId)
+  if (optimization) {
+    Object.assign(title, {
+      DEMAND_SUBMITTED: '项目优化待审批，请及时处理',
+      DEMAND_APPROVED: '项目优化已批准', PROJECT_ASSIGNED: '项目优化已分配',
+      PROPOSAL_ASSIGNED: '项目优化待确认接单', PROPOSAL_RETURNED: '项目优化退回管理评估',
+      ACCEPTANCE_SUBMITTED: '项目优化待完成验收', ACCEPTANCE_RETURNED: '项目优化验收退回整改',
+      PROJECT_COMPLETED: '项目优化已完成', DEMAND_RETURNED: '项目优化需求已退回',
+      PROJECT_RISKS_CHANGED: '项目优化风险提醒'
+    })
+    if (item.recipient.role === 'ENGINEER' && item.project?.primaryOwnerId === item.recipientId) {
+      title.DEMAND_APPROVED = '项目优化已批准，请制定计划'
+      title.PROJECT_ASSIGNED = '项目优化已批准，请制定计划'
+    }
+  }
   const risks = Array.isArray(payload.risks) ? payload.risks.filter((risk): risk is string =>
     typeof risk === 'string' && (item.recipient.role === 'MANAGER' || /临期|延期|未更新|阻塞/.test(risk))) : []
   const path = typeof payload.proposalId === 'string' ? `/#/today-tasks?proposalId=${encodeURIComponent(payload.proposalId)}` : item.projectId ? `/#/project-overview?projectId=${encodeURIComponent(item.projectId)}` :
     `/#/my-demands?demandId=${encodeURIComponent(item.demandId ?? '')}`
-  return [title[item.eventType], `项目：${item.project?.name ?? item.demand?.name ?? payload.name ?? '需求'}`,
-    item.project ? `负责人：${item.project.primaryOwner.name}` : '', ...risks,
+  return [title[item.eventType], `${optimization ? '项目优化' : '正式项目'}：${item.project?.name ?? item.demand?.name ?? payload.name ?? '需求'}`,
+    item.project ? `负责人：${item.project.primaryOwner.name}` : '',
+    ...notificationProjectLabels(optimization ? 'optimization' : null, item.project?.stage ?? '', risks).risks,
     typeof payload.reason === 'string' ? `原因：${payload.reason}` : '',
     `查看详情：${new URL(path, origin).href}`].filter(Boolean).join('\n')
 }
