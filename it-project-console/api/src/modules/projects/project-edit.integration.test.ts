@@ -94,6 +94,14 @@ describe('正式完整编辑API',()=>{
     expect(notifications.map(n=>n.recipientId).sort()).toEqual([engineer,collab].sort())
     expect((await db.demand.findUniqueOrThrow({where:{id:p.demandId!}})).ownerId).toBe(business)
   })
+  it('项目完整编辑可指定管理员和工程师为验收人',async()=>{
+    const p=await fixture()
+    for(const acceptanceOwnerId of [manager,collab]) {
+      const current=await row(p.id)
+      expect((await save(p.id,input(current,{acceptanceOwnerId}))).statusCode).toBe(200)
+      expect((await row(p.id)).acceptanceOwnerId).toBe(acceptanceOwnerId)
+    }
+  })
   it('仅当前迁移主责与指定管理员获权，正常及名称伪造不得提权',async()=>{
     const p=await fixture()
     for(const user of [collab,business]) expect((await save(p.id,input(p,{primaryOwnerId:user}),user)).statusCode).toBe(403)

@@ -9,7 +9,7 @@ import { lifecycleEvent } from '../notifications/lifecycle-event-service.js'
 import { refreshProjectRisks } from '../risks/risk-scan-job.js'
 import { assertScheduled } from './project-plan-state.js'
 import { acceptanceSchema } from './acceptance-schemas.js'
-import { acceptanceHistory, finishAcceptanceStage, notificationLock, validBusiness } from './acceptance-state.js'
+import { acceptanceHistory, finishAcceptanceStage, notificationLock, validAcceptanceOwner } from './acceptance-state.js'
 export class AcceptanceService {
   constructor(private readonly db: PrismaClient) {}
   async act(actor: Actor, id: string, body: unknown) {
@@ -26,21 +26,21 @@ export class AcceptanceService {
       const { action } = input, now = new Date(), summary = input.summary ?? ''
       if (action === 'assign') {
         if (currentActor.role !== 'MANAGER') throw new AppError(403, 'FORBIDDEN', '只有管理人员可改派验收人')
-        await validBusiness(tx, input.ownerId)
+        await validAcceptanceOwner(tx, input.ownerId)
         if (input.ownerId === project.acceptanceOwnerId) invalid('验收负责人未变化')
       } else {
         if (action === 'submit' || action === 'withdraw') {
           if (actor.id !== project.primaryOwnerId || currentActor.role !== 'ENGINEER' || !isEngineerEligible(currentActor))
             throw new AppError(403, 'FORBIDDEN', '仅主负责工程师可提交或撤回验收')
         } else {
-          if (actor.id !== project.acceptanceOwnerId || currentActor.role !== 'BUSINESS')
+          if (actor.id !== project.acceptanceOwnerId)
             throw new AppError(403, 'FORBIDDEN', '仅指定业务验收人可通过或退回')
-          await validBusiness(tx, project.acceptanceOwnerId)
+          await validAcceptanceOwner(tx, project.acceptanceOwnerId)
         }
         if (project.stage !== '验收交付') invalid('仅验收交付阶段可操作验收')
         if (action === 'submit') {
           if (project.acceptanceStatus === 'pending') invalid('已提交验收，请等待业务确认或撤回')
-          await validBusiness(tx, project.acceptanceOwnerId)
+          await validAcceptanceOwner(tx, project.acceptanceOwnerId)
           assertScheduled(project.stage, project.stagePlans)
         } else if (project.acceptanceStatus !== 'pending') invalid('当前没有待业务验收的提交')
       }

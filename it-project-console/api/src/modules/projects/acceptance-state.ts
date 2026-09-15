@@ -8,11 +8,11 @@ export function acceptanceHistory(project: Project, action: string, actorId: str
 export async function notificationLock(tx: Prisma.TransactionClient) {
   await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':notification-flush', 0))::text`
 }
-export async function validBusiness(tx: Prisma.TransactionClient, id: string | null) {
+export async function validAcceptanceOwner(tx: Prisma.TransactionClient, id: string | null) {
   if (!id) throw new AppError(400, 'ACCEPTANCE_OWNER_REQUIRED', '请先指定有效业务验收负责人')
   await tx.$queryRaw`SELECT id FROM users WHERE id = ${id} FOR SHARE`
   const user = await tx.user.findUnique({ where: { id } })
-  if (!user?.active || user.role !== 'BUSINESS') throw new AppError(400, 'INVALID_ACCEPTANCE_OWNER', '验收负责人必须是有效业务人员')
+  if (!user?.active) throw new AppError(400, 'INVALID_ACCEPTANCE_OWNER', '验收负责人必须是有效公司人员')
   return user
 }
 export function invalidateAcceptance(project: Project, actorId: string, now: Date, reason: string): Prisma.ProjectUpdateInput {

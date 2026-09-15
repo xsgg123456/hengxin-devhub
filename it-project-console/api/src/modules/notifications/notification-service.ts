@@ -115,7 +115,7 @@ export class NotificationService {
     const acceptanceExpired = item.eventType.startsWith('ACCEPTANCE_') && (
       !item.project || item.project.status !== 'ACTIVE' || item.project.archived ||
       payload.acceptanceRound !== item.project.acceptanceRound ||
-      (item.eventType === 'ACCEPTANCE_SUBMITTED' && (item.project.acceptanceStatus !== 'pending' || item.project.acceptanceOwnerId !== item.recipientId || item.recipient.role !== 'BUSINESS')) ||
+      (item.eventType === 'ACCEPTANCE_SUBMITTED' && (item.project.acceptanceStatus !== 'pending' || item.project.acceptanceOwnerId !== item.recipientId)) ||
       (item.eventType === 'ACCEPTANCE_RETURNED' && (item.project.acceptanceStatus !== 'returned' || item.project.primaryOwnerId !== item.recipientId)))
     const assignmentExpired = item.eventType === 'PROJECT_ASSIGNED' && (!item.project || ![
       item.project.primaryOwnerId, ...item.project.members.map(member => member.userId),

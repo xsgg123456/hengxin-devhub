@@ -11,7 +11,7 @@ import { saveProposal } from './proposal-service.js'
 export async function createProject(tx: Prisma.TransactionClient, input: ProjectInput, demandId?: string) {
   await validateProjectMembers(tx, input)
   const demand = demandId ? await tx.demand.findUnique({ where: { id: demandId }, include: { owner: true } }) : null
-  const acceptanceOwnerId = demand?.owner.active && demand.owner.role === 'BUSINESS' ? demand.ownerId : null
+  const acceptanceOwnerId = demand?.owner.active ? demand.ownerId : null
   const now = new Date()
   const project = await tx.project.create({ data: {
     requestId: input.requestId, name: input.name, department: input.department,

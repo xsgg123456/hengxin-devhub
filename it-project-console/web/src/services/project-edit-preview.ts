@@ -43,9 +43,8 @@ export function saveProjectEditPreview(
     throw new Error('协作人员必须有效且不能与主负责人重复')
   for (const id of [edited.businessOwnerId, edited.acceptanceOwnerId]) {
     if (id && !snapshot.database.users.some((u) => u.id === id))
-      throw new Error('请选择有效业务人员')
+      throw new Error('请选择有效公司人员')
   }
-  if (edited.acceptanceOwnerId && !snapshot.database.users.some(u => u.id === edited.acceptanceOwnerId && u.role === 'business')) throw new Error('验收人必须为业务人员')
   if (edited.simpleStatus === 'blocked' && !edited.blocker.trim())
     throw new Error('请填写阻塞说明（阶段与日期）')
   if (edited.simpleStatus === 'completed' && current.simpleStatus !== 'completed')

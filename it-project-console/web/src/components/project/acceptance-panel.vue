@@ -45,7 +45,7 @@
             class="w-full"
             v-model="ownerId"
             aria-label="业务验收负责人"
-            placeholder="请选择业务人员"
+            placeholder="请选择公司人员"
           >
             <ElOption
               v-for="u in candidates"
@@ -176,7 +176,7 @@
   )
   defineExpose({ beforeClose })
   const candidates = computed(
-    () => store.database?.users.filter((u) => u.role === 'business') ?? []
+    () => store.database?.users ?? []
   )
   const userName = (id?: string | null) =>
     store.database?.users.find((u) => u.id === id)?.name ?? '待指定'
@@ -194,7 +194,6 @@
   const canDecide = computed(
     () =>
       pending.value &&
-      store.currentUser.role === 'business' &&
       store.currentUser.id === props.project.acceptanceOwnerId
   )
   const waiting = computed(() =>

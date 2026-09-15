@@ -74,30 +74,28 @@ export function responsibilityTasks(
       })
     }
   }
-  if (user.role === 'business') {
-    for (const p of db.projects) {
-      if (
-        p.status === 'active' &&
-        !p.archived &&
-        p.acceptanceStatus === 'pending' &&
-        p.acceptanceOwnerId === user.id
-      )
-        tasks.push({
-          id: p.id,
-          projectId: p.id,
-          code: projectCode(p),
-          name: p.name,
-          reason: '待我验收：请确认交付结果',
-          action: 'acceptance',
-          severity: 3,
-          days: 0
-        })
-    }
-    return tasks
+  for (const p of db.projects) {
+    if (
+      p.status === 'active' &&
+      !p.archived &&
+      p.acceptanceStatus === 'pending' &&
+      p.acceptanceOwnerId === user.id
+    )
+      tasks.push({
+        id: p.id,
+        projectId: p.id,
+        code: projectCode(p),
+        name: p.name,
+        reason: '待我验收：请确认交付结果',
+        action: 'acceptance',
+        severity: 3,
+        days: 0
+      })
   }
+  if (user.role === 'business') return tasks
   for (const p of db.projects) {
     if (p.status !== 'active' || p.archived) continue
-    if (p.acceptanceStatus === 'pending' && user.role === 'engineer') continue
+    if (p.acceptanceStatus === 'pending' && (user.role === 'engineer' || p.acceptanceOwnerId === user.id)) continue
     const risks =
       p.riskVersion !== undefined ? p.risks : computeProjectRisks(p, db.scheduleChanges, now)
     const delay = risks.filter((r) => r.includes('延期'))

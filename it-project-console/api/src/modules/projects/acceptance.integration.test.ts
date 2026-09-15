@@ -39,7 +39,7 @@ describe('业务确认验收真实API', () => {
     for (const user of [manager, business, collab]) expect((await act(id, 1, 'submit', user)).statusCode).toBe(403)
     expect((await act(id, 1, 'submit')).statusCode).toBe(400)
     expect((await act(id, 1, 'assign', engineer, { ownerId: business })).statusCode).toBe(403)
-    expect((await act(id, 1, 'assign', manager, { ownerId: engineer })).statusCode).toBe(400)
+    expect((await act(id, 1, 'assign', manager, { ownerId: 'missing-user' })).statusCode).toBe(400)
     expect((await act(id, 1, 'assign', manager, { ownerId: business })).statusCode).toBe(200)
     for (const user of [engineer, manager]) expect((await call(`/api/projects/${id}/progress`, { requestId: key(), version: 2, kind: 'overall', status: 'completed' }, user)).statusCode).toBe(400)
     expect((await act(id, 2, 'submit', engineer, { url: 'javascript:alert(1)' })).statusCode).toBe(400)
@@ -71,14 +71,11 @@ describe('业务确认验收真实API', () => {
     expect((await db.notificationOutbox.findMany({ where: { projectId: id, eventType: 'PROJECT_COMPLETED' } })).map(n => n.recipientId).sort()).toEqual([engineer, collab, business].sort())
     expect((await act(id, 5, 'submit')).statusCode).toBe(409)
   })
-  it('身份停用与角色变更即时失权；改派、撤回过期消息不再投递，已受理保留回执', async () => {
+  it('身份停用即时失权；改派、撤回过期消息不再投递，已受理保留回执', async () => {
     const { id } = await fixture()
     expect((await act(id, 1, 'submit')).statusCode).toBe(200)
     const notice = await db.notificationOutbox.findFirstOrThrow({ where: { projectId: id, eventType: 'ACCEPTANCE_SUBMITTED' } })
     await db.notificationLog.create({ data: { outboxId: notice.id, state: 'ACCEPTED', taskId: 'accepted-task' } })
-    await db.user.update({ where: { id: business }, data: { role: 'MANAGER' } })
-    try { expect((await act(id, 2, 'accept', business)).statusCode).toBe(403) }
-    finally { await db.user.update({ where: { id: business }, data: { role: 'BUSINESS' } }) }
     await db.user.update({ where: { id: business }, data: { active: false } })
     try { expect((await act(id, 2, 'accept', business)).statusCode).toBe(401) }
     finally { await db.user.update({ where: { id: business }, data: { active: true } }) }
@@ -95,6 +92,18 @@ describe('业务确认验收真实API', () => {
       expect((await act(id, 5, 'assign', manager, { ownerId: business })).statusCode).toBe(200)
       expect(await db.notificationLog.findUniqueOrThrow({ where: { outboxId: pending.id } })).toMatchObject({ state: 'SKIPPED' })
     } finally { await db.notificationOutbox.deleteMany({ where: { recipientId: substitute.id } }); await db.user.delete({ where: { id: substitute.id } }) }
+  })
+  it('管理员和工程师均可被指定、退回和通过，非指定人仍被拒绝', async () => {
+    for (const ownerId of [manager, engineer]) {
+      const { id } = await fixture()
+      expect((await act(id, 1, 'assign', manager, { ownerId })).statusCode).toBe(200)
+      expect((await act(id, 2, 'submit')).statusCode).toBe(200)
+      expect((await act(id, 3, 'accept', business)).statusCode).toBe(403)
+      expect((await act(id, 3, 'return', ownerId)).statusCode).toBe(200)
+      expect((await act(id, 4, 'submit')).statusCode).toBe(200)
+      expect((await act(id, 5, 'accept', ownerId)).statusCode).toBe(200)
+      expect(await row(id)).toMatchObject({ status: 'COMPLETED', acceptanceOwnerId: ownerId })
+    }
   })
   it('通过/退回/撤回并发只有一次生效，完成通知故障原子回滚', async () => {
     const { id } = await fixture()
@@ -129,6 +138,11 @@ describe('业务确认验收真实API', () => {
     const input = { requestId: key(), name: '默认验收人', department: '财务部', priority: 'P1' as const, primaryOwnerId: engineer, collaboratorIds: [], approvedLaunchDate: '2099-10-10' }
     const created = await db.$transaction(tx => createProject(tx, input, demand.id))
     expect(created.acceptanceOwnerId).toBe(business)
+    for (const ownerId of [manager, engineer]) {
+      const staffDemand = await db.demand.create({ data: { name: '公司人员需求', ownerId } })
+      const staffProject = await db.$transaction(tx => createProject(tx, { ...input, requestId: key() }, staffDemand.id))
+      expect(staffProject.acceptanceOwnerId).toBe(ownerId)
+    }
     await db.project.update({ where: { id: created.id }, data: { status: 'COMPLETED', acceptanceOwnerId: null } })
     const migration = await readFile(new URL('../../../prisma/migrations/20260914050000_business_acceptance/migration.sql', import.meta.url), 'utf8')
     for (let i = 0; i < 2; i++) for (const statement of migration.split(';').filter(s => s.trim())) await db.$executeRawUnsafe(statement)

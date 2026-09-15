@@ -38,7 +38,7 @@ it('提交消息真实深链和当前业务收件，回执已受理后撤回仍�
   expect(legacy.mock.calls[0]![0]).toContain('getsendresult')
   expect(await db.notificationLog.findUniqueOrThrow({ where: { outboxId: item.id } })).toMatchObject({ state: 'SENT', taskId: '501' })
 })
-it('撤回、改派、轮次、取消、归档、业务身份变化使待发送验收消息失效', async () => {
+it('撤回、改派、轮次、取消、归档、停用使待发送验收消息失效', async () => {
   for (const data of [{ acceptanceStatus: 'none' }, { acceptanceOwnerId: null }, { acceptanceRound: 3 }, { status: 'CANCELLED' as const }, { archived: true }]) {
     const { project, item, legacy, service } = await fixture()
     await db.project.update({ where: { id: project.id }, data })
@@ -47,9 +47,18 @@ it('撤回、改派、轮次、取消、归档、业务身份变化使待发送�
     expect(await db.notificationLog.findUniqueOrThrow({ where: { outboxId: item.id } })).toMatchObject({ state: 'SKIPPED' })
   }
   const { user, legacy, service } = await fixture()
-  await db.user.update({ where: { id: user.id }, data: { role: 'MANAGER' } })
+  await db.user.update({ where: { id: user.id }, data: { active: false } })
   await service.flush(now)
   expect(legacy).not.toHaveBeenCalled()
+})
+it('指定验收人为管理员或工程师仍投递待验收通知', async () => {
+  for (const role of ['MANAGER', 'ENGINEER'] as const) {
+    const { user, item, legacy, service } = await fixture()
+    await db.user.update({ where: { id: user.id }, data: { role } })
+    await service.flush(now)
+    expect(legacy).toHaveBeenCalledOnce()
+    expect(await db.notificationLog.findUniqueOrThrow({ where: { outboxId: item.id } })).toMatchObject({ state: 'ACCEPTED' })
+  }
 })
 it('退回消息重提后失效，待验收时旧工程师风险消息不能新发', async () => {
   for (const eventType of ['ACCEPTANCE_RETURNED', 'PROJECT_RISKS_CHANGED']) {

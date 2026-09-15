@@ -117,10 +117,17 @@ describe('全局编辑本地预览', () => {
     saveProjectEditPreview(snapshot, second, JSON.stringify(p), '再次核对计划', false)
     expect(isPrototypeSnapshot(snapshot)).toBe(true)
   })
+  it.each(['user-manager-chen', 'user-engineer-wang'])('公司人员 %s 可作为验收人保存', (ownerId) => {
+    const {snapshot,p,baseline,edit} = setup()
+    edit.acceptanceOwnerId=ownerId
+    saveProjectEditPreview(snapshot,edit,baseline,'指定公司验收人',false)
+    expect(p.acceptanceOwnerId).toBe(ownerId)
+    expect(isPrototypeSnapshot(snapshot)).toBe(true)
+  })
   it('错误验收人及主协作重复均拒绝且项目不变', () => {
     const {snapshot,p,baseline,edit} = setup()
-    edit.acceptanceOwnerId='user-engineer-wang'
-    expect(() => saveProjectEditPreview(snapshot,edit,baseline,'核实',true)).toThrow('业务人员')
+    edit.acceptanceOwnerId='unknown-user'
+    expect(() => saveProjectEditPreview(snapshot,edit,baseline,'核实',true)).toThrow('有效公司人员')
     edit.acceptanceOwnerId='user-business-li'; edit.collaboratorIds=[edit.primaryOwnerId]
     expect(() => saveProjectEditPreview(snapshot,edit,baseline,'核实',false)).toThrow('不能与主负责人重复')
     expect(JSON.stringify(p)).toBe(baseline)

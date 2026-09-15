@@ -27,7 +27,7 @@ export function initializeAcceptance(project: DemoProject, db: PrototypeDatabase
     const demand = db.demands.find((d) => d.id === project.demandId)
     project.acceptanceOwnerId =
       project.status === 'active'
-        ? (db.users.find((u) => u.id === demand?.submitterId && u.role === 'business')?.id ?? null)
+        ? (db.users.find((u) => u.id === demand?.submitterId)?.id ?? null)
         : null
   }
   project.acceptanceStatus ??= 'none'
@@ -109,8 +109,8 @@ export function actionAcceptance(snapshot: PrototypeSnapshot, input: AcceptanceI
   if (input.action === 'accept' && needsPlan(p)) throw new WorkflowError('请先制定完整计划')
   if (input.action === 'assign') {
     if (actor.role !== 'manager') throw new WorkflowError('只有管理人员可指定验收负责人')
-    if (!snapshot.database.users.some((u) => u.id === input.ownerId && u.role === 'business'))
-      throw new WorkflowError('请选择有效业务人员')
+    if (!snapshot.database.users.some((u) => u.id === input.ownerId))
+      throw new WorkflowError('请选择有效公司人员')
     if (input.ownerId === p.acceptanceOwnerId) throw new WorkflowError('验收负责人未改变')
   } else if (input.action === 'submit' || input.action === 'withdraw') {
     if (actor.role !== 'engineer' || !isEngineerEligible(actor) || actor.id !== p.primaryOwnerId)
@@ -120,12 +120,12 @@ export function actionAcceptance(snapshot: PrototypeSnapshot, input: AcceptanceI
       if (p.stage !== '验收交付' || needsPlan(p))
         throw new WorkflowError('请先完成前序环节并制定完整计划')
       if (
-        !snapshot.database.users.some((u) => u.id === p.acceptanceOwnerId && u.role === 'business')
+        !snapshot.database.users.some((u) => u.id === p.acceptanceOwnerId)
       )
         throw new WorkflowError('请管理人员指定有效业务验收负责人')
     } else if (!pending) throw new WorkflowError('当前没有待验收提交')
   } else if (input.action === 'accept' || input.action === 'return') {
-    if (actor.role !== 'business' || actor.id !== p.acceptanceOwnerId)
+    if (actor.id !== p.acceptanceOwnerId)
       throw new WorkflowError('只有指定业务验收负责人可以验收')
     if (!pending) throw new WorkflowError('当前没有待验收提交')
   } else throw new WorkflowError('验收操作无效')

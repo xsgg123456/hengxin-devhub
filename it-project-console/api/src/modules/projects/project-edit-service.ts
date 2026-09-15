@@ -8,7 +8,7 @@ import { STAGES } from '../progress/progress-schemas.js'
 import { enterStage, invalid, lockedProject } from '../progress/progress-state.js'
 import { validateProjectMembers } from './project-service.js'
 import { readStagePlans, validatePlanOrder } from './project-plan-state.js'
-import { acceptanceHistory, notificationLock, validBusiness } from './acceptance-state.js'
+import { acceptanceHistory, notificationLock, validAcceptanceOwner } from './acceptance-state.js'
 import { cancelAcceptanceNotifications } from '../notifications/acceptance-notifications.js'
 import { lifecycleEvent } from '../notifications/lifecycle-event-service.js'
 import { refreshProjectRisks } from '../risks/risk-scan-job.js'
@@ -38,7 +38,7 @@ export class ProjectEditService {
         throw new AppError(403, 'PROJECT_EDIT_FORBIDDEN', '仅指定管理员或待核实项目的主负责工程师可完整编辑')
       await validateProjectMembers(tx, input)
       if (input.businessOwnerId && !await tx.user.count({ where: { id: input.businessOwnerId, active: true } })) invalid('业务负责人无效')
-      if (input.acceptanceOwnerId) await validBusiness(tx, input.acceptanceOwnerId)
+      if (input.acceptanceOwnerId) await validAcceptanceOwner(tx, input.acceptanceOwnerId)
       if (input.verify && project.migrationVerified) invalid('项目已核实，请使用保存修改')
       if (input.verify && (!input.firstRequestedOn || !input.businessOwnerId || !input.acceptanceOwnerId ||
         !input.expectedLaunchDate || !input.expectedDeliveryDate)) invalid('完成核实前请补齐首次提出日期、业务人员及预计上线交付日期')

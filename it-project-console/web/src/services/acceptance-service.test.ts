@@ -35,6 +35,33 @@ function fixture() {
   return { s, p, run }
 }
 describe('业务验收状态与权限', () => {
+  it.each(['user-manager-chen', 'user-engineer-zhao'])('指定公司人员 %s 可收到待办、退回和通过，非指定人不可操作', (ownerId) => {
+    const { s, p, run } = fixture()
+    s.activeUserId = 'user-manager-chen'
+    run('assign', '指定公司验收人', { ownerId })
+    s.activeUserId = p.primaryOwnerId
+    run('submit', '第一轮交付')
+    const owner = s.database.users.find(u => u.id === ownerId)!
+    expect(responsibilityTasks(s.database, owner, now)).toContainEqual(expect.objectContaining({ projectId: p.id, action: 'acceptance' }))
+    s.activeUserId = 'user-business-li'
+    expect(() => run('accept')).toThrow('只有指定')
+    expect(() => run('return', '非指定退回')).toThrow('只有指定')
+    s.activeUserId = ownerId
+    run('return', '补充验收材料')
+    s.activeUserId = p.primaryOwnerId
+    run('submit', '第二轮交付')
+    s.activeUserId = ownerId
+    run('accept', '')
+    expect(p).toMatchObject({ status: 'completed', acceptanceStatus: 'accepted', acceptanceRound: 2 })
+    expect(responsibilityTasks(s.database, owner, now).some(t => t.projectId === p.id && t.action === 'acceptance')).toBe(false)
+  })
+  it.each(['user-manager-chen', 'user-engineer-zhao'])('默认验收人继承有效提交人 %s', (ownerId) => {
+    const s = fresh(), p = s.database.projects[0]
+    s.database.demands.find(d => d.id === p.demandId)!.submitterId = ownerId
+    p.acceptanceOwnerId = undefined
+    initializeAcceptance(p, s.database)
+    expect(p.acceptanceOwnerId).toBe(ownerId)
+  })
   it('主负责人失去工程师资格后，提交和撤回均拒绝', () => {
     const { s, run } = fixture()
     const owner = s.database.users.find((u) => u.id === s.activeUserId)!
@@ -137,7 +164,6 @@ describe('业务验收状态与权限', () => {
     expect(() => run('withdraw', '撤回', { version: 0 })).toThrow('已更新')
     s.activeUserId = 'user-manager-chen'
     const newOwner = s.database.users.find((u) => u.id === 'user-engineer-zhao')!
-    newOwner.role = 'business'
     run('assign', '更换验收人', { ownerId: newOwner.id })
     expect(p.acceptanceSummary).toBe('交付')
     s.activeUserId = 'user-business-li'
