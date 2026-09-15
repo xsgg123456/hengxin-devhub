@@ -6,6 +6,7 @@ import { command, lockedDemand } from '../../lib/business-command.js'
 import { reviewSchema } from '../projects/project-schemas.js'
 import { saveProposal, clearProposalNotifications, auditProposal } from '../projects/proposal-service.js'
 import { demandData } from '../demands/demand-materials.js'
+import { auditDemand } from '../demands/demand-audit.js'
 import { lifecycleEvent } from '../notifications/lifecycle-event-service.js'
 
 export class ApprovalService {
@@ -45,6 +46,7 @@ export class ApprovalService {
         status: input.decision === 'return' ? 'RETURNED' : 'REJECTED', reviewReason: input.reason,
         reviewedAt, reviewedBy: actor.id, version: { increment: 1 }
       } })
+      await auditDemand(tx, actor, updated, input.decision, input.reason, demand)
       await lifecycleEvent(tx, { eventType: input.decision === 'return' ? 'DEMAND_RETURNED' : 'DEMAND_REJECTED',
         requestId: `${actor.id}:${input.requestId}`, demandId: id, reason: input.reason, recipientIds: [demand.ownerId] })
       return { id, version: updated.version, status: updated.status }

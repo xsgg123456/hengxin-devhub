@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { createServer } from 'node:net'
 import { readdir } from 'node:fs/promises'
 import { isolatedIntegration } from './isolated-integration.js'
+import { seedProjectEditFixture } from './project-edit-fixture.js'
 
 async function freePort() {
   const server = createServer()
@@ -37,6 +38,7 @@ async function stop(child: ChildProcess) {
 }
 async function runSuite(args: string[]) {
 await isolatedIntegration(async ({ env }) => {
+  if (args.includes('project-edit.spec.ts')) await seedProjectEditFixture(env)
   const apiRoot = process.cwd(), webRoot = resolve('../web')
   const port = await freePort()
   const origin = 'http://127.0.0.1:4325'

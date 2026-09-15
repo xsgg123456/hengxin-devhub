@@ -63,3 +63,32 @@ export function planLiveProject(
     }
   })
 }
+
+export function editLiveProject(
+  project: import('@/domain/prototype').DemoProject,
+  reason: string,
+  verify: boolean,
+  requestId: string
+) {
+  const fields = [
+    'name', 'description', 'department', 'priority', 'primaryOwnerId', 'collaboratorIds',
+    'stage', 'simpleStatus', 'blocker', 'acceptanceUrl', 'acceptanceSummary'
+  ] as const
+  const dates = ['firstRequestedOn', 'approvedLaunchDate', 'originalLaunchDate',
+    'originalDeliveryDate', 'expectedLaunchDate', 'expectedDeliveryDate'] as const
+  if (!Number.isInteger(project.version)) throw new Error('项目版本缺失，请关闭后刷新重试')
+  if (!reason.trim()) throw new Error('请填写本次修改原因')
+  return apiRequest<LiveWriteResult>(`/projects/${project.id}/edit`, {
+    method: 'POST',
+    body: {
+      ...Object.fromEntries(fields.map(key => [key, project[key] ?? ''])),
+      ...Object.fromEntries(dates.map(key => [key, project[key] || null])),
+      businessOwnerId: project.businessOwnerId || null,
+      acceptanceOwnerId: project.acceptanceOwnerId || null,
+      stagePlans: (project.stagePlans ?? [])
+        .filter(plan => plan.startDate || plan.endDate)
+        .map(({ stage, startDate, endDate }) => ({ stage, startDate: startDate || '', endDate: endDate || '' })),
+      version: project.version, requestId, reason: reason.trim(), verify
+    }
+  })
+}

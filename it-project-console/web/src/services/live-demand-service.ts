@@ -6,6 +6,7 @@ export interface LiveDemandInput {
   attachments?: DemoAttachment[]
   name: string
   description: string
+  firstRequestedOn?: string | null
   expectedLaunchDate: string
   prd: DemoAttachment | null
   prototype: DemoAttachment | null

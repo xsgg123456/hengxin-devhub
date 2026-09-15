@@ -19,6 +19,10 @@
       <ElFormItem label="项目名称" prop="name" :error="errors.name" required>
         <ElInput v-model="form.name" maxlength="100" show-word-limit />
       </ElFormItem>
+      <ElFormItem label="需求首次提出日期" prop="firstRequestedOn" :error="errors.firstRequestedOn">
+        <ElDatePicker v-model="form.firstRequestedOn" aria-label="需求首次提出日期" type="date" value-format="YYYY-MM-DD" :disabled-date="futureDate" placeholder="未知可留空，待核实后补录" />
+        <p class="text-xs">业务实际首次提出需求的日期，退回重提不改变该日期。</p>
+      </ElFormItem>
       <ElRow :gutter="20">
         <ElCol :span="12"
           ><ElFormItem label="需求部门"
@@ -91,7 +95,7 @@
   import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
   import type { DemoAttachment, DemoDemand } from '@/domain/prototype'
   import { saveDemand } from '@/services/workflow-service'
-  import { validateMaterials } from '@/services/workflow-validation'
+  import { dateValue, validateMaterials } from '@/services/workflow-validation'
   import { demandMaterials } from '@/services/demand-materials'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { currentDate } from '@/utils/project-display'
@@ -109,6 +113,7 @@
   const materialField = ref<{ releaseCleanup: () => void }>()
   const form = reactive({
     name: props.demand?.name || '',
+    firstRequestedOn: props.demand?.firstRequestedOn || '',
     description: props.demand?.description || '',
     expectedLaunchDate: props.demand?.expectedLaunchDate || '',
     attachments: demandMaterials(props.demand).map(file => ({ ...file }))
@@ -139,6 +144,10 @@
     // DatePicker supplies a local calendar cell; compare its label to Shanghai's business day.
     const label = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
     return label < currentDate()
+  }
+  function futureDate(date: Date) {
+    const label = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    return label > currentDate()
   }
   async function ensureDraft(): Promise<string> {
     if (liveId.value) return liveId.value
@@ -183,6 +192,12 @@
       validateMaterials(form.attachments, submit || props.demand?.status === 'pending')
     } catch (cause) {
       errors.attachments = cause instanceof Error ? cause.message : '附件校验失败'
+    }
+    if (form.firstRequestedOn) {
+      try {
+        dateValue(form.firstRequestedOn, '需求首次提出日期')
+        if (form.firstRequestedOn > currentDate()) errors.firstRequestedOn = '需求首次提出日期不能晚于今天'
+      } catch (cause) { errors.firstRequestedOn = cause instanceof Error ? cause.message : '日期格式不正确' }
     }
     const firstError = Object.keys(errors)[0]
     if (firstError) {

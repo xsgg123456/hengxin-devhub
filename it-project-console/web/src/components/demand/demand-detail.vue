@@ -10,6 +10,7 @@
       <ElDescriptionsItem label="需求编号">{{ demandCode(demand) }}</ElDescriptionsItem>
       <ElDescriptionsItem label="需求部门">{{ demand.department }}</ElDescriptionsItem>
       <ElDescriptionsItem label="提出人">{{ submitter }}</ElDescriptionsItem>
+      <ElDescriptionsItem label="需求首次提出日期">{{ demand.firstRequestedOn || '待核实' }}</ElDescriptionsItem>
       <ElDescriptionsItem label="期望上线">{{
         demand.expectedLaunchDate || '未填写'
       }}</ElDescriptionsItem>
@@ -28,6 +29,7 @@
       class="mb-5"
     />
     <MaterialSummary :demand="demand" />
+    <LifecycleHistory :demand-id="demand.id" />
     <template #footer
       ><DemandLifecycleActions :demand="demand" @deleted="emit('close')" /><ElButton
         @click="emit('close')"
@@ -43,6 +45,7 @@
   import { usePrototypeStore } from '@/store/modules/prototype'
   import DemandLifecycleActions from './demand-lifecycle-actions.vue'
   import MaterialSummary from './material-summary.vue'
+  import LifecycleHistory from '@/components/project/lifecycle-history.vue'
   const props = defineProps<{ demand: DemoDemand }>()
   const emit = defineEmits<{ close: [] }>()
   const store = usePrototypeStore()

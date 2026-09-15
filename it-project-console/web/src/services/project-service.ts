@@ -82,6 +82,8 @@ export function createFormalProject(
     ),
     requestId,
     demandId,
+    firstRequestedOn: snapshot.database.demands.find(d => d.id === demandId)?.firstRequestedOn || '',
+    businessOwnerId: snapshot.database.demands.find(d => d.id === demandId)?.submitterId || '',
     source: demandId ? ('demand' as const) : ('direct' as const),
     name,
     department,

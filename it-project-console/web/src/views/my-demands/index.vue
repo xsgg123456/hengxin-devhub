@@ -145,11 +145,7 @@
               formatDate(row.expectedLaunchDate)
             }}</template></ElTableColumn
           >
-          <ElTableColumn label="提交时间" min-width="120"
-            ><template #default="{ row }">{{
-              formatDateTime(row.submittedAt)
-            }}</template></ElTableColumn
-          >
+          <ElTableColumn label="需求首次提出日期" min-width="150"><template #default="{ row }">{{ row.firstRequestedOn || '待核实' }}</template></ElTableColumn>
           <ElTableColumn label="验收交付计划结束" min-width="145"
             ><template #default="{ row }">{{
               row.plannedCompletionDate || '—'

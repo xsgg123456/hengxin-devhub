@@ -1,4 +1,6 @@
 import { AcceptanceService } from './acceptance-service.js'
+import { ProjectEditService } from './project-edit-service.js'
+import { projectEditSchema } from './project-edit-schemas.js'
 import { acceptanceSchema } from './acceptance-schemas.js'
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
@@ -10,6 +12,8 @@ import { commandSchema } from '../demands/demand-schemas.js'
 export async function registerProjectRoutes(app: FastifyInstance, db: PrismaClient, authenticate: preHandlerHookHandler, approverId = '') {
   const api = app.withTypeProvider<ZodTypeProvider>()
   const service = new ProjectService(db, approverId)
+  const editor = new ProjectEditService(db, approverId)
+  api.post<{ Params: { id: string } }>('/api/projects/:id/edit', { preHandler: authenticate, schema: { body: projectEditSchema } }, async request => ({ data: await editor.save(request.actor!, request.params.id, request.body) }))
   const acceptance = new AcceptanceService(db)
   api.post<{ Params: { id: string } }>('/api/projects/:id/acceptance', { preHandler: authenticate, schema: { body: acceptanceSchema } }, async request => ({ data: await acceptance.act(request.actor!, request.params.id, request.body) }))
   const proposals = new ProposalService(db, approverId)

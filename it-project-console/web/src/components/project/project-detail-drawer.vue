@@ -31,6 +31,7 @@
         <ElDescriptionsItem label="主负责人">{{
           userName(project.primaryOwnerId)
         }}</ElDescriptionsItem>
+        <ElDescriptionsItem label="需求首次提出日期">{{ project.firstRequestedOn || demand?.firstRequestedOn || '待核实' }}</ElDescriptionsItem>
         <ElDescriptionsItem label="协作人员">{{
           project.collaboratorIds.map(userName).join('、') || '无'
         }}</ElDescriptionsItem>
@@ -99,7 +100,7 @@
       /></template>
     </template>
     <template #footer
-      ><ElButton @click="closeDetail(() => emit('update:modelValue', false))">关闭</ElButton
+      ><ElButton v-if="project && canEditProject(store.currentUser, project)" @click="editOpen = true">编辑项目</ElButton><ElButton @click="closeDetail(() => emit('update:modelValue', false))">关闭</ElButton
       ><ElButton v-if="canUpdate && isOverall" @click="planOpen = true">{{
         needsPlan(project!) ? '制定计划' : '调整计划'
       }}</ElButton
@@ -112,6 +113,7 @@
         }}</ElButton
       ></template
     >
+    <ProjectEditDrawer v-if="project" v-model="editOpen" :project="project" />
     <ProjectPlanDrawer v-model="planOpen" :project="project" />
   </ElDrawer>
 </template>
@@ -119,6 +121,9 @@
   import { approvedLaunchOverrun } from '@/utils/approved-launch'
   import { projectCode } from '@/utils/project-code'
   import { computed, ref } from 'vue'
+  import ProjectEditDrawer from './project-edit-drawer.vue'
+  import { canEditProject } from '@/utils/project-edit-permission'
+  const editOpen = ref(false)
   import type { DemoProject } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { computeProjectRisks } from '@/services/risk-service'

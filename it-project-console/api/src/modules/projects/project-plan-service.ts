@@ -3,7 +3,8 @@ import type { Actor } from '../../plugins/auth.js'
 import { command } from '../../lib/business-command.js'
 import { AppError } from '../../lib/errors.js'
 import { invalid, lockedProject, unchanged, writable, type ProjectChanged } from '../progress/progress-state.js'
-import { PLAN_STAGES, planSchema, readStagePlans, remainingStages, validatePlanOrder } from './project-plan-state.js'
+import { planSchema, readStagePlans, remainingStages, validatePlanOrder } from './project-plan-state.js'
+import { STAGES } from '../progress/progress-schemas.js'
 
 export class ProjectPlanService {
   constructor(private readonly db: PrismaClient, private readonly onProjectChanged: ProjectChanged = unchanged) {}
@@ -26,7 +27,7 @@ export class ProjectPlanService {
           originalEndDate: previous?.originalEndDate ?? plan.endDate }
       })
       const plans = [...old.filter(item => !required.includes(item.stage)), ...updated]
-        .sort((a, b) => PLAN_STAGES.indexOf(a.stage) - PLAN_STAGES.indexOf(b.stage))
+        .sort((a, b) => STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage))
       validatePlanOrder(plans)
       if (changes.length && (!input.changeReason || !input.changeDescription)) invalid('调整排期须填写原因和说明')
       for (const change of changes) await tx.scheduleChange.create({ data: {

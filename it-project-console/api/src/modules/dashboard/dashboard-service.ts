@@ -11,7 +11,7 @@ export async function readProjects(tx: Prisma.TransactionClient) {
   return { projects: projects.map(mapProject), users: users.map(mapUser) }
 }
 export const assigned = (p: ReadProject, id: string) =>
-  p.primaryOwnerId === id || p.collaboratorIds.includes(id)
+  p.primaryOwnerId === id || p.collaboratorIds.includes(id) || p.businessOwnerId === id || p.acceptanceOwnerId === id
 export function matchesRisk(p: ReadProject, risk: string) {
   if (risk === 'any') return p.risks.length > 0
   if (risk === 'delayed') return p.risks.some((r) => r.includes('延期'))

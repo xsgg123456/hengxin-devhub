@@ -26,6 +26,8 @@ export async function demandData(tx: Prisma.TransactionClient, id: string, input
   }
   return {
     name: input.name, description: input.description, attachmentIds,
+    firstRequestedOn: input.firstRequestedOn === undefined ? old?.firstRequestedOn ?? null
+      : input.firstRequestedOn ? new Date(`${input.firstRequestedOn}T00:00:00.000Z`) : null,
     expectedLaunchDate: input.expectedLaunchDate ? new Date(input.expectedLaunchDate) : null,
     prdUrl: input.prd?.kind === 'link' ? input.prd.url : null,
     prototypeUrl: input.prototype?.kind === 'link' ? input.prototype.url : null,

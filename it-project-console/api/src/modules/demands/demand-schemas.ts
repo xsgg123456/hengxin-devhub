@@ -4,6 +4,9 @@ export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value =
   const date = new Date(`${value}T00:00:00.000Z`)
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
 }, '日期无效')
+export const firstRequestedDateSchema = dateSchema.refine(value => value <= new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit'
+}).format(new Date()), '需求首次提出日期不能晚于今天')
 export const materialSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('link'), url: z.string().max(2048).url().refine(value => {
     const url = URL.parse(value)
@@ -15,6 +18,7 @@ export const commandSchema = z.object({ requestId: idSchema, version: z.number()
 export const demandSchema = z.object({
   requestId: idSchema, name: z.string().trim().max(100),
   description: z.string().trim().max(300).default(''),
+  firstRequestedOn: z.union([firstRequestedDateSchema, z.literal(''), z.null()]).optional(),
   expectedLaunchDate: z.union([dateSchema, z.literal(''), z.null()]).default(null),
   attachmentIds: z.array(idSchema).optional(),
   prd: materialSchema.default(null), prototype: materialSchema.default(null), submit: z.boolean()

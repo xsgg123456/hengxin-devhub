@@ -110,6 +110,7 @@ model Session {
   @@map("sessions")
 }
 model Demand {
+  firstRequestedOn DateTime? @map("first_requested_on") @db.Date
   code String @unique @default(dbgenerated())
   requestId String? @map("request_id")
   description String @default("")
@@ -154,6 +155,10 @@ model ProjectCodeCounter {
   @@map("project_code_counters")
 }
 model Project {
+  firstRequestedOn DateTime? @map("first_requested_on") @db.Date
+  businessOwnerId String? @map("business_owner_id")
+  description String @default("")
+  migrationVerified Boolean @default(true) @map("migration_verified")
   code String @unique @default(dbgenerated())
   requestId String? @map("request_id")
   source String @default("direct")

@@ -16,6 +16,7 @@ export interface DemandInput {
   requestId: string
   name: string
   description: string
+  firstRequestedOn?: string | null
   expectedLaunchDate: string
   prd: DemoAttachment | null
   prototype: DemoAttachment | null
@@ -53,6 +54,11 @@ export function saveDemand(snapshot: PrototypeSnapshot, input: DemandInput) {
   if (input.submit || input.expectedLaunchDate) dateValue(input.expectedLaunchDate, '期望上线日期')
   if (input.submit && input.expectedLaunchDate < shanghaiDay(now))
     throw new WorkflowError('期望上线日期不得早于提交日')
+  const firstRequestedOn = input.firstRequestedOn === undefined ? (existing?.firstRequestedOn || '') : (input.firstRequestedOn || '')
+  if (firstRequestedOn) {
+    dateValue(firstRequestedOn, '需求首次提出日期')
+    if (firstRequestedOn > shanghaiDay(now)) throw new WorkflowError('需求首次提出日期不能晚于今天')
+  }
   const materials = input.attachments ?? demandMaterials(input)
   validateMaterials(materials, input.submit || existing?.status === 'pending')
   const demand = {
@@ -74,6 +80,7 @@ export function saveDemand(snapshot: PrototypeSnapshot, input: DemandInput) {
     description,
     department: actor.department,
     submitterId: actor.id,
+    firstRequestedOn,
     expectedLaunchDate: input.expectedLaunchDate,
     attachments: structuredClone(materials),
     prd: structuredClone(input.prd),

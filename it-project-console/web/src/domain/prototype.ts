@@ -41,6 +41,7 @@ export interface DemoAttachment {
   status: 'ready' | 'failed' | 'uploading'
 }
 export interface DemoDemand {
+  firstRequestedOn?: string
   code?: string
   createdAt?: string
   attachments?: DemoAttachment[]
@@ -97,6 +98,10 @@ export interface AcceptanceHistory {
   ownerId: string | null
 }
 export interface DemoProject {
+  firstRequestedOn?: string
+  businessOwnerId?: string
+  description?: string
+  migrationVerified?: boolean
   acceptanceOwnerId?: string | null
   acceptanceStatus?: 'none' | 'pending' | 'returned' | 'accepted'
   acceptanceSubmittedAt?: string | null
@@ -191,6 +196,10 @@ export interface DemoLifecycleEvent {
   entityId: string
   action:
     | 'submit'
+    | 'resubmit'
+    | 'reject'
+    | 'edit'
+    | 'verify'
     | 'accept'
     | 'return'
     | 'plan'

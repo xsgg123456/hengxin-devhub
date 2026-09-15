@@ -10,7 +10,7 @@ export const planSchema = commandSchema.extend({
   changeReason: z.enum(['业务新增或变更需求', '技术问题', '等待外部资源', '人员安排变化', '其他']).optional(),
   changeDescription: z.string().trim().min(1).max(300).optional()
 }).strict()
-const storedPlan = plan.extend({ originalStartDate: dateSchema, originalEndDate: dateSchema })
+const storedPlan = plan.extend({ stage: z.enum(STAGES), originalStartDate: dateSchema, originalEndDate: dateSchema })
 export type StagePlan = z.infer<typeof storedPlan>
 export function readStagePlans(value: unknown): StagePlan[] {
   const parsed = z.array(storedPlan).safeParse(value)

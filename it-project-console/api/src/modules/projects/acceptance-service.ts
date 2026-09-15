@@ -71,9 +71,8 @@ export class AcceptanceService {
         await lifecycleEvent(tx, { ...event, eventType: 'ACCEPTANCE_SUBMITTED', recipientIds: [ownerId!] })
       if (action === 'return') await lifecycleEvent(tx, { ...event, eventType: 'ACCEPTANCE_RETURNED', recipientIds: [project.primaryOwnerId] })
       if (action === 'accept') {
-        const demand = project.demandId ? await tx.demand.findUnique({ where: { id: project.demandId } }) : null
         await lifecycleEvent(tx, { ...event, eventType: 'PROJECT_COMPLETED',
-          recipientIds: [project.primaryOwnerId, ...project.members.map(member => member.userId), ...(demand ? [demand.ownerId] : [])] })
+          recipientIds: [project.primaryOwnerId, ...project.members.map(member => member.userId), ...(project.businessOwnerId ? [project.businessOwnerId] : [])] })
         await tx.lifecycleEvent.create({ data: { entityType: 'project', entityId: id, authorId: actor.id, action: 'complete',
           reason: summary, before: projectState(project), after: projectState(changed), createdAt: now } })
       }

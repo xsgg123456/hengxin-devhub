@@ -7,6 +7,7 @@ import { demandSchema, demandUpdateSchema, commandSchema } from './demand-schema
 import { demandData, queueAttachmentDeletion } from './demand-materials.js'
 import { projectApproverRecipients } from '../../lib/project-approver.js'
 import { lifecycleEvent } from '../notifications/lifecycle-event-service.js'
+import { auditDemand } from './demand-audit.js'
 
 function assertOwner(actor: Actor, demand: Demand) {
   if (demand.ownerId !== actor.id) throw new AppError(403, 'FORBIDDEN', '只有提交人可以维护需求')
@@ -24,6 +25,7 @@ export class DemandService {
         ...data, id, ownerId: actor.id, department: actor.department, requestId: input.requestId,
         status: input.submit ? 'PENDING' : 'DRAFT', submittedAt: input.submit ? new Date() : null
       } })
+      if (input.submit) await auditDemand(tx, actor, row, 'submit', '首次提交需求')
       if (input.submit) await lifecycleEvent(tx, { eventType: 'DEMAND_SUBMITTED', requestId: `${actor.id}:${input.requestId}`,
         demandId: row.id, submittedAt: row.submittedAt!.toISOString(), recipientIds: await projectApproverRecipients(tx, this.approverId) })
       return { id: row.id, version: row.version, status: row.status }
@@ -45,6 +47,8 @@ export class DemandService {
       const kept = data.attachmentIds
       const removed = [...new Set([...old.attachmentIds, old.prdAttachmentId, old.prototypeAttachmentId])].filter((item): item is string => !!item && !kept.includes(item))
       await queueAttachmentDeletion(tx, removed)
+      if (input.submit && old.status !== 'PENDING') await auditDemand(tx, actor, row,
+        old.status === 'DRAFT' ? 'submit' : 'resubmit', old.status === 'DRAFT' ? '首次提交需求' : '补充或调整资料后重新提交', old)
       if (input.submit && old.status !== 'PENDING') await lifecycleEvent(tx, { eventType: 'DEMAND_SUBMITTED', requestId: `${actor.id}:${input.requestId}`,
         demandId: row.id, submittedAt: row.submittedAt!.toISOString(), recipientIds: await projectApproverRecipients(tx, this.approverId) })
       return { id: row.id, version: row.version, status: row.status }
@@ -59,6 +63,7 @@ export class DemandService {
       if (!['PENDING', 'RETURNED'].includes(old.status) || old.project)
         throw new AppError(409, 'INVALID_STATE', '仅待评估或退回补充需求可撤回')
       const row = await tx.demand.update({ where: { id }, data: { status: 'WITHDRAWN', version: { increment: 1 } } })
+      await auditDemand(tx, actor, row, 'withdraw', '提出人撤回需求', old)
       return { id: row.id, version: row.version, status: row.status }
     })
   }

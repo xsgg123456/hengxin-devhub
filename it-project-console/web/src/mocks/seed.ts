@@ -161,6 +161,14 @@ export function createInitialPrototypeSnapshot(): PrototypeSnapshot {
   })
   snapshot.database.progressUpdates[0].overallProgress = 65
   for (const project of snapshot.database.projects) initializeAcceptance(project, snapshot.database)
+  if (typeof window !== 'undefined' && window.location && new URLSearchParams(window.location.search).get('editPreview') === '1') {
+    const names = ['【迁移待核实】Amazon 产品机会洞察系统', '【迁移待核实】新机追踪工作台视图', '库存管理及补货管理系统']
+    snapshot.database.projects.forEach((project, index) => {
+      project.name = names[index] ?? project.name
+      project.businessOwnerId = 'user-business-li'
+      project.description = '从旧系统迁入的项目资料，请结合实际推进情况核对人员与计划。'
+    })
+  }
   return snapshot
 }
 import { initializeAcceptance } from '@/services/acceptance-service'

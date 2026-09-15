@@ -1,3 +1,4 @@
+import { projectBusinessOwner } from '@/utils/project-business-owner'
 import { projectCode } from '@/utils/project-code'
 import { computed, ref, watch } from 'vue'
 import { runtimeConfig } from '@/config/runtime'
@@ -36,7 +37,9 @@ export function useProjectOverviewFilters(personal = false) {
         if (
           scope.value === 'mine' &&
           p.primaryOwnerId !== store.currentUser.id &&
-          !p.collaboratorIds.includes(store.currentUser.id)
+          !p.collaboratorIds.includes(store.currentUser.id) &&
+          projectBusinessOwner(p, store.database?.demands ?? []) !== store.currentUser.id &&
+          p.acceptanceOwnerId !== store.currentUser.id
         )
           return false
         if (status.value !== 'all' && p.status !== status.value) return false

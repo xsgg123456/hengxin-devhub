@@ -15,6 +15,8 @@ export async function createProject(tx: Prisma.TransactionClient, input: Project
   const now = new Date()
   const project = await tx.project.create({ data: {
     requestId: input.requestId, name: input.name, department: input.department,
+    firstRequestedOn: demand?.firstRequestedOn ?? null, businessOwnerId: demand?.ownerId ?? null,
+    description: demand?.description ?? '',
     approvedLaunchDate: new Date(input.approvedLaunchDate),
     acceptanceOwnerId, demandId, source: demandId ? 'demand' : 'direct', priority: input.priority,
     primaryOwnerId: input.primaryOwnerId, stage: '方案设计', simpleStatus: 'not-started',

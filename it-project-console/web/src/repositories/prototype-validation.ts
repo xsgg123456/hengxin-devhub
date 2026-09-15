@@ -160,6 +160,7 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
         userIds.has(d.submitterId) &&
         (d.expectedLaunchDate === '' || date(d.expectedLaunchDate)) &&
         (d.submittedAt === '' || timestamp(d.submittedAt)) &&
+        (d.firstRequestedOn === undefined || d.firstRequestedOn === '' || date(d.firstRequestedOn)) &&
         attachment(d.prd) &&
         attachment(d.prototype) &&
         (d.attachments === undefined ||
@@ -171,6 +172,7 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
     !db.projects.every(
       (p) =>
         strings(p, ['requestId', 'name', 'department', 'blocker']) &&
+        (p.firstRequestedOn === undefined || p.firstRequestedOn === '' || date(p.firstRequestedOn)) &&
         acceptance(p) &&
         userIds.has(p.primaryOwnerId) &&
         list(p.collaboratorIds) &&
@@ -205,7 +207,7 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
             p.stagePlans.every(
               (plan) =>
                 record(plan) &&
-                PROJECT_STAGES.slice(2).includes(plan.stage as never) &&
+                PROJECT_STAGES.includes(plan.stage as never) &&
                 date(plan.startDate) &&
                 date(plan.endDate) &&
                 String(plan.startDate) <= String(plan.endDate) &&
@@ -249,7 +251,7 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
         (['stageExpectedDate', 'expectedLaunchDate', 'expectedDeliveryDate'].includes(
           String(c.field)
         ) ||
-          /^stage:(方案设计|开发编码|联调测试|上线部署|验收交付):(startDate|endDate)$/.test(
+          /^stage:(需求受理|立项评审|方案设计|开发编码|联调测试|上线部署|验收交付):(startDate|endDate)$/.test(
             String(c.field)
           )) &&
         date(c.oldValue) &&
@@ -265,6 +267,10 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
       strings(e, ['entityId', 'reason']) &&
       [
         'submit',
+        'resubmit',
+        'reject',
+        'edit',
+        'verify',
         'accept',
         'return',
         'plan',

@@ -42,6 +42,9 @@
         ><dt>提出人</dt><dd>{{ demand ? userName(demand.submitterId) : '直接创建' }}</dd></div
       >
       <div
+        ><dt>需求首次提出日期</dt><dd>{{ project.firstRequestedOn || demand?.firstRequestedOn || '待核实' }}</dd></div
+      >
+      <div
         ><dt>主负责人</dt><dd>{{ userName(project.primaryOwnerId) }}</dd></div
       >
       <div
@@ -81,7 +84,7 @@
         :type="needsPlan(project) ? 'primary' : 'default'"
         @click="planOpen = true"
         >{{ needsPlan(project) ? '制定计划' : '调整计划' }}</ElButton
-      ><ElButton @click="$emit('detail', project.id)">详情</ElButton></div
+      ><ElButton @click="$emit('detail', project.id)">详情</ElButton><ElButton v-if="canEditProject(store.currentUser, project)" @click="editOpen = true">编辑项目</ElButton></div
     >
     <p class="relation-note">{{
       canUpdate
@@ -90,11 +93,15 @@
           : '仅填写个人进展，不改变整体进度'
         : '当前项目仅可查看'
     }}</p>
+    <ProjectEditDrawer v-if="project" v-model="editOpen" :project="project" />
     <ProjectPlanDrawer v-model="planOpen" :project="project" />
   </article>
 </template>
 <script setup lang="ts">
   import { computed, ref } from 'vue'
+  import ProjectEditDrawer from './project-edit-drawer.vue'
+  import { canEditProject } from '@/utils/project-edit-permission'
+  const editOpen = ref(false)
   import { projectCode } from '@/utils/project-code'
   import type { DemoProject } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'

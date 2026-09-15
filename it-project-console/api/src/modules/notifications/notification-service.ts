@@ -8,7 +8,7 @@ import { recipientScope, skipHistoricalNotifications, type NotificationScope } f
 
 const supported = new Set(['DEMAND_SUBMITTED', 'ACCEPTANCE_SUBMITTED', 'ACCEPTANCE_RETURNED', 'PROPOSAL_ASSIGNED', 'PROPOSAL_RETURNED', 'MANAGER_RISK_DIGEST', 'PROJECT_RISKS_CHANGED', 'DEMAND_RETURNED', 'DEMAND_APPROVED', 'PROJECT_ASSIGNED', 'PROJECT_COMPLETED'])
 const samples = new Set(['user-manager-chen', 'user-business-li', 'user-engineer-wang', 'user-engineer-zhao'])
-const include = { recipient: true, demand: true, project: { include: { primaryOwner: true } }, deliveryLog: true } as const
+const include = { recipient: true, demand: true, project: { include: { primaryOwner: true, members: true } }, deliveryLog: true } as const
 type Item = Prisma.NotificationOutboxGetPayload<{ include: typeof include }>
 type State = 'ACCEPTED' | 'SENT' | 'RETRY' | 'FAILED' | 'UNKNOWN' | 'SKIPPED'
 export type NotificationOptions = NotificationScope & {
@@ -18,7 +18,7 @@ export type NotificationOptions = NotificationScope & {
 }
 export type NotificationOutcome = { accepted: number; sent: number; failed: number; skipped: number; unknown: number }
 
-export function notificationContent(item: Item, origin: string) {
+export function notificationContent(item: Omit<Item, 'project'> & { project: Omit<NonNullable<Item['project']>, 'members'> | null }, origin: string) {
   const payload = item.payload && typeof item.payload === 'object' && !Array.isArray(item.payload) ? item.payload : {}
   if (item.eventType === 'MANAGER_RISK_DIGEST') {
     const projects = Array.isArray(payload.projects) ? payload.projects : []
@@ -117,7 +117,11 @@ export class NotificationService {
       payload.acceptanceRound !== item.project.acceptanceRound ||
       (item.eventType === 'ACCEPTANCE_SUBMITTED' && (item.project.acceptanceStatus !== 'pending' || item.project.acceptanceOwnerId !== item.recipientId || item.recipient.role !== 'BUSINESS')) ||
       (item.eventType === 'ACCEPTANCE_RETURNED' && (item.project.acceptanceStatus !== 'returned' || item.project.primaryOwnerId !== item.recipientId)))
-    return submissionExpired || acceptanceExpired || (item.eventType !== 'MANAGER_RISK_DIGEST' && !item.projectId && !item.demandId && typeof payload.proposalId !== 'string') ||
+    const assignmentExpired = item.eventType === 'PROJECT_ASSIGNED' && (!item.project || ![
+      item.project.primaryOwnerId, ...item.project.members.map(member => member.userId),
+      item.project.businessOwnerId
+    ].includes(item.recipientId))
+    return submissionExpired || acceptanceExpired || assignmentExpired || (item.eventType !== 'MANAGER_RISK_DIGEST' && !item.projectId && !item.demandId && typeof payload.proposalId !== 'string') ||
       (item.eventType === 'MANAGER_RISK_DIGEST' && (!Array.isArray(payload.projects) || payload.projects.length === 0)) ||
       !supported.has(item.eventType) || !item.recipient.active || !item.recipient.dingUserId ||
       (item.eventType === 'PROPOSAL_RETURNED' && !canApproveProjects(item.recipient, this.options.projectApproverDingUserId ?? '')) ||

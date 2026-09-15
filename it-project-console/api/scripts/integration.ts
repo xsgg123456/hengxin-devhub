@@ -26,5 +26,6 @@ await isolatedIntegration(async ({ run }) => {
     '--no-file-parallelism'
   ])
   // This suite creates additional identities in the disposable schema after baseline seed checks.
-  await run('node_modules/vitest/vitest.mjs', ['run', 'src/modules/approvals/project-approver.integration.test.ts', '--maxWorkers=1'])
+  await run('node_modules/vitest/vitest.mjs', ['run', 'src/modules/approvals/project-approver.integration.test.ts',
+    'src/modules/projects/project-edit.integration.test.ts', 'src/modules/demands/demand-lifecycle.integration.test.ts', '--maxWorkers=1', '--no-file-parallelism'])
 })

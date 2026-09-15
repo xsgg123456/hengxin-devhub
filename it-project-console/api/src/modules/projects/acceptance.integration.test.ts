@@ -50,7 +50,7 @@ describe('业务确认验收真实API', () => {
   it('提交-退回-重提-通过不覆盖历史，通过只允许当前业务并生成去重完成通知', async () => {
     const demand = await db.demand.create({ data: { name: '验收需求', ownerId: business } }), project = await fixture()
     const id = project.id
-    await db.project.update({ where: { id }, data: { demandId: demand.id } })
+  await db.project.update({ where: { id }, data: { demandId: demand.id, businessOwnerId: business } })
     expect((await act(id, 1, 'submit', engineer, { summary: '首轮交付', url: 'http://192.168.1.10:8080/result' })).statusCode).toBe(200)
     expect((await row(id)).acceptanceUrl).toBe('http://192.168.1.10:8080/result')
     for (const user of [manager, engineer, collab]) expect((await act(id, 2, 'accept', user)).statusCode).toBe(403)
