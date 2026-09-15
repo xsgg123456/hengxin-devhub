@@ -66,6 +66,7 @@
           v-model="form.attachments"
           :disabled="saving"
           :ensure-demand="ensureDraft"
+          :optional="isOptimization"
           @busy="uploading = $event"
         />
       </ElFormItem>

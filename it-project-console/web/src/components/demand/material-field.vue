@@ -12,7 +12,7 @@
       <div class="text-sm"><span class="text-primary">点击选择文件</span>，或将文件拖到这里</div>
       <div class="mt-1 text-xs text-g-500">不限文件格式 · 单文件 ≤100 MB · 合计 ≤500 MB</div>
     </ElUpload>
-    <p class="mt-2 text-xs text-g-500">提交评估至少需要一个上传完成的文件，草稿可暂不上传。</p>
+    <p class="mt-2 text-xs text-g-500">{{ optional ? '附件选填，可直接提交优化需求；如添加附件，请等待上传完成。' : '提交评估至少需要一个上传完成的文件，草稿可暂不上传。' }}</p>
     <p v-if="runtimeConfig.isPrototype" class="mt-2 text-xs text-g-500">
       仅模拟：只保存文件信息，不上传或保存文件内容。
     </p>
@@ -71,6 +71,7 @@
   const props = defineProps<{
     modelValue: DemoAttachment[]
     disabled?: boolean
+    optional?: boolean
     ensureDemand?: () => Promise<string>
   }>()
   const emit = defineEmits<{

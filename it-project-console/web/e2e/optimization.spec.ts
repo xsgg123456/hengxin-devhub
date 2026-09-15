@@ -20,6 +20,8 @@ test('优化真实组件跨角色提交审批接单默认计划验收并保留�
   await expect(detail).toBeVisible()
   await detail.getByRole('button', { name: '提优化需求', exact: true }).click()
   const editor = page.getByRole('dialog', { name: '优化需求', exact: true })
+  await expect(editor).toContainText('附件选填，可直接提交优化需求')
+  await expect(editor).not.toContainText('提交评估至少需要一个上传完成的文件')
   await editor.getByLabel('优化标题', { exact: true }).fill('优化单节点浏览器闭环')
   await editor.getByLabel('当前问题', { exact: true }).fill('导出缺少部门字段')
   await editor.getByRole('button', { name: '提交评估', exact: true }).click()
