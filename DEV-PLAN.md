@@ -804,3 +804,8 @@ D. 联动与验收：复用既有项目人员、待办、负载与通知分发�
 执行 [OPTIMIZATION-ITERATION](it-project-console/docs/OPTIMIZATION-ITERATION.md) 四步计划，API与前端可隔离实施，主Agent处理工作日默认与图表并集成验证；不发布。
 
 本地实现及验收完成：Web283/API106单测、158隔离集成、14项真实浏览器、57项原型浏览器均有通过记录（两项启动超时独立复跑通过），类型/正式构建、发布9项、Harness20项通过；独立两阶段审查通过。边界复测与截图详见 [OPTIMIZATION-VERIFICATION](it-project-console/docs/OPTIMIZATION-VERIFICATION.md)。未部署生产。
+
+## 2026-09-15 中文提示与实时同步
+执行 [本轮四步计划](it-project-console/docs/LIVE-SYNC-CHINESE-ITERATION.md)，保留现有前端交互，隔离测试后独立审查，本轮不自动发布。
+
+中文提示与同步已完成实现：复用原表单/抽屉和查询，补中文校验与历史映射，事务版本+SSE及30秒兜底，冻结编辑版本并保留输入。验证详情见 [本轮验收记录](it-project-console/docs/LIVE-SYNC-CHINESE-VERIFICATION.md)。

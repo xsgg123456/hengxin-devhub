@@ -933,3 +933,6 @@ MVP 完成条件：
 
 ## 2026-09-15 单节点优化正式开发（已确认）
 用户确认开始本地开发：[本轮验收规则](it-project-console/docs/OPTIMIZATION-ITERATION.md)。覆盖原七环节优化预览；优化仅一个交付节点、管理图表只对管理人员显示、首次排期每环节默认3个工作日。
+
+## 2026-09-15 中文提示与实时同步
+用户授权本地实现，需求与验收以 [本轮规则](it-project-console/docs/LIVE-SYNC-CHINESE-ITERATION.md) 为准。

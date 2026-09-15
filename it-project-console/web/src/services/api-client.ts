@@ -1,4 +1,5 @@
 import { runtimeConfig } from '@/config/runtime'
+import { businessError } from '@/utils/business-labels'
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -40,7 +41,7 @@ export async function apiRequest<T>(
   if (!response.ok) {
     if (response.status === 401) window.dispatchEvent(new Event('itpc-session-expired'))
     throw new ApiError(
-      payload.error?.message || '请求失败，请稍后重试',
+      businessError(payload.error?.message, '请求失败，请稍后重试'),
       response.status,
       payload.error?.code
     )

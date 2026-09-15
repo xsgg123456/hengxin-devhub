@@ -91,14 +91,13 @@
 </template>
 <script setup lang="ts">
   import {
-    listManagers,
-    listManagerCandidates,
     setLiveManager,
     type LiveManager
   } from '@/services/live-manager-service'
   import { runtimeConfig } from '@/config/runtime'
   import BusinessPageState from '@/components/system/business-page-state.vue'
-  import { computed, ref, watch, onMounted } from 'vue'
+  import { computed, ref, watch } from 'vue'
+  import { useLiveQuery } from '@/hooks/business/use-live-query'
   import { ElMessage, ElMessageBox } from 'element-plus'
   import { useRouter } from 'vue-router'
   import { usePrototypeStore } from '@/store/modules/prototype'
@@ -112,19 +111,20 @@
     addError = ref(''),
     addOpen = ref(false),
     selectedId = ref('')
-  const liveManagers = ref<LiveManager[]>([])
-  const liveCandidates = ref<Array<{ id: string; name: string; department: string }>>([])
-  const loading = ref(false)
+  const managerQuery = useLiveQuery<LiveManager[]>('/manager-grants', () => ({}))
+  const candidateQuery = useLiveQuery<Array<{ id: string; name: string; department: string }>>('/manager-grants/candidates', () => ({}))
+  const loading = computed(() => managerQuery.loading.value || candidateQuery.loading.value)
+  watch([managerQuery.error, candidateQuery.error], ([first, second]) => { error.value = first || second })
   const canManage = computed(() => store.currentUser.role === 'manager')
   const managers = computed(() =>
     runtimeConfig.isPrototype
       ? (store.database?.users.filter((u) => u.role === 'manager') ?? [])
-      : liveManagers.value
+      : managerQuery.data.value ?? []
   )
   const candidates = computed(() =>
     runtimeConfig.isPrototype
       ? (store.database?.users.filter((u) => u.role !== 'manager') ?? [])
-      : liveCandidates.value
+      : candidateQuery.data.value ?? []
   )
   const userName = (id: string) => store.database?.users.find((u) => u.id === id)?.name ?? id
   const grant = (id: string) =>
@@ -137,18 +137,9 @@
   })
   async function load() {
     if (runtimeConfig.isPrototype) return
-    loading.value = true
-    error.value = ''
-    try {
-      liveManagers.value = await listManagers()
-      liveCandidates.value = canManage.value ? await listManagerCandidates() : []
-    } catch (cause) {
-      error.value = cause instanceof Error ? cause.message : '加载失败'
-    } finally {
-      loading.value = false
-    }
+    managerQuery.retry()
+    candidateQuery.retry()
   }
-  onMounted(load)
   const requests = new Map<string, string>()
   async function saveLive(userId: string, enabled: boolean) {
     const key = `${userId}:${enabled}`

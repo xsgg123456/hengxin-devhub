@@ -49,3 +49,25 @@ it('多个上传的离开保护直到全部结束才释放', () => {
   store.setUploadBusy(false)
   expect(store.pendingUploads).toBe(0)
 })
+it('晚到工作区响应不覆盖后发刷新，后台读取不改未保存状态', async () => {
+  const store = usePrototypeStore()
+  let finish!: (value: ReturnType<typeof createInitialPrototypeSnapshot>) => void
+  vi.mocked(apiRequest).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  const old = store.refreshLive()
+  const fresh = createInitialPrototypeSnapshot(); fresh.revision = 999
+  vi.mocked(apiRequest).mockResolvedValueOnce(fresh)
+  store.setDirty('editor', true); store.setUploadBusy(true)
+  await store.refreshLive({ background: true })
+  finish(createInitialPrototypeSnapshot()); await old
+  expect(store.snapshot?.revision).toBe(999)
+  expect(store.hasUnsavedChanges).toBe(true); expect(store.uploading).toBe(true)
+})
+it('退出后晚到成功响应不能恢复旧账号', async () => {
+  const store = usePrototypeStore()
+  let finish!: (value: ReturnType<typeof createInitialPrototypeSnapshot>) => void
+  vi.mocked(apiRequest).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  const request = store.refreshLive()
+  store.authRequired = true; store.ready = false; store.snapshot = null
+  finish(createInitialPrototypeSnapshot()); await request
+  expect(store.snapshot).toBeNull(); expect(store.authRequired).toBe(true)
+})

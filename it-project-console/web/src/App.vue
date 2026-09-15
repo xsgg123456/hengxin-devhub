@@ -14,16 +14,20 @@
       <ElIcon class="is-loading" :size="28"><Loading /></ElIcon>
       <span>正在加载数据…</span>
     </div>
+    <ElResult v-else-if="!routeAllowed" icon="warning" title="当前页面权限已变更" sub-title="你已无权访问此页面，请返回可访问的工作台。">
+      <template #extra><ElButton @click="router.replace(getHomePath(prototypeStore.currentUser.role))">返回工作台</ElButton></template>
+    </ElResult>
     <RouterView v-else :key="prototypeStore.resetVersion" />
   </ElConfigProvider>
 </template>
 
 <script setup lang="ts">
-  import { onBeforeMount, onBeforeUnmount, onMounted, ref, defineAsyncComponent } from 'vue'
+  import { onBeforeMount, onBeforeUnmount, onMounted, ref, computed, watch, defineAsyncComponent } from 'vue'
   import { Loading } from '@element-plus/icons-vue'
   import zhCn from 'element-plus/es/locale/lang/zh-cn'
   import { RouterView, useRouter } from 'vue-router'
   import { usePrototypeStore } from '@/store/modules/prototype'
+  import { useWorkspaceSync } from '@/hooks/business/use-workspace-sync'
   import { getHomePath } from '@/router/access'
   import { syncPrototypeShell } from '@/prototype/sync-shell'
   import { isSupportedDevice } from '@/utils/device'
@@ -37,6 +41,14 @@
 
   const router = useRouter()
   const prototypeStore = usePrototypeStore()
+  useWorkspaceSync()
+  const routeAllowed = computed(() => {
+    const roles = router.currentRoute.value.meta.roles
+    return !Array.isArray(roles) || roles.includes(prototypeStore.currentUser.role)
+  })
+  watch(() => prototypeStore.currentUser.role, role => {
+    if (prototypeStore.ready) syncPrototypeShell(role)
+  })
   const deviceSupported = ref(isSupportedDevice())
 
   async function retryLive() {

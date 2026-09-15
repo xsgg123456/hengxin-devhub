@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import type { DemoProject, PrototypeScenario, PrototypeSnapshot } from '@/domain/prototype'
 import { getPrototypeDriver } from '@/store/business-runtime'
@@ -61,19 +61,27 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
     return driver
   }
 
-  async function refreshLive(): Promise<void> {
+  let requestVersion = 0
+  watch(authRequired, () => { requestVersion++ }, { flush: 'sync' })
+  async function refreshLive(options: { background?: boolean; signal?: AbortSignal } = {}): Promise<void> {
+    const request = ++requestVersion
     try {
-      snapshot.value = await apiRequest<PrototypeSnapshot>('/workspace')
+      const result = await apiRequest<PrototypeSnapshot>('/workspace', {
+        signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(30000)]) : undefined
+      })
+      if (request !== requestVersion || options.signal?.aborted) return
+      snapshot.value = result
       loadError.value = ''
       authRequired.value = false
       ready.value = true
     } catch (error) {
+      if (request !== requestVersion || options.signal?.aborted) throw error
       if (error instanceof ApiError && error.status === 401) {
         snapshot.value = null
         authRequired.value = true
         ready.value = false
       }
-      loadError.value = error instanceof Error ? error.message : '数据加载失败'
+      if (!options.background) loadError.value = error instanceof Error ? error.message : '数据加载失败'
       throw error
     }
   }

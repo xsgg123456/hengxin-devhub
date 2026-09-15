@@ -6,6 +6,7 @@
     :before-close="close"
     append-to-body
   >
+    <ElAlert v-if="stale" :title="stale" type="warning" :closable="false" class="mb-5" />
     <ElAlert v-if="failure" :title="failure" type="error" :closable="false" class="mb-5" />
     <PrototypeSaveRecovery v-if="failure && runtimeConfig.isPrototype" />
     <p class="mb-2 text-g-500"
@@ -55,6 +56,7 @@
   import type { DemoDemand } from '@/domain/prototype'
   import { reviewDemand, type ProjectInput } from '@/services/workflow-service'
   import { usePrototypeStore } from '@/store/modules/prototype'
+  import { useRecordStaleness } from '@/hooks/business/use-record-staleness'
   import ProjectFields from '@/components/project/project-fields.vue'
   import { ApiError } from '@/services/api-client'
   import { reviewLiveDemand, liveOperationKey } from '@/services/live-demand-service'
@@ -62,6 +64,8 @@
   const props = defineProps<{ demand: DemoDemand; excludeEstablish?: boolean }>()
   const emit = defineEmits<{ close: []; saved: [] }>()
   const store = usePrototypeStore()
+  const baselineVersion = props.demand.version
+  const stale = useRecordStaleness('demand', () => props.demand.id, () => baselineVersion)
   const operationKey = liveOperationKey()
   const decision = ref<'establish' | 'return' | 'reject'>(
     props.excludeEstablish ? 'return' : 'establish'
@@ -109,6 +113,7 @@
   }
   async function save() {
     if (saving.value) return
+    if (stale.value) { failure.value = stale.value; return }
     reasonError.value = ''
     if (decision.value === 'establish') {
       if (!(await projectFields.value?.validate())) return
@@ -127,13 +132,13 @@
             requestId: undefined,
             decision: decision.value,
             reason: reason.value,
-            version: props.demand.version
+            version: baselineVersion
           })
         }
         await store.runLiveCommand(() =>
           reviewLiveDemand(
             props.demand.id,
-            props.demand.version,
+            baselineVersion,
             decision.value,
             reason.value,
             input

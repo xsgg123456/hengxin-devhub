@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, nextTick, reactive, ref } from 'vue'
 import { queryString, useLiveQuery } from './use-live-query'
 const mocks = vi.hoisted(() => ({ request: vi.fn(), prototype: false }))
-const store = reactive({ ready: true, authRequired: false, snapshot: { revision: 1 } })
+const store = reactive({ ready: true, authRequired: false, currentUser: { id: 'one' }, snapshot: { revision: 1 } })
 vi.mock('@/config/runtime', () => ({
   runtimeConfig: {
     get isPrototype() {
@@ -18,6 +18,8 @@ describe('真实查询生命周期', () => {
     mocks.request.mockReset()
     mocks.prototype = false
     store.ready = true
+    store.authRequired = false
+    store.currentUser.id = 'one'
     store.snapshot.revision = 1
   })
   afterEach(() => vi.useRealTimers())
@@ -86,5 +88,32 @@ describe('真实查询生命周期', () => {
     live.stop()
     await vi.advanceTimersByTimeAsync(200)
     expect(mocks.request).not.toHaveBeenCalled()
+  })
+  it('同筛选后台更新保留列表不闪烁，失败保留内容，新筛选清空旧数据', async () => {
+    mocks.request.mockResolvedValueOnce(['原数据']).mockRejectedValueOnce(new Error('暂时断网'))
+    const scope = effectScope(), params = ref('原筛选')
+    const query = scope.run(() => useLiveQuery<string[]>('/dashboard', () => ({ keyword: params.value })))!
+    await vi.advanceTimersByTimeAsync(180)
+    store.snapshot.revision++; await nextTick()
+    expect(query.data.value).toEqual(['原数据']); expect(query.loading.value).toBe(false)
+    await vi.advanceTimersByTimeAsync(180)
+    expect(query.error.value).toBe(''); expect(query.refreshError.value).toBe('暂时断网')
+    expect(query.data.value).toEqual(['原数据'])
+    params.value = '新筛选'; await nextTick()
+    expect(query.data.value).toBeUndefined(); expect(query.loading.value).toBe(true)
+    scope.stop()
+  })
+  it('账号变化立即清除旧账号结果，失败查询定时恢复', async () => {
+    mocks.request.mockResolvedValueOnce(['旧账号']).mockRejectedValueOnce(new Error('暂时断网')).mockResolvedValueOnce(['新账号'])
+    const scope = effectScope()
+    const query = scope.run(() => useLiveQuery<string[]>('/dashboard', () => ({})))!
+    await vi.advanceTimersByTimeAsync(180)
+    store.currentUser.id = 'two'; await nextTick()
+    expect(query.data.value).toBeUndefined()
+    await vi.advanceTimersByTimeAsync(180)
+    expect(query.error.value).toBe('暂时断网')
+    await vi.advanceTimersByTimeAsync(30180)
+    expect(query.data.value).toEqual(['新账号'])
+    scope.stop()
   })
 })

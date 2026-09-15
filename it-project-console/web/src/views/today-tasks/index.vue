@@ -53,6 +53,7 @@
 <script setup lang="ts">
   import { runtimeConfig } from '@/config/runtime'
   import { useLiveQuery } from '@/hooks/business/use-live-query'
+  import { useRetainedSelection } from '@/hooks/business/use-retained-selection'
   import type { DashboardResult } from '@/services/live-dashboard-types'
   import BusinessPageState from '@/components/system/business-page-state.vue'
   import { computed, ref, watch } from 'vue'
@@ -72,9 +73,7 @@
     router = useRouter()
   const store = usePrototypeStore()
   const proposalId = ref('')
-  const proposal = computed(() =>
-    store.database?.projectProposals?.find((p) => p.id === proposalId.value)
-  )
+  const proposal = useRetainedSelection(() => proposalId.value, () => store.database?.projectProposals ?? [])
   const proposalError = computed(() =>
     proposalId.value && store.ready && !proposal.value
       ? '待接单记录不存在或无权访问，请刷新待办'
@@ -131,11 +130,10 @@
   const selected = computed(
     () => store.visibleProjects.find((p) => p.id === detailId.value) ?? null
   )
-  const updateProject = computed(
-    () => store.visibleProjects.find((p) => p.id === updateId.value) ?? null
-  )
-  const review = computed(() => store.visibleDemands.find((d) => d.id === reviewId.value))
-  const supplement = computed(() => store.visibleDemands.find((d) => d.id === supplementId.value))
+  const retainedUpdate = useRetainedSelection(() => updateId.value, () => store.visibleProjects)
+  const updateProject = computed(() => retainedUpdate.value ?? null)
+  const review = useRetainedSelection(() => reviewId.value, () => store.visibleDemands)
+  const supplement = useRetainedSelection(() => supplementId.value, () => store.visibleDemands)
   const actionLabels = {
     acceptance: '验收确认',
     confirm: '确认接单',

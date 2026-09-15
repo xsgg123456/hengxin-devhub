@@ -18,30 +18,42 @@ export function useLiveQuery<T>(path: string, params: WatchSource<QueryParams>) 
   const loading = ref(false)
   const error = ref('')
   const retryVersion = ref(0)
+  const refreshError = ref('')
+  let previousKey = ''
   watch(
-    [params, () => store.snapshot?.revision, retryVersion],
+    [params, () => store.snapshot?.revision, () => store.currentUser.id, () => store.ready, () => store.authRequired, retryVersion],
     (_, __, cleanup) => {
       if (runtimeConfig.isPrototype) return
-      data.value = undefined
+      const key = queryString(typeof params === 'function' ? params() : params.value)
+      const identityKey = `${store.currentUser.id}:${key}`
+      if (identityKey !== previousKey || !store.ready || store.authRequired) data.value = undefined
+      previousKey = identityKey
       error.value = ''
+      refreshError.value = ''
       if (!store.ready || store.authRequired) {
         loading.value = false
         return
       }
-      loading.value = true
+      loading.value = data.value === undefined
       let current = true
+      let retryTimer: ReturnType<typeof setTimeout> | undefined
       const controller = new AbortController()
       const timer = setTimeout(async () => {
         try {
           const result = await apiRequest<T>(
-            `${path}?${queryString(typeof params === 'function' ? params() : params.value)}`,
+            `${path}?${key}`,
             {
               signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30000)])
             }
           )
           if (current) data.value = result
         } catch (cause) {
-          if (current) error.value = cause instanceof Error ? cause.message : '数据加载失败，请重试'
+          if (current) {
+            const message = cause instanceof Error ? cause.message : '数据加载失败，请重试'
+            if (data.value === undefined) error.value = message
+            else refreshError.value = message
+            retryTimer = setTimeout(() => { if (current) retryVersion.value++ }, 30000)
+          }
         } finally {
           if (current) loading.value = false
         }
@@ -49,6 +61,7 @@ export function useLiveQuery<T>(path: string, params: WatchSource<QueryParams>) 
       cleanup(() => {
         current = false
         clearTimeout(timer)
+        clearTimeout(retryTimer)
         controller.abort()
       })
     },
@@ -61,6 +74,7 @@ export function useLiveQuery<T>(path: string, params: WatchSource<QueryParams>) 
     data,
     loading,
     error,
+    refreshError,
     retry: () => {
       retryVersion.value++
     }

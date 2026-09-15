@@ -12,7 +12,14 @@ export function useDemandDeepLink(
     [queryId, readableDemands],
     ([id, demands]) => {
       deepLinkError.value = ''
-      if (id === undefined) return
+      if (id === undefined) {
+        if (detail.value) {
+          const latest = demands.find(demand => demand.id === detail.value?.id)
+          if (!latest) deepLinkError.value = '该需求不存在或你已无权查看，请联系管理员'
+          detail.value = latest
+        }
+        return
+      }
       detail.value = typeof id === 'string' ? demands.find((demand) => demand.id === id) : undefined
       if (!detail.value) deepLinkError.value = '该需求不存在或你已无权查看，请联系管理员'
     },

@@ -6,6 +6,7 @@
     :before-close="beforeClose"
     @update:model-value="emit('update:modelValue', $event)"
   >
+    <ElAlert v-if="stale" :title="stale" type="warning" :closable="false" class="mb-4" />
     <template v-if="project">
       <h3 class="mb-2 text-lg font-medium">{{ project.name }}</h3>
       <p class="mb-5 text-g-600">{{
@@ -95,6 +96,7 @@
   } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { useUnsavedForm } from '@/hooks/business/use-unsaved-form'
+  import { useRecordStaleness } from '@/hooks/business/use-record-staleness'
   import { saveProjectPlan, validatePlans } from '@/services/stage-plan-service'
   import { planLiveProject } from '@/services/live-project-service'
   import { defaultStagePlans } from '@/services/default-stage-plans'
@@ -114,6 +116,7 @@
     initial = ref(''),
     version = ref<number>()
   let operationKey = liveOperationKey()
+  const stale = useRecordStaleness('project', () => props.project?.id, () => version.value)
   const snapshot = () =>
     JSON.stringify({ plans: plans.value, reason: reason.value, description: description.value })
   const dirty = computed(() => props.modelValue && snapshot() !== initial.value)
@@ -149,6 +152,7 @@
   )
   async function save() {
     if (busy.value || !props.project) return
+    if (stale.value) { error.value = stale.value; return }
     busy.value = true
     error.value = ''
     try {
@@ -174,8 +178,7 @@
       error.value = cause instanceof Error ? cause.message : '保存失败，请重试'
       if (cause instanceof ApiError && cause.status === 409) {
         await store.refreshLive().catch(() => undefined)
-        version.value = store.visibleProjects.find((p) => p.id === props.project?.id)?.version
-        error.value += '；已尝试刷新项目版本，请核对后重试，填写内容已保留'
+        error.value += '；填写内容已保留，请关闭后重新打开核对'
       }
     } finally {
       busy.value = false

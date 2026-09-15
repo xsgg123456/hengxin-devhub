@@ -6,6 +6,7 @@
     :before-close="beforeClose"
     @update:model-value="$emit('update:modelValue', $event)"
   >
+    <ElAlert v-if="stale" :title="stale" type="warning" :closable="false" class="mb-4" />
     <ElAlert
       class="mb-5"
       :title="
@@ -80,6 +81,7 @@
   import { type ProjectInput } from '@/services/workflow-service'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { useUnsavedForm } from '@/hooks/business/use-unsaved-form'
+  import { useRecordStaleness } from '@/hooks/business/use-record-staleness'
   import { createLiveProject, liveOperationKey } from '@/services/live-demand-service'
   import {
     submitProjectProposal,
@@ -100,6 +102,8 @@
   const props = defineProps<{ modelValue: boolean; proposal?: ProjectProposal }>()
   const emit = defineEmits<{ 'update:modelValue': [value: boolean]; created: [id: string] }>()
   const store = usePrototypeStore()
+  const baselineVersion = ref(0)
+  const stale = useRecordStaleness('proposal', () => props.proposal?.id, () => baselineVersion.value)
   const reviewOpen = ref(false)
   function reviewSaved() {
     reviewOpen.value = false
@@ -140,6 +144,7 @@
     () => props.modelValue,
     (open) => {
       if (open) {
+        baselineVersion.value = props.proposal?.version ?? 0
         operationKey = liveOperationKey()
         form.value = props.proposal
           ? { ...props.proposal, collaboratorIds: [...props.proposal.collaboratorIds] }
@@ -152,6 +157,7 @@
     { immediate: true }
   )
   async function save(): Promise<void> {
+    if (stale.value) { error.value = stale.value; return }
     if (busy.value || !(await fields.value?.validate())) return
     busy.value = true
     error.value = ''
@@ -163,7 +169,7 @@
         id = (
           await store.runLiveCommand(() =>
             props.proposal
-              ? resubmitLiveProposal(props.proposal.id, props.proposal.version, input)
+              ? resubmitLiveProposal(props.proposal.id, baselineVersion.value, input)
               : createLiveProject(input)
           )
         ).id
@@ -171,7 +177,7 @@
         await store.runCommand((draft) => {
           id = (
             props.proposal
-              ? resubmitProjectProposal(draft, props.proposal.id, props.proposal.version, input)
+              ? resubmitProjectProposal(draft, props.proposal.id, baselineVersion.value, input)
               : submitProjectProposal(draft, input)
           ).id
         })
@@ -186,6 +192,7 @@
     }
   }
   async function confirm(decision: 'accept' | 'return') {
+    if (stale.value) { error.value = stale.value; return }
     if (!props.proposal || busy.value) return
     if (decision === 'return' && !reason.value.trim()) {
       error.value = '请填写退回评估原因'
@@ -201,7 +208,7 @@
           projectId = confirmProjectProposal(
             draft,
             proposal.id,
-            proposal.version,
+            baselineVersion.value,
             decision,
             reason.value
           ).projectId
@@ -211,12 +218,12 @@
           await store.runLiveCommand(() =>
             confirmLiveProposal(
               proposal.id,
-              proposal.version,
+              baselineVersion.value,
               decision,
               reason.value,
               operationKey({
                 id: proposal.id,
-                version: proposal.version,
+                version: baselineVersion.value,
                 decision,
                 reason: reason.value
               })
@@ -237,6 +244,7 @@
     }
   }
   async function remove() {
+    if (stale.value) { error.value = stale.value; return }
     const proposal = props.proposal
     if (!proposal || busy.value) return
     try {
@@ -259,8 +267,8 @@
         await store.runLiveCommand(() =>
           deleteLiveProposal(
             proposal.id,
-            proposal.version,
-            operationKey({ id: proposal.id, version: proposal.version, action: 'delete' })
+            baselineVersion.value,
+            operationKey({ id: proposal.id, version: baselineVersion.value, action: 'delete' })
           )
         )
       emit('update:modelValue', false)

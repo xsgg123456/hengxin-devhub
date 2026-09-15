@@ -233,9 +233,7 @@
   const selected = computed(
     () => store.visibleProjects.find((p) => p.id === route.query.projectId) ?? null
   )
-  const updateProject = computed(
-    () => store.visibleProjects.find((p) => p.id === updateId.value) ?? null
-  )
+  const updateProject = ref<(typeof store.visibleProjects)[number] | null>(null)
   function openDetail(id: string): void {
     void router.push({ query: { ...route.query, projectId: id } })
   }
@@ -248,6 +246,7 @@
   }
   function openUpdate(id: string): void {
     updateId.value = id
+    updateProject.value = store.visibleProjects.find(p => p.id === id) ?? null
     updateOpen.value = true
   }
   watch(

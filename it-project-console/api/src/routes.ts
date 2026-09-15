@@ -3,6 +3,7 @@ import { registerDashboardRoutes } from './modules/dashboard/dashboard-routes.js
 import { registerManagerGrantRoutes } from './modules/manager-grants/manager-grant-routes.js'
 import { refreshProjectRisks } from './modules/risks/risk-scan-job.js'
 import { registerWorkspaceRoutes } from './modules/workspace/workspace-routes.js'
+import { registerWorkspaceSync } from './modules/workspace/workspace-sync.js'
 import { registerDemandRoutes } from './modules/demands/demand-routes.js'
 import { registerApprovalRoutes } from './modules/approvals/approval-routes.js'
 import { registerProjectRoutes } from './modules/projects/project-routes.js'
@@ -22,6 +23,7 @@ export async function registerRoutes(
 ) {
   const api = app.withTypeProvider<ZodTypeProvider>()
   const auth = authService(db, env)
+  registerWorkspaceSync(app, db, auth.authenticate)
   registerDashboardRoutes(app, db, auth.authenticate)
   registerManagerGrantRoutes(app, db, auth.authenticate)
   registerProgressRoutes(app, db, auth.authenticate, async (tx, id) => {

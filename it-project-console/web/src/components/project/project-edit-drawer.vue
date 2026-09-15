@@ -1,6 +1,7 @@
 <template>
   <ElDrawer :model-value="modelValue" title="编辑项目" size="min(960px, 95vw)" :before-close="beforeClose" append-to-body @update:model-value="emit('update:modelValue', $event)">
     <template v-if="form">
+      <ElAlert v-if="stale" :title="stale" type="warning" :closable="false" class="mb-4" />
       <div class="edit-heading"><div><h3>{{ project.name }}</h3><p>{{ projectCode(project) }} · 全局编辑</p></div><ElTag :type="pending ? 'warning' : 'success'">{{ pending ? '迁移待核实' : '正常项目' }}</ElTag></div>
       <ElAlert v-if="runtimeConfig.isPrototype" title="交互预览：修改保存在当前浏览器，未接入生产数据和通知。" type="info" :closable="false" class="mb-4" />
       <ElAlert v-if="store.currentUser.role === 'engineer'" title="主负责工程师可整理本项目的迁移资料；完成核实或转交主责后，恢复原有日常权限。" type="warning" :closable="false" class="mb-4" />
@@ -67,6 +68,7 @@ import { ElMessage } from 'element-plus'
 import { PROJECT_STAGES, type DemoProject, type SimpleStatus } from '@/domain/prototype'
 import { usePrototypeStore } from '@/store/modules/prototype'
 import { useUnsavedForm } from '@/hooks/business/use-unsaved-form'
+import { useRecordStaleness } from '@/hooks/business/use-record-staleness'
 import { projectCode } from '@/utils/project-code'
 import { statusLabel } from '@/utils/project-display'
 import { isEngineerEligible } from '@/utils/engineer-eligibility'
@@ -78,6 +80,7 @@ const store = usePrototypeStore()
 let operationKey = liveOperationKey()
 const futureDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` > shanghaiDay(new Date().toISOString())
 const form = ref<DemoProject>()
+const stale = useRecordStaleness('project', () => form.value?.id, () => form.value?.version)
 const baseline = ref(''), initialForm = ref(''), tab = ref('basic'), reason = ref(''), error = ref('')
 const confirmOpen = ref(false), verifying = ref(false)
 const historicalOpen = ref(false)
@@ -110,7 +113,8 @@ const changes = computed(() => {
   const originalDate = (JSON.parse(initialForm.value) as DemoProject).firstRequestedOn || ''
   if ((form.value.firstRequestedOn || '') !== originalDate) lines.push(`需求首次提出日期：${originalDate || '待核实'} → ${form.value.firstRequestedOn || '待核实'}`)
   for (const [key, label] of [['name','项目名称'], ['department','需求部门'], ['priority','优先级'], ['stage','当前环节'], ['simpleStatus','环节状态'], ...dateFields.map(d => [d.key, d.label])] as [keyof DemoProject, string][]) {
-    if (form.value[key] !== props.project[key]) lines.push(`${label}：${props.project[key] || '未填写'} → ${form.value[key] || '未填写'}`)
+    const display = (value: unknown) => key === 'simpleStatus' ? statusLabel[value as SimpleStatus] || '未知状态' : value || '未填写'
+    if (form.value[key] !== props.project[key]) lines.push(`${label}：${display(props.project[key])} → ${display(form.value[key])}`)
   }
   if (JSON.stringify(form.value.stagePlans) !== JSON.stringify((JSON.parse(initialForm.value) as DemoProject).stagePlans)) lines.push('七环节计划已调整，请核对日期')
   if (['description','acceptanceUrl','acceptanceSummary','blocker'].some(k => form.value![k as keyof DemoProject] !== props.project[k as keyof DemoProject])) lines.push('项目描述、交付资料或阻塞说明已修改')
@@ -134,12 +138,14 @@ watch(() => props.modelValue, open => {
   tab.value = 'basic'; reason.value = ''; error.value = ''; confirmOpen.value = false; historicalOpen.value = false
 }, { immediate: true })
 function prepare(verify: boolean) {
+  if (stale.value) { error.value = stale.value; return }
   const delivery = form.value?.parentProjectId ? form.value.stagePlans?.find(p => p.stage === '验收交付' && p.startDate && p.endDate) : undefined
   if (delivery && form.value) form.value.expectedLaunchDate = form.value.expectedDeliveryDate = delivery.endDate
   verifying.value = verify; error.value = ''; confirmOpen.value = true
 }
 async function save() {
   if (!form.value) return
+  if (stale.value) { error.value = stale.value; return }
   error.value = ''
   try {
     const edited = JSON.parse(JSON.stringify(form.value)) as DemoProject
@@ -172,5 +178,4 @@ async function save() {
 .change-row { padding:8px 0; border-bottom:1px solid var(--el-border-color-lighter); overflow-wrap:anywhere; }
 @media(max-width:600px) { .edit-grid { grid-template-columns:1fr; } .plan-row { grid-template-columns:1fr 1fr; } .plan-row > span { grid-column:1 / -1; } }
 </style>
-
 

@@ -16,7 +16,8 @@
     <ElAlert v-if="failure" :title="failure" type="error" :closable="false" class="mb-5" />
     <PrototypeSaveRecovery v-if="failure && runtimeConfig.isPrototype" />
     <p v-if="isOptimization" class="mb-4 text-sm text-g-600">原项目：{{ store.database?.projects.find(p => p.id === form.parentProjectId)?.name || form.parentProjectId }}</p>
-    <ElForm ref="formRef" :model="form" label-position="top" :disabled="saving" scroll-to-error>
+    <ElAlert v-if="stale" :title="stale" type="warning" :closable="false" class="mb-5" />
+    <ElForm ref="formRef" :model="form" :rules="rules" label-position="top" :disabled="saving" scroll-to-error>
       <ElFormItem :label="isOptimization ? '优化标题' : '项目名称'" prop="name" :error="errors.name" required>
         <ElInput v-model="form.name" maxlength="100" show-word-limit />
       </ElFormItem>
@@ -93,7 +94,7 @@
   import { runtimeConfig } from '@/config/runtime'
   import PrototypeSaveRecovery from '@/components/system/prototype-save-recovery.vue'
   import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-  import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
+  import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
   import type { DemoAttachment, DemoDemand } from '@/domain/prototype'
   import { saveDemand } from '@/services/workflow-service'
   import { validateMaterials } from '@/services/workflow-validation'
@@ -121,6 +122,13 @@
     attachments: demandMaterials(props.demand).map(file => ({ ...file }))
   })
   const isOptimization = computed(() => !!form.parentProjectId)
+  const rules = computed<FormRules>(() => ({
+    name: [{ required: true, whitespace: true, message: isOptimization.value ? '请填写优化标题' : '请填写项目名称', trigger: 'blur' }],
+    description: [{ required: true, whitespace: true, message: '请说明要解决的问题', trigger: 'blur' }],
+    optimizationOutcome: [{ required: true, whitespace: true, message: '请填写期望效果 / 验收标准', trigger: 'blur' }],
+    expectedLaunchDate: [{ required: true, message: '请选择期望上线日期', trigger: 'change' }],
+    attachments: [{ type: 'array', required: !isOptimization.value, message: '请上传需求附件', trigger: 'change' }]
+  }))
   function input(): LiveDemandInput {
     const legacyLink = (file?: DemoAttachment | null) =>
       file?.kind === 'link' && form.attachments.some(item => item.kind === 'link' && item.url === file.url)
@@ -135,6 +143,12 @@
   const busy = computed(() => saving.value || uploading.value)
   const liveId = ref(props.demand?.id)
   const liveVersion = ref(props.demand?.version)
+  const stale = computed(() => {
+    if (runtimeConfig.isPrototype || !liveId.value || saving.value) return ''
+    const latest = store.visibleDemands.find(d => d.id === liveId.value)
+    return !latest ? '该需求已移除；填写内容已保留，请关闭后核对。'
+      : latest.version !== liveVersion.value ? '该需求已被更新；填写内容已保留，请复制需要保留的内容，关闭后重新打开核对。' : ''
+  })
   const operationKey = liveOperationKey()
   let draftInput: LiveDemandInput | undefined
   let draftPromise: Promise<string> | undefined
@@ -182,6 +196,7 @@
   }
   async function save(submit: boolean) {
     if (busy.value) return
+    if (stale.value) { failure.value = stale.value; return }
     Object.keys(errors).forEach((key) => delete errors[key])
     const requiresMaterials = submit || props.demand?.status === 'pending'
     if (requiresMaterials && !form.name.trim()) errors.name = '请填写项目名称'
@@ -243,9 +258,6 @@
       if (cause instanceof ApiError && cause.status === 409) {
         try {
           await store.refreshLive()
-          liveVersion.value =
-            store.database?.demands.find((demand) => demand.id === liveId.value)?.version ??
-            liveVersion.value
         } catch {
           /* 当前输入保留，稍后可重试。 */
         }

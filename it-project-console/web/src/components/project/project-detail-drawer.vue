@@ -6,6 +6,7 @@
     :before-close="closeDetail"
     @update:model-value="$emit('update:modelValue', $event)"
   >
+    <ElAlert v-if="project && !store.visibleProjects.some(p => p.id === project!.id)" title="项目已移除，未保存内容已保留，请核对后关闭。" type="warning" :closable="false" />
     <ElEmpty v-if="!project" description="项目不存在或已移除" />
     <template v-else>
       <div class="flex-cb gap-3 mb-3"
@@ -120,8 +121,9 @@
 </template>
 <script setup lang="ts">
   import { approvedLaunchOverrun } from '@/utils/approved-launch'
+  import { scheduleFieldLabel as fieldLabel } from '@/utils/business-labels'
   import { projectCode } from '@/utils/project-code'
-  import { computed, ref } from 'vue'
+  import { computed, ref, watch } from 'vue'
   import OptimizationPreview from './optimization-preview.vue'
   import { projectStageLabel, optimizationStatus } from '@/utils/optimization-display'
   import ProjectEditDrawer from './project-edit-drawer.vue'
@@ -147,8 +149,12 @@
   const closeDetail = (done: () => void) =>
     acceptancePanel.value ? acceptancePanel.value.beforeClose(done) : done()
   const store = usePrototypeStore()
+  const retainedProject = ref<DemoProject | null>(null)
+  watch(() => props.project, value => { if (value) retainedProject.value = value }, { immediate: true })
+  watch(() => props.modelValue, open => { if (!open) retainedProject.value = null })
   const project = computed(
-    () => store.visibleProjects.find((p) => p.id === props.project?.id) ?? null
+    () => store.visibleProjects.find((p) => p.id === props.project?.id) ??
+      (editOpen.value || planOpen.value || store.hasUnsavedChanges ? retainedProject.value : null)
   )
   const businessOwnerId = computed(() => project.value ? projectBusinessOwner(project.value, store.database?.demands ?? []) : null)
   const userName = (id: string) =>
@@ -175,17 +181,6 @@
         : computeProjectRisks(project.value, store.database?.scheduleChanges ?? [])
       : []
   )
-  const fieldLabels: Record<string, string> = {
-    stageExpectedDate: '阶段预计完成',
-    expectedLaunchDate: '预计上线',
-    expectedDeliveryDate: '预计交付'
-  }
-  const fieldLabel = (field: string) =>
-    fieldLabels[field] ??
-    field
-      .replace(/^stage:/, '')
-      .replace(':startDate', '计划开始')
-      .replace(':endDate', '计划结束')
   const isOverall = computed(
     () =>
       store.currentUser.role === 'manager' || store.currentUser.id === project.value?.primaryOwnerId
@@ -211,4 +206,3 @@
     overflow-wrap: anywhere;
   }
 </style>
-

@@ -8,7 +8,7 @@
         >{{ describe(event.before, event.after, event.entityType) }} → {{ describe(event.after, event.before, event.entityType) }}</p
       >
       <small
-        >{{ store.database?.users.find((u) => u.id === event.authorId)?.name ?? event.authorId }} ·
+        >{{ store.database?.users.find((u) => u.id === event.authorId)?.name ?? '未知人员' }} ·
         {{ displayTime(event.createdAt) }}</small
       >
     </div>
@@ -16,6 +16,7 @@
 </template>
 <script setup lang="ts">
   import { projectCode } from '@/utils/project-code'
+  import { stageLabel } from '@/utils/business-labels'
   import { computed } from 'vue'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { displayTime } from '@/utils/project-display'
@@ -93,8 +94,8 @@
   }
   function displayValue(key: string, value: unknown, entityType: string) {
     if (entityType === 'demand' && key === 'status') {
-      const statuses: Record<string, string> = { DRAFT: '草稿', PENDING: '待评估', RETURNED: '退回补充', REJECTED: '不予立项', WITHDRAWN: '已撤回', ESTABLISHED: '已立项', AWAITING_ENGINEER: '待工程师确认' }
-      return statuses[String(value).toUpperCase()] ?? value
+      const statuses: Record<string, string> = { DRAFT: '草稿', PENDING: '待评估', RETURNED: '退回补充', REJECTED: '不予立项', WITHDRAWN: '已撤回', ESTABLISHED: '已立项', APPROVED: '已立项', AWAITING_ENGINEER: '待工程师确认' }
+      return value == null || value === '' ? '未填写' : statuses[String(value).toUpperCase()] ?? '未知状态'
     }
     if (['primaryOwnerId', 'collaboratorIds', 'businessOwnerId', 'acceptanceOwnerId', 'submitterId'].includes(key))
       return (
@@ -108,13 +109,17 @@
       const project = store.visibleProjects.find((p) => p.id === value)
       return project ? projectCode(project) : value ? '关联项目已删除' : '未立项'
     }
-    if (key === 'stagePlans' && Array.isArray(value)) return value.map(plan => `${plan.stage}：${plan.startDate || '—'} 至 ${plan.endDate || '—'}`).join('；') || '未填写'
-    return values[String(value)] ?? (value === '' || value == null ? '未填写' : value)
+    if (key === 'stage') return stageLabel(value)
+    if (key === 'stagePlans' && Array.isArray(value)) return value.map(plan => `${stageLabel(plan?.stage)}：${plan?.startDate || '—'} 至 ${plan?.endDate || '—'}`).join('；') || '未填写'
+    if (value === '' || value == null) return '未填写'
+    if (['status', 'simpleStatus', 'archived', 'deleted', 'migrationVerified'].includes(key))
+      return values[String(value)] ?? values[String(value).toLowerCase()] ?? '未知状态'
+    return value
   }
   function actionLabel(event: DemoLifecycleEvent) {
     if (event.entityType === 'demand' && event.action === 'submit') return '提交需求'
     if (event.entityType === 'demand' && event.action === 'return') return '退回补充'
-    return actions[event.action] ?? event.action
+    return actions[event.action] ?? '其他管理操作'
   }
   function fields(data: DemoLifecycleEvent['before']): Record<string, unknown> {
     if (typeof data?.details === 'string') {

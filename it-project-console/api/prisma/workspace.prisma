@@ -1,0 +1,5 @@
+model WorkspaceRevision {
+  id       Int    @id @default(1)
+  revision String @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  @@map("workspace_revision")
+}

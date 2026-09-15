@@ -14,6 +14,7 @@ import { updateProgress, type ProgressInput } from '@/services/workflow-service'
 import { correctProject } from '@/services/management-service'
 import { usePrototypeStore } from '@/store/modules/prototype'
 import { useUnsavedForm } from '@/hooks/business/use-unsaved-form'
+import { useRecordStaleness } from '@/hooks/business/use-record-staleness'
 export function useProgressForm(
   props: { modelValue: boolean; project: DemoProject | null; correction?: boolean },
   emit: (event: 'update:modelValue', value: boolean) => void
@@ -21,6 +22,7 @@ export function useProgressForm(
   const store = usePrototypeStore()
   let operationKey = liveOperationKey()
   const version = ref<number>()
+  const stale = useRecordStaleness('project', () => props.project?.id, () => version.value)
   const overall = computed(
     () =>
       store.currentUser.role === 'manager' || store.currentUser.id === props.project?.primaryOwnerId
@@ -94,6 +96,7 @@ export function useProgressForm(
     }
   )
   async function save(): Promise<void> {
+    if (stale.value) { error.value = stale.value; return }
     if (busy.value || !(await formRef.value?.validate().catch(() => false))) return
     if (overall.value && !props.correction && unplanned.value) {
       error.value = '请先完整制定当前及后续环节计划'
@@ -143,14 +146,14 @@ export function useProgressForm(
       error.value = cause instanceof Error ? cause.message : '保存失败，请重试'
       if (cause instanceof ApiError && cause.status === 409) {
         await store.refreshLive().catch(() => undefined)
-        version.value = store.visibleProjects.find((p) => p.id === form.value.projectId)?.version
-        error.value += '；已尝试刷新项目版本，请核对后重试，填写内容已保留'
+        error.value += '；填写内容已保留，请关闭后重新打开核对'
       }
     } finally {
       busy.value = false
     }
   }
   return {
+    stale,
     overall,
     form,
     correctionStage,

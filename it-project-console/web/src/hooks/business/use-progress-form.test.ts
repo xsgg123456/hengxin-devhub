@@ -76,7 +76,7 @@ describe('真实进度表单状态', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     mocks.store.currentUser = { id: 'owner', role: 'engineer' }
-    mocks.store.visibleProjects = [{ ...project, version: 2 }]
+    mocks.store.visibleProjects = reactive([{ ...project, version: 1 }])
     mocks.refresh.mockResolvedValue(undefined)
   })
   it('网络失败保留输入、相同请求键重试，成功才关闭', async () => {
@@ -92,16 +92,17 @@ describe('真实进度表单状态', () => {
     expect(mocks.runCommand).not.toHaveBeenCalled()
     scope.stop()
   })
-  it('409刷新版本且不重置输入，下次明确保存使用新版本和键', async () => {
+  it('409保留原版本及输入，后续保存不能静默覆盖他人更新', async () => {
     const { form, scope } = await openForm()
     mocks.update.mockRejectedValueOnce(new ApiError('版本冲突', 409))
+    mocks.refresh.mockImplementationOnce(async () => { mocks.store.visibleProjects[0].version = 2 })
     await form.save()
     expect(mocks.refresh).toHaveBeenCalledOnce()
     expect(form.form.value.summary).toBe('已完成接口设计')
     await form.save()
     expect(mocks.update.mock.calls[0]?.[1]).toBe(1)
-    expect(mocks.update.mock.calls[1]?.[1]).toBe(2)
-    expect(mocks.update.mock.calls[0]?.[2]).not.toBe(mocks.update.mock.calls[1]?.[2])
+    expect(mocks.update).toHaveBeenCalledTimes(1)
+    expect(form.stale.value).toContain('记录已被更新')
     scope.stop()
   })
   it('协作只发送个人进展和阻塞，即使表单意外残留整体字段', async () => {

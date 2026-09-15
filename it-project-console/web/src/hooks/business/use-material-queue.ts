@@ -101,7 +101,7 @@ export function useMaterialQueue(options: Options) {
           )
         } catch (cause) {
           row.material = { ...row.material, status: 'failed' }
-          row.error = cause instanceof Error ? cause.message : '上传失败，请重试'
+          row.error = cause instanceof Error && /[\u3400-\u9fff]/.test(cause.message) ? cause.message : '上传失败，请检查连接后重试'
         }
         publish()
       }

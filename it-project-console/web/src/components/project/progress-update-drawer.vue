@@ -8,6 +8,7 @@
     :before-close="closeDrawer"
     @update:model-value="emit('update:modelValue', $event)"
   >
+    <ElAlert v-if="stale" :title="stale" type="warning" :closable="false" class="mb-4" />
     <template v-if="project">
       <h3 class="mb-2 text-lg font-medium">{{ project.name }}</h3>
       <p class="mb-5 text-g-600">{{
@@ -114,7 +115,7 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
-  import { computed, ref } from 'vue'
+  import { computed, ref, watch } from 'vue'
   import AcceptancePanel from './acceptance-panel.vue'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import ProjectPlanDrawer from './project-plan-drawer.vue'
@@ -136,11 +137,10 @@
   const currentProject = computed(
     () => store.visibleProjects.find((p) => p.id === props.project?.id) ?? props.project
   )
-  const acceptanceMode = computed(
-    () => !props.correction && currentProject.value?.stage === '验收交付' && overall.value
-  )
+  const acceptanceMode = ref(false)
   const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
   const {
+    stale,
     overall,
     form,
     correctionStage,
@@ -156,6 +156,9 @@
     rules,
     save
   } = useProgressForm(props, emit)
+  watch(() => props.modelValue, open => {
+    if (open) acceptanceMode.value = !props.correction && currentProject.value?.stage === '验收交付' && overall.value
+  })
 </script>
 <style scoped>
   .date-fields {
