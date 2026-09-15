@@ -22,16 +22,21 @@ describe('需求首次日期与独立流转审计', () => {
   it('提交、退回、重提原子持久化；重复请求不重复事件，旧版本不产生事件', async () => {
     const actor = await db.user.findUniqueOrThrow({ where: { id: 'user-business-li' } })
     const manager = await db.user.findUniqueOrThrow({ where: { id: 'user-manager-chen' } })
-    const input = { ...draft(), firstRequestedOn: '2024-02-29' }
+    const input = draft()
     const created = await demands.create(actor, input)
+    expect((await db.demand.findUniqueOrThrow({where:{id:created.id}})).firstRequestedOn).toBeNull()
     expect(await db.lifecycleEvent.count({ where: { entityId: created.id } })).toBe(0)
     const attachment = await db.attachment.create({ data: { demandId: created.id, uploaderId: actor.id,
       kind: 'FILE', name: 'fixture.txt', mime: 'text/plain', size: 1, objectKey: `attachments/${key()}`,
       status: 'READY', expiresAt: new Date('2099-01-01') } })
     const submission = { ...draft(), version: 1, attachmentIds: [attachment.id], submit: true }
+    await expect(demands.save(actor,created.id,{...submission,attachmentIds:[]})).rejects.toThrow()
+    expect((await db.demand.findUniqueOrThrow({where:{id:created.id}})).firstRequestedOn).toBeNull()
     await demands.save(actor, created.id, submission)
     await demands.save(actor, created.id, submission)
     const submitted = await db.demand.findUniqueOrThrow({ where: { id: created.id } })
+    const day = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(submitted.submittedAt!)
+    expect(submitted.firstRequestedOn?.toISOString()).toBe(`${day}T00:00:00.000Z`)
     const returned = { requestId: key(), version: 2, decision: 'return', reason: '请补充业务背景' }
     await approvals.review(manager, created.id, returned)
     await approvals.review(manager, created.id, returned)
@@ -41,7 +46,7 @@ describe('需求首次日期与独立流转审计', () => {
     await expect(demands.save(actor, created.id, { ...resubmission, requestId: key() }))
       .rejects.toMatchObject({ code: 'VERSION_CONFLICT' })
     const updated = await db.demand.findUniqueOrThrow({ where: { id: created.id } })
-    expect(updated.firstRequestedOn?.toISOString()).toBe('2024-02-29T00:00:00.000Z')
+    expect(updated.firstRequestedOn).toEqual(submitted.firstRequestedOn)
     expect(updated.submittedAt!.getTime()).toBeGreaterThanOrEqual(submitted.submittedAt!.getTime())
     expect(updated.ownerId).toBe(actor.id)
     const events = await db.lifecycleEvent.findMany({ where: { entityType: 'demand', entityId: created.id }, orderBy: { createdAt: 'asc' } })
@@ -58,13 +63,16 @@ describe('需求首次日期与独立流转审计', () => {
       description: updated.description })
   })
 
-  it('未知保持null，草稿拒绝未来日期且显式清空可持久保存', async () => {
+  it('业务接口拒绝篡改或清空首次日期，已补录历史日期不覆盖', async () => {
     const actor = await db.user.findUniqueOrThrow({ where: { id: 'user-business-li' } })
     const created = await demands.create(actor, draft())
     expect((await db.demand.findUniqueOrThrow({ where: { id: created.id } })).firstRequestedOn).toBeNull()
     await expect(demands.save(actor, created.id, { ...draft(), version: 1, firstRequestedOn: '9999-12-31' })).rejects.toThrow()
-    await demands.save(actor, created.id, { ...draft(), version: 1, firstRequestedOn: '2020-01-01' })
-    await demands.save(actor, created.id, { ...draft(), version: 2, firstRequestedOn: null })
+    await expect(demands.save(actor, created.id, { ...draft(), version: 1, firstRequestedOn: '2020-01-01' })).rejects.toThrow()
+    await expect(demands.save(actor, created.id, { ...draft(), version: 1, firstRequestedOn: null })).rejects.toThrow()
     expect((await db.demand.findUniqueOrThrow({ where: { id: created.id } })).firstRequestedOn).toBeNull()
+    await db.demand.update({where:{id:created.id},data:{status:'RETURNED',submittedAt:new Date('2020-01-01'),firstRequestedOn:new Date('2020-01-01')}})
+    await demands.save(actor,created.id,{...draft(),version:1})
+    expect((await db.demand.findUniqueOrThrow({where:{id:created.id}})).firstRequestedOn?.toISOString()).toBe('2020-01-01T00:00:00.000Z')
   })
 })

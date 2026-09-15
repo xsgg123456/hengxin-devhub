@@ -16,7 +16,6 @@ export interface DemandInput {
   requestId: string
   name: string
   description: string
-  firstRequestedOn?: string | null
   expectedLaunchDate: string
   prd: DemoAttachment | null
   prototype: DemoAttachment | null
@@ -54,11 +53,11 @@ export function saveDemand(snapshot: PrototypeSnapshot, input: DemandInput) {
   if (input.submit || input.expectedLaunchDate) dateValue(input.expectedLaunchDate, '期望上线日期')
   if (input.submit && input.expectedLaunchDate < shanghaiDay(now))
     throw new WorkflowError('期望上线日期不得早于提交日')
-  const firstRequestedOn = input.firstRequestedOn === undefined ? (existing?.firstRequestedOn || '') : (input.firstRequestedOn || '')
-  if (firstRequestedOn) {
-    dateValue(firstRequestedOn, '需求首次提出日期')
-    if (firstRequestedOn > shanghaiDay(now)) throw new WorkflowError('需求首次提出日期不能晚于今天')
-  }
+  // Legacy prototype drafts stored a synthetic submittedAt; only submitted demands can use it.
+  const neverSubmitted = !existing || existing.status === 'draft'
+  const firstRequestedOn = neverSubmitted
+    ? (input.submit ? shanghaiDay(now) : '')
+    : existing.firstRequestedOn || (input.submit ? shanghaiDay(existing.submittedAt || now) : '')
   const materials = input.attachments ?? demandMaterials(input)
   validateMaterials(materials, input.submit || existing?.status === 'pending')
   const demand = {
@@ -85,9 +84,9 @@ export function saveDemand(snapshot: PrototypeSnapshot, input: DemandInput) {
     attachments: structuredClone(materials),
     prd: structuredClone(input.prd),
     prototype: structuredClone(input.prototype),
-    status: input.submit ? ('pending' as const) : ('draft' as const),
+    status: input.submit ? ('pending' as const) : (existing?.status ?? ('draft' as const)),
     reviewReason: existing?.reviewReason ?? '',
-    submittedAt: input.submit ? now : (existing?.submittedAt ?? now)
+    submittedAt: input.submit ? now : (existing?.submittedAt ?? '')
   }
   if (existing) Object.assign(existing, demand)
   else snapshot.database.demands.unshift(demand)

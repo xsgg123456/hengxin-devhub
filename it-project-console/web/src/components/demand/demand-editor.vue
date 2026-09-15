@@ -19,10 +19,6 @@
       <ElFormItem label="项目名称" prop="name" :error="errors.name" required>
         <ElInput v-model="form.name" maxlength="100" show-word-limit />
       </ElFormItem>
-      <ElFormItem label="需求首次提出日期" prop="firstRequestedOn" :error="errors.firstRequestedOn">
-        <ElDatePicker v-model="form.firstRequestedOn" aria-label="需求首次提出日期" type="date" value-format="YYYY-MM-DD" :disabled-date="futureDate" placeholder="未知可留空，待核实后补录" />
-        <p class="text-xs">业务实际首次提出需求的日期，退回重提不改变该日期。</p>
-      </ElFormItem>
       <ElRow :gutter="20">
         <ElCol :span="12"
           ><ElFormItem label="需求部门"
@@ -74,7 +70,7 @@
       <div class="flex justify-end gap-2 flex-wrap">
         <ElButton :disabled="busy" @click="close">取消</ElButton>
         <ElButton :disabled="busy" :loading="saving && !submitting" @click="save(false)">{{
-          !runtimeConfig.isPrototype && demand?.status === 'pending' ? '保存修改' : '保存草稿'
+          demand?.status === 'pending' ? '保存修改' : '保存草稿'
         }}</ElButton>
         <ElButton
           type="primary"
@@ -95,7 +91,7 @@
   import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
   import type { DemoAttachment, DemoDemand } from '@/domain/prototype'
   import { saveDemand } from '@/services/workflow-service'
-  import { dateValue, validateMaterials } from '@/services/workflow-validation'
+  import { validateMaterials } from '@/services/workflow-validation'
   import { demandMaterials } from '@/services/demand-materials'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { currentDate } from '@/utils/project-display'
@@ -113,7 +109,6 @@
   const materialField = ref<{ releaseCleanup: () => void }>()
   const form = reactive({
     name: props.demand?.name || '',
-    firstRequestedOn: props.demand?.firstRequestedOn || '',
     description: props.demand?.description || '',
     expectedLaunchDate: props.demand?.expectedLaunchDate || '',
     attachments: demandMaterials(props.demand).map(file => ({ ...file }))
@@ -144,10 +139,6 @@
     // DatePicker supplies a local calendar cell; compare its label to Shanghai's business day.
     const label = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
     return label < currentDate()
-  }
-  function futureDate(date: Date) {
-    const label = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-    return label > currentDate()
   }
   async function ensureDraft(): Promise<string> {
     if (liveId.value) return liveId.value
@@ -193,12 +184,6 @@
     } catch (cause) {
       errors.attachments = cause instanceof Error ? cause.message : '附件校验失败'
     }
-    if (form.firstRequestedOn) {
-      try {
-        dateValue(form.firstRequestedOn, '需求首次提出日期')
-        if (form.firstRequestedOn > currentDate()) errors.firstRequestedOn = '需求首次提出日期不能晚于今天'
-      } catch (cause) { errors.firstRequestedOn = cause instanceof Error ? cause.message : '日期格式不正确' }
-    }
     const firstError = Object.keys(errors)[0]
     if (firstError) {
       formRef.value?.scrollToField(firstError)
@@ -239,7 +224,7 @@
       ElMessage.success(
         submit
           ? `${code} 已提交，等待管理人员评估`
-          : !runtimeConfig.isPrototype && props.demand?.status === 'pending'
+          : props.demand?.status === 'pending'
             ? `${code} 修改已保存，仍待评估`
             : `${code} 草稿已保存`
       )

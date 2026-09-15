@@ -18,7 +18,6 @@ export const commandSchema = z.object({ requestId: idSchema, version: z.number()
 export const demandSchema = z.object({
   requestId: idSchema, name: z.string().trim().max(100),
   description: z.string().trim().max(300).default(''),
-  firstRequestedOn: z.union([firstRequestedDateSchema, z.literal(''), z.null()]).optional(),
   expectedLaunchDate: z.union([dateSchema, z.literal(''), z.null()]).default(null),
   attachmentIds: z.array(idSchema).optional(),
   prd: materialSchema.default(null), prototype: materialSchema.default(null), submit: z.boolean()

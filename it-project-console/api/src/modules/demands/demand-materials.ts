@@ -2,6 +2,15 @@ import type { Prisma, Demand } from '../../generated/prisma/client.js'
 import { AppError } from '../../lib/errors.js'
 import type { DemandInput } from './demand-schemas.js'
 
+export function automaticFirstRequestedOn(old: Pick<Demand, 'firstRequestedOn' | 'submittedAt' | 'status'> | undefined, submit: boolean, now: Date) {
+  const neverSubmitted = !old || (old.status === 'DRAFT' && !old.submittedAt)
+  if (!neverSubmitted && old?.firstRequestedOn) return old.firstRequestedOn
+  if (!submit) return null
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .format(neverSubmitted ? now : old?.submittedAt ?? now)
+  return new Date(`${day}T00:00:00.000Z`)
+}
+
 export async function demandData(tx: Prisma.TransactionClient, id: string, input: DemandInput, old?: Demand) {
   const legacyIds = [input.prd, input.prototype].flatMap(material => material?.kind === 'file' ? [material.attachmentId] : [])
   const attachmentIds = input.attachmentIds ?? [...new Set([...(old?.attachmentIds ?? []), ...legacyIds])]
@@ -26,8 +35,6 @@ export async function demandData(tx: Prisma.TransactionClient, id: string, input
   }
   return {
     name: input.name, description: input.description, attachmentIds,
-    firstRequestedOn: input.firstRequestedOn === undefined ? old?.firstRequestedOn ?? null
-      : input.firstRequestedOn ? new Date(`${input.firstRequestedOn}T00:00:00.000Z`) : null,
     expectedLaunchDate: input.expectedLaunchDate ? new Date(input.expectedLaunchDate) : null,
     prdUrl: input.prd?.kind === 'link' ? input.prd.url : null,
     prototypeUrl: input.prototype?.kind === 'link' ? input.prototype.url : null,

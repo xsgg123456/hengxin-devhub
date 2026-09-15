@@ -6,7 +6,6 @@ export interface LiveDemandInput {
   attachments?: DemoAttachment[]
   name: string
   description: string
-  firstRequestedOn?: string | null
   expectedLaunchDate: string
   prd: DemoAttachment | null
   prototype: DemoAttachment | null
@@ -32,8 +31,7 @@ export function saveLiveDemand(
   id?: string,
   version?: number
 ) {
-  const { attachments, ...fields } = input
-  const attachmentIds = attachments
+  const attachmentIds = input.attachments
     ?.filter((file) => file.kind === 'file')
     .map((file) => {
       const value = materialDto(file)
@@ -43,7 +41,6 @@ export function saveLiveDemand(
   return apiRequest<LiveWriteResult>(id ? `/demands/${id}` : '/demands', {
     method: id ? 'PATCH' : 'POST',
     body: {
-      ...fields,
       ...(attachmentIds ? { attachmentIds } : {}),
       name: input.name.trim(),
       description: input.description.trim(),

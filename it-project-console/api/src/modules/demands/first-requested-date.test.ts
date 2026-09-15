@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { Demand, Prisma } from '../../generated/prisma/client.js'
-import { demandSchema, firstRequestedDateSchema } from './demand-schemas.js'
-import { demandData } from './demand-materials.js'
+import { demandSchema, demandUpdateSchema, firstRequestedDateSchema } from './demand-schemas.js'
+import { automaticFirstRequestedOn } from './demand-materials.js'
 
 describe('独立需求首次提出日期', () => {
   it('有效日历、上海今天和未来日期边界', () => {
@@ -12,20 +11,23 @@ describe('独立需求首次提出日期', () => {
         expect(firstRequestedDateSchema.safeParse(date).success).toBe(false)
       expect(firstRequestedDateSchema.parse('2026-09-15')).toBe('2026-09-15')
       expect(firstRequestedDateSchema.parse('2024-02-29')).toBe('2024-02-29')
-      for (const firstRequestedOn of ['', null, undefined])
-        expect(demandSchema.safeParse({ requestId: 'draft', name: '', submit: false, firstRequestedOn }).success).toBe(true)
+      for (const firstRequestedOn of ['', null, undefined, '2024-02-29']) {
+        expect(demandSchema.safeParse({ requestId: 'draft', name: '', submit: false, firstRequestedOn }).success).toBe(false)
+        expect(demandUpdateSchema.safeParse({ requestId: 'draft', name: '', submit: false, version: 1, firstRequestedOn }).success).toBe(false)
+      }
     } finally { vi.useRealTimers() }
   })
 
-  it('不从创建或提交时间补值，省略保留旧值，显式空值可清除', async () => {
-    const tx = {} as Prisma.TransactionClient
-    const input = demandSchema.parse({ requestId: 'draft', name: '', submit: false })
-    const old = { firstRequestedOn: new Date('2024-02-29T00:00:00Z'), attachmentIds: [] } as unknown as Demand
-    expect((await demandData(tx, 'id', input)).firstRequestedOn).toBeNull()
-    expect((await demandData(tx, 'id', input, old)).firstRequestedOn).toEqual(old.firstRequestedOn)
-    for (const firstRequestedOn of ['', null])
-      expect((await demandData(tx, 'id', { ...input, firstRequestedOn }, old)).firstRequestedOn).toBeNull()
-    expect((await demandData(tx, 'id', { ...input, firstRequestedOn: '2024-02-28' }, old)).firstRequestedOn)
-      .toEqual(new Date('2024-02-28T00:00:00Z'))
+  it('草稿不记日期，首次提交按上海日期记录，重提与历史补录值保留', () => {
+    const now = new Date('2026-09-14T16:01:00Z')
+    expect(automaticFirstRequestedOn(undefined, false, now)).toBeNull()
+    expect(automaticFirstRequestedOn(undefined, true, now)?.toISOString()).toBe('2026-09-15T00:00:00.000Z')
+    const old = { firstRequestedOn: new Date('2024-02-29T00:00:00Z'), submittedAt: new Date('2026-09-14T16:01:00Z'), status:'RETURNED' as const }
+    expect(automaticFirstRequestedOn(old, true, now)).toEqual(old.firstRequestedOn)
+    expect(automaticFirstRequestedOn(old, false, now)).toEqual(old.firstRequestedOn)
+    expect(automaticFirstRequestedOn({firstRequestedOn:null,submittedAt:new Date('2026-09-01T16:01:00Z'),status:'RETURNED'},true,now)?.toISOString()).toBe('2026-09-02T00:00:00.000Z')
+    const draft={...old,submittedAt:null,status:'DRAFT' as const}
+    expect(automaticFirstRequestedOn(draft,false,now)).toBeNull()
+    expect(automaticFirstRequestedOn(draft,true,now)?.toISOString()).toBe('2026-09-15T00:00:00.000Z')
   })
 })

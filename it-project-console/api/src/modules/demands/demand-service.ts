@@ -4,7 +4,7 @@ import type { Actor } from '../../plugins/auth.js'
 import { AppError } from '../../lib/errors.js'
 import { command, lockedDemand } from '../../lib/business-command.js'
 import { demandSchema, demandUpdateSchema, commandSchema } from './demand-schemas.js'
-import { demandData, queueAttachmentDeletion } from './demand-materials.js'
+import { automaticFirstRequestedOn, demandData, queueAttachmentDeletion } from './demand-materials.js'
 import { projectApproverRecipients } from '../../lib/project-approver.js'
 import { lifecycleEvent } from '../notifications/lifecycle-event-service.js'
 import { auditDemand } from './demand-audit.js'
@@ -21,9 +21,11 @@ export class DemandService {
     return command(this.db, actor, input.requestId, { operation: 'create-demand', input }, async tx => {
       const id = randomUUID()
       const data = await demandData(tx, id, input)
+      const now = new Date()
       const row = await tx.demand.create({ data: {
         ...data, id, ownerId: actor.id, department: actor.department, requestId: input.requestId,
-        status: input.submit ? 'PENDING' : 'DRAFT', submittedAt: input.submit ? new Date() : null
+        status: input.submit ? 'PENDING' : 'DRAFT', submittedAt: input.submit ? now : null,
+        firstRequestedOn: automaticFirstRequestedOn(undefined, input.submit, now)
       } })
       if (input.submit) await auditDemand(tx, actor, row, 'submit', '首次提交需求')
       if (input.submit) await lifecycleEvent(tx, { eventType: 'DEMAND_SUBMITTED', requestId: `${actor.id}:${input.requestId}`,
@@ -39,9 +41,11 @@ export class DemandService {
       if (old.proposals.some(row => ['pending', 'returned'].includes(row.status))) throw new AppError(409, 'READ_ONLY', '需求已进入工程师接单或管理重新评估，不可修改或撤回')
       if (old.project) throw new AppError(409, 'READ_ONLY', '已关联项目的需求不可编辑')
       const data = await demandData(tx, id, { ...input, submit: input.submit || old.status === 'PENDING' }, old)
+      const now = new Date()
       const row = await tx.demand.update({ where: { id }, data: {
         ...data, status: input.submit ? 'PENDING' : old.status === 'PENDING' ? 'PENDING' : old.status,
-        submittedAt: input.submit && old.status !== 'PENDING' ? new Date() : old.submittedAt,
+        submittedAt: input.submit && old.status !== 'PENDING' ? now : old.submittedAt,
+        firstRequestedOn: automaticFirstRequestedOn(old, input.submit, now),
         reviewReason: input.submit ? null : old.reviewReason, version: { increment: 1 }
       } })
       const kept = data.attachmentIds
