@@ -26,12 +26,12 @@
         project.status === 'active'
           ? needsPlan(project)
             ? '待排期'
-            : statusLabel[project.simpleStatus]
+            : project.parentProjectId ? optimizationStatus(project) : statusLabel[project.simpleStatus]
           : project.status === 'completed'
             ? '项目已完成'
             : '已取消'
       }}</ElTag
-      ><ElTag size="small" type="info">{{ project.stage }}</ElTag
+      ><ElTag size="small" type="info">{{ projectStageLabel(project, project.stage) }}</ElTag
       ><ElTag v-if="relationship" size="small" type="info">{{ relationship }}</ElTag></div
     >
     <dl>
@@ -93,12 +93,15 @@
           : '仅填写个人进展，不改变整体进度'
         : '当前项目仅可查看'
     }}</p>
+    <OptimizationPreview v-if="project.parentProjectId || project.status === 'completed'" :project="project" />
     <ProjectEditDrawer v-if="project" v-model="editOpen" :project="project" />
     <ProjectPlanDrawer v-model="planOpen" :project="project" />
   </article>
 </template>
 <script setup lang="ts">
   import { computed, ref } from 'vue'
+  import OptimizationPreview from './optimization-preview.vue'
+  import { projectStageLabel, optimizationStatus } from '@/utils/optimization-display'
   import ProjectEditDrawer from './project-edit-drawer.vue'
   import { canEditProject } from '@/utils/project-edit-permission'
   import { projectBusinessOwner } from '@/utils/project-business-owner'
@@ -249,3 +252,4 @@
     margin: 10px 0 0;
   }
 </style>
+

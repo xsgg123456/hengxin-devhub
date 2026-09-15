@@ -1,8 +1,8 @@
 <template>
   <section class="mt-6">
-    <h4 class="mb-4 font-medium">七环节计划与执行</h4>
+    <h4 class="mb-4 font-medium">{{ project?.parentProjectId ? '优化交付计划与执行' : '七环节计划与执行' }}</h4>
     <ElTable :data="rows" size="small">
-      <ElTableColumn prop="stage" label="环节" min-width="90" />
+      <ElTableColumn label="环节" min-width="90"><template #default="{ row }">{{ project?.parentProjectId ? '优化交付' : row.stage }}</template></ElTableColumn>
       <ElTableColumn label="计划区间" min-width="220"
         ><template #default="{ row }">
           <span>{{ row.plan ? `${row.plan.startDate} → ${row.plan.endDate}` : '—' }}</span>
@@ -45,7 +45,7 @@
     <details v-if="histories.length" class="mt-3 text-sm">
       <summary class="cursor-pointer text-g-600">查看全部阶段历史</summary>
       <p v-for="(history, index) in histories" :key="index" class="mt-2">
-        {{ history.stage }} · 进入 {{ displayTime(history.startedAt) }} ·
+        {{ project?.parentProjectId ? '优化交付' : history.stage }} · 进入 {{ displayTime(history.startedAt) }} ·
         {{
           history.interruptedAt
             ? `纠正离开，未完成（${displayTime(history.interruptedAt)}）`
@@ -102,7 +102,7 @@
     store.database?.users.find((u) => u.id === id)?.name ?? '未指定'
   const project = computed(() => store.visibleProjects.find((p) => p.id === props.projectId))
   const histories = computed(
-    () => store.database?.stageHistories.filter((h) => h.projectId === props.projectId) ?? []
+    () => store.database?.stageHistories.filter((h) => h.projectId === props.projectId && (!project.value?.parentProjectId || h.stage === '验收交付')) ?? []
   )
   const rows = computed(() =>
     project.value ? stageExecutions(project.value, histories.value) : []

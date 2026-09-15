@@ -70,6 +70,8 @@ export function editLiveProject(
   verify: boolean,
   requestId: string
 ) {
+  const deliveryPlan = project.parentProjectId ? project.stagePlans?.find(p => p.stage === '验收交付' && p.startDate && p.endDate) : undefined
+  if (deliveryPlan) project = { ...project, expectedLaunchDate: deliveryPlan.endDate, expectedDeliveryDate: deliveryPlan.endDate }
   const fields = [
     'name', 'description', 'department', 'priority', 'primaryOwnerId', 'collaboratorIds',
     'stage', 'simpleStatus', 'blocker', 'acceptanceUrl', 'acceptanceSummary'

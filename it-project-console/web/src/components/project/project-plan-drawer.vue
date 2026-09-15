@@ -9,20 +9,21 @@
     <template v-if="project">
       <h3 class="mb-2 text-lg font-medium">{{ project.name }}</h3>
       <p class="mb-5 text-g-600">{{
-        project.stage === '方案设计'
+        project.parentProjectId ? '只安排优化交付的开始和交付日期，完成后提交业务验收。' : project.stage === '方案设计'
           ? '需求受理、立项评审已完成，请安排后续五个环节。'
           : '只安排当前及后续未完成环节，已完成环节保持原记录。'
       }}</p>
+      <p v-if="defaultNotice" class="mb-5 text-sm text-g-600">{{ defaultNotice }}</p>
       <ElForm :disabled="busy" label-position="top" @submit.prevent="save">
         <ElTable :data="plans" class="mb-6">
-          <ElTableColumn prop="stage" label="环节" width="108" />
+          <ElTableColumn label="环节" width="108"><template #default="{ row }">{{ project.parentProjectId ? '优化交付' : row.stage }}</template></ElTableColumn>
           <ElTableColumn label="计划开始日期" min-width="205"
             ><template #default="{ row }">
               <ElDatePicker
                 v-model="row.startDate"
                 type="date"
                 value-format="YYYY-MM-DD"
-                :aria-label="`${row.stage}计划开始日期`"
+                :aria-label="`${project.parentProjectId ? '优化交付' : row.stage}计划开始日期`"
               /> </template
           ></ElTableColumn>
           <ElTableColumn label="计划结束日期" min-width="205"
@@ -31,7 +32,7 @@
                 v-model="row.endDate"
                 type="date"
                 value-format="YYYY-MM-DD"
-                :aria-label="`${row.stage}计划结束日期`"
+                :aria-label="`${project.parentProjectId ? '优化交付' : row.stage}计划结束日期`"
               /> </template
           ></ElTableColumn>
         </ElTable>
@@ -39,7 +40,7 @@
           <ElDescriptionsItem label="审批确认上线日期" :span="2">{{
             project.approvedLaunchDate || '未设置'
           }}</ElDescriptionsItem>
-          <ElDescriptionsItem label="计划上线">{{ milestone('上线部署') }}</ElDescriptionsItem>
+          <ElDescriptionsItem v-if="!project.parentProjectId" label="计划上线">{{ milestone('上线部署') }}</ElDescriptionsItem>
           <ElDescriptionsItem label="计划交付">{{ milestone('验收交付') }}</ElDescriptionsItem>
         </ElDescriptions>
         <ElAlert
@@ -50,7 +51,7 @@
           :title="`超出审批日期 ${overrun} 天`"
           description="可继续保存计划，无需管理人员再次确认；审批确认日期保留作为对照基准。"
         />
-        <p class="mt-4 mb-5 text-sm text-g-600">上线和交付日期由对应环节的计划结束日期自动带出。</p>
+        <p class="mt-4 mb-5 text-sm text-g-600">{{ project.parentProjectId ? '计划交付日期由优化交付节点的结束日期带出。' : '上线和交付日期由对应环节的计划结束日期自动带出。' }}</p>
         <template v-if="changed">
           <ElFormItem label="日期调整原因" required>
             <ElSelect v-model="reason" aria-label="日期调整原因"
@@ -94,8 +95,9 @@
   } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { useUnsavedForm } from '@/hooks/business/use-unsaved-form'
-  import { remainingStages, saveProjectPlan, validatePlans } from '@/services/stage-plan-service'
+  import { saveProjectPlan, validatePlans } from '@/services/stage-plan-service'
   import { planLiveProject } from '@/services/live-project-service'
+  import { defaultStagePlans } from '@/services/default-stage-plans'
   import { liveOperationKey } from '@/services/live-demand-service'
   import { ApiError } from '@/services/api-client'
   import { runtimeConfig } from '@/config/runtime'
@@ -107,6 +109,7 @@
     reason = ref(''),
     description = ref(''),
     error = ref('')
+  const defaultNotice = ref('')
   const busy = ref(false),
     initial = ref(''),
     version = ref<number>()
@@ -127,16 +130,15 @@
     props.project?.stagePlans?.find((p) => p.stage === stage)?.endDate ||
     '—'
   const overrun = computed(() =>
-    approvedLaunchOverrun(props.project?.approvedLaunchDate, milestone('上线部署'))
+    approvedLaunchOverrun(props.project?.approvedLaunchDate, milestone(props.project?.parentProjectId ? '验收交付' : '上线部署'))
   )
   watch(
     () => props.modelValue,
     (open) => {
       if (!open || !props.project) return
-      plans.value = remainingStages(props.project).map((stage) => {
-        const old = props.project!.stagePlans?.find((p) => p.stage === stage)
-        return { stage, startDate: old?.startDate ?? '', endDate: old?.endDate ?? '' }
-      })
+      const defaults = defaultStagePlans(props.project, store.database?.stageHistories ?? [])
+      plans.value = defaults.plans
+      defaultNotice.value = defaults.notice
       version.value = props.project.version
       reason.value = ''
       description.value = ''
@@ -186,3 +188,6 @@
     width: 100%;
   }
 </style>
+
+
+

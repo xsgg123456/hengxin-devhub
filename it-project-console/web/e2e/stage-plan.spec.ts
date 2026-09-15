@@ -25,6 +25,8 @@ test('确认接单后立项、先排五环节、调整留痕、前四环节完�
   const card = page.locator('[data-project-id]').filter({ hasText: '五环节排期验收项目' })
   await card.getByRole('button', { name: '制定计划', exact: true }).click()
   const plan = page.getByRole('dialog', { name: '制定项目计划', exact: true })
+  await plan.getByLabel('方案设计计划开始日期', { exact: true }).fill('')
+  await plan.getByLabel('方案设计计划开始日期', { exact: true }).press('Tab')
   await plan.getByRole('button', { name: '保存计划' }).click()
   await expect(plan.getByRole('alert')).toBeVisible()
   const stages = ['方案设计', '开发编码', '联调测试', '上线部署', '验收交付']
@@ -106,3 +108,5 @@ test('确认接单后立项、先排五环节、调整留痕、前四环节完�
     saved.actualCompletedAt
   )
 })
+
+

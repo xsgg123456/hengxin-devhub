@@ -13,6 +13,7 @@ export function useProjectOverviewFilters(personal = false) {
   const store = usePrototypeStore(),
     router = useRouter()
   const scope = ref(personal && store.currentUser.role === 'engineer' ? 'mine' : 'all')
+  const projectType = ref('')
   const status = ref('all'),
     person = ref(''),
     riskFilter = ref('all')
@@ -33,6 +34,7 @@ export function useProjectOverviewFilters(personal = false) {
             : computeProjectRisks(p, store.database?.scheduleChanges ?? [])
       }))
       .filter((p) => {
+        if (projectType.value && (projectType.value === 'optimization') !== !!p.parentProjectId) return false
         if (!includeArchived.value && p.archived) return false
         if (
           scope.value === 'mine' &&
@@ -110,11 +112,13 @@ export function useProjectOverviewFilters(personal = false) {
         store.visibleDemands.filter(
           (d) =>
             ['pending', 'awaiting_engineer'].includes(d.status) &&
+            (!projectType.value || (projectType.value === 'optimization') === !!d.parentProjectId) &&
             (!department.value || d.department === department.value) &&
             (scope.value !== 'mine' || d.submitterId === store.currentUser.id)
         ).length +
         (store.database?.projectProposals ?? []).filter(
           (p) =>
+            projectType.value !== 'optimization' &&
             !p.demandId &&
             p.status !== 'confirmed' &&
             (!department.value || p.department === department.value) &&
@@ -127,6 +131,7 @@ export function useProjectOverviewFilters(personal = false) {
   const page = ref(1)
   const pageSize = 20
   const query = computed(() => ({
+    projectType: projectType.value,
     scope: scope.value,
     status: status.value,
     person: person.value,
@@ -165,6 +170,7 @@ export function useProjectOverviewFilters(personal = false) {
       page.value = Math.max(1, Math.ceil(value / pageSize))
   })
   function clearFilters() {
+    projectType.value = ''
     status.value = 'all'
     person.value = ''
     dates.value = null
@@ -198,6 +204,7 @@ export function useProjectOverviewFilters(personal = false) {
       if (!saved || typeof saved !== 'object') return
       const f = saved as Record<string, unknown>
       for (const [key, target] of Object.entries({
+        projectType,
         scope,
         status,
         person,
@@ -220,12 +227,13 @@ export function useProjectOverviewFilters(personal = false) {
   }
   restore()
   watch(
-    [scope, status, person, dates, riskFilter, includeArchived, keyword, department, stage],
+    [projectType, scope, status, person, dates, riskFilter, includeArchived, keyword, department, stage],
     () => {
       try {
         sessionStorage.setItem(
           storageKey(),
           JSON.stringify({
+            projectType: projectType.value,
             scope: scope.value,
             status: status.value,
             person: person.value,
@@ -252,6 +260,7 @@ export function useProjectOverviewFilters(personal = false) {
     loading,
     error,
     retry,
+    projectType,
     scope,
     status,
     person,

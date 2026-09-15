@@ -12,13 +12,21 @@ export function automaticFirstRequestedOn(old: Pick<Demand, 'firstRequestedOn' |
 }
 
 export async function demandData(tx: Prisma.TransactionClient, id: string, input: DemandInput, old?: Demand) {
+  if (old && (old.submittedAt || old.firstRequestedOn) && input.parentProjectId !== old.parentProjectId)
+    throw new AppError(409, 'PARENT_IMMUTABLE', '首次提交后不能更换关联主项目')
+  if (input.parentProjectId) {
+    await tx.$queryRaw`SELECT id FROM projects WHERE id = ${input.parentProjectId} FOR SHARE`
+    const parent = await tx.project.findUnique({ where: { id: input.parentProjectId } })
+    if (!parent || parent.status !== 'COMPLETED' || parent.parentProjectId)
+      throw new AppError(400, 'INVALID_PARENT_PROJECT', '只能关联已完成的主项目')
+  }
   const legacyIds = [input.prd, input.prototype].flatMap(material => material?.kind === 'file' ? [material.attachmentId] : [])
   const attachmentIds = input.attachmentIds ?? [...new Set([...(old?.attachmentIds ?? []), ...legacyIds])]
   if (new Set(attachmentIds).size !== attachmentIds.length)
     throw new AppError(400, 'DUPLICATE_ATTACHMENT', '附件不能重复')
   if (input.submit) {
-    if (!input.name || !input.description || !input.expectedLaunchDate || !attachmentIds.length)
-      throw new AppError(400, 'MISSING_FIELDS', '正式提交需要名称、说明、期望上线日期和至少一个上传完成的附件')
+    if (!input.name || !input.description || !input.expectedLaunchDate || (input.parentProjectId ? !input.optimizationOutcome : !attachmentIds.length))
+      throw new AppError(400, 'MISSING_FIELDS', input.parentProjectId ? '优化提交需要名称、当前问题、期望效果/验收标准和期望上线日期' : '正式提交需要名称、说明、期望上线日期和至少一个上传完成的附件')
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
     if (input.expectedLaunchDate < today) throw new AppError(400, 'PAST_DATE', '期望上线日期不能早于提交日')
   }
@@ -34,6 +42,7 @@ export async function demandData(tx: Prisma.TransactionClient, id: string, input
       throw new AppError(400, 'INVALID_ATTACHMENT', '旧材料引用类型不匹配，请使用统一附件列表')
   }
   return {
+    parentProjectId: input.parentProjectId, optimizationOutcome: input.optimizationOutcome,
     name: input.name, description: input.description, attachmentIds,
     expectedLaunchDate: input.expectedLaunchDate ? new Date(input.expectedLaunchDate) : null,
     prdUrl: input.prd?.kind === 'link' ? input.prd.url : null,

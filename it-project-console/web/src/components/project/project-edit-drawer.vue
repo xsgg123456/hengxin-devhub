@@ -28,12 +28,12 @@
           <ElEmpty v-if="!users.length" description="暂无可选人员" />
         </section>
         <section v-show="tab === 'schedule'">
-          <div class="edit-grid"><ElFormItem label="当前环节"><ElSelect v-model="form.stage" aria-label="当前环节"><ElOption v-for="s in PROJECT_STAGES" :key="s" :label="s" :value="s" /></ElSelect></ElFormItem><ElFormItem label="环节状态"><ElSelect v-model="form.simpleStatus" aria-label="环节状态"><ElOption v-for="s in editableStatuses" :key="s" :label="statusLabel[s]" :value="s" /></ElSelect></ElFormItem></div>
+          <div class="edit-grid"><ElFormItem label="当前环节"><ElSelect v-model="form.stage" aria-label="当前环节"><ElOption v-for="s in (project.parentProjectId ? ['验收交付'] : PROJECT_STAGES)" :key="s" :label="project.parentProjectId ? '优化交付' : s" :value="s" /></ElSelect></ElFormItem><ElFormItem label="环节状态"><ElSelect v-model="form.simpleStatus" aria-label="环节状态"><ElOption v-for="s in editableStatuses" :key="s" :label="statusLabel[s]" :value="s" /></ElSelect></ElFormItem></div>
           <ElAlert title="业务验收结果继续沿用原验收入口；本表单不会直接标记项目验收通过。" type="info" :closable="false" class="mb-4" />
           <ElFormItem v-if="form.simpleStatus === 'blocked'" label="阻塞说明" required><ElInput v-model="form.blocker" aria-label="阻塞说明" type="textarea" /></ElFormItem>
-          <div class="edit-grid"><ElFormItem v-for="item in dateFields" :key="item.key" :label="item.label"><ElDatePicker v-model="form[item.key]" :aria-label="item.label" value-format="YYYY-MM-DD" type="date" /></ElFormItem></div>
-          <h4 class="mb-3">七个环节计划</h4>
-          <div v-for="plan in form.stagePlans" :key="plan.stage" class="plan-row"><span>{{ plan.stage }}</span><ElDatePicker v-model="plan.startDate" :aria-label="plan.stage + '计划开始'" value-format="YYYY-MM-DD" placeholder="计划开始" /><ElDatePicker v-model="plan.endDate" :aria-label="plan.stage + '计划结束'" value-format="YYYY-MM-DD" placeholder="计划结束" /></div>
+          <div class="edit-grid"><ElFormItem v-for="item in (project.parentProjectId ? dateFields.filter(d => d.key === 'approvedLaunchDate') : dateFields)" :key="item.key" :label="item.label"><ElDatePicker v-model="form[item.key]" :aria-label="item.label" value-format="YYYY-MM-DD" type="date" /></ElFormItem></div>
+          <h4 class="mb-3">{{ project.parentProjectId ? '优化交付计划' : '七个环节计划' }}</h4>
+          <div v-for="plan in form.stagePlans" :key="plan.stage" class="plan-row"><span>{{ project.parentProjectId ? '优化交付' : plan.stage }}</span><ElDatePicker v-model="plan.startDate" :aria-label="plan.stage + '计划开始'" value-format="YYYY-MM-DD" placeholder="计划开始" /><ElDatePicker v-model="plan.endDate" :aria-label="plan.stage + '计划结束'" value-format="YYYY-MM-DD" placeholder="计划结束" /></div>
           <p class="hint">历史实际发生记录保留；计划日期修改将记录本次原因。各环节计划须按顺序衔接；已填写上线部署或验收交付计划时，预计上线、交付须与对应计划结束日期一致。</p>
         </section>
         <section v-show="tab === 'migration'">
@@ -44,7 +44,7 @@
       </ElForm>
       <ElAlert v-if="error" class="mt-4" :title="error" type="error" :closable="false" show-icon />
     </template>
-    <template #footer><div class="edit-footer"><span class="hint">{{ dirty ? '有未保存的修改' : '尚未修改' }}</span><div><ElButton v-if="canRegisterHistory" :disabled="busy" @click="openHistorical">登记历史已交付</ElButton><ElButton :disabled="busy" @click="beforeClose(() => emit('update:modelValue', false))">取消</ElButton><ElButton :loading="busy" :disabled="!dirty" :type="pending ? 'default' : 'primary'" @click="prepare(false)">保存修改</ElButton><ElButton v-if="pending" type="primary" :loading="busy" @click="prepare(true)">保存并完成核实</ElButton></div></div></template>
+    <template #footer><div class="edit-footer"><span class="hint">{{ dirty ? '有未保存的修改' : '尚未修改' }}</span><div><ElButton v-if="canRegisterHistory && !project.parentProjectId" :disabled="busy" @click="openHistorical">登记历史已交付</ElButton><ElButton :disabled="busy" @click="beforeClose(() => emit('update:modelValue', false))">取消</ElButton><ElButton :loading="busy" :disabled="!dirty" :type="pending ? 'default' : 'primary'" @click="prepare(false)">保存修改</ElButton><ElButton v-if="pending" type="primary" :loading="busy" @click="prepare(true)">保存并完成核实</ElButton></div></div></template>
     <HistoricalDeliveryDialog v-model="historicalOpen" :project="project" :dirty="dirty" @completed="emit('update:modelValue', false)" />
     <ElDialog v-model="confirmOpen" title="确认本次修改" width="min(560px, 92vw)" append-to-body :close-on-click-modal="false" :show-close="!busy" :close-on-press-escape="!busy">
       <p class="mb-3">{{ verifying ? '保存全部修改，并解除迁移待核实标记。' : '以下修改将同步到项目相关页面。' }}</p>
@@ -129,11 +129,15 @@ watch(() => props.modelValue, open => {
   baseline.value = JSON.stringify(store.database?.projects.find(p => p.id === props.project.id) ?? props.project)
   form.value = JSON.parse(baseline.value) as DemoProject
   form.value.firstRequestedOn ||= store.database?.demands.find(d => d.id === form.value!.demandId)?.firstRequestedOn || ''
-  form.value.stagePlans = PROJECT_STAGES.map(stage => form.value!.stagePlans?.find(p => p.stage === stage) ?? { stage, startDate: '', endDate: '' })
+  form.value.stagePlans = (props.project.parentProjectId ? ['验收交付' as const] : PROJECT_STAGES).map(stage => form.value!.stagePlans?.find(p => p.stage === stage) ?? { stage, startDate: '', endDate: '' })
   initialForm.value = JSON.stringify(form.value)
   tab.value = 'basic'; reason.value = ''; error.value = ''; confirmOpen.value = false; historicalOpen.value = false
 }, { immediate: true })
-function prepare(verify: boolean) { verifying.value = verify; error.value = ''; confirmOpen.value = true }
+function prepare(verify: boolean) {
+  const delivery = form.value?.parentProjectId ? form.value.stagePlans?.find(p => p.stage === '验收交付' && p.startDate && p.endDate) : undefined
+  if (delivery && form.value) form.value.expectedLaunchDate = form.value.expectedDeliveryDate = delivery.endDate
+  verifying.value = verify; error.value = ''; confirmOpen.value = true
+}
 async function save() {
   if (!form.value) return
   error.value = ''

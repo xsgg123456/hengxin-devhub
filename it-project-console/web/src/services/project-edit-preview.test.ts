@@ -17,6 +17,25 @@ function setup() {
   return { snapshot, p, baseline, edit }
 }
 describe('全局编辑本地预览', () => {
+  it('优化单节点完整编辑维护日期并拒绝待验收改计划、清空及原里程碑分叉', () => {
+    const { snapshot, p } = setup()
+    snapshot.activeUserId = 'user-manager-chen'
+    p.parentProjectId = 'parent'; p.stage = '验收交付'
+    p.expectedLaunchDate = p.expectedDeliveryDate = '2026-09-18'
+    p.originalLaunchDate = p.originalDeliveryDate = '2026-09-18'
+    p.stagePlans = [{ stage: '验收交付', startDate: '2026-09-16', endDate: '2026-09-18' }]
+    const run = (change: Partial<typeof p>) => saveProjectEditPreview(snapshot, { ...structuredClone(p), ...change }, JSON.stringify(p), '调整', false)
+    expect(() => run({ stagePlans: [] })).toThrow('不能清空')
+    expect(() => run({ originalLaunchDate: '2026-09-17' })).toThrow('保持一致')
+    p.acceptanceStatus = 'pending'
+    expect(() => run({ stagePlans: [{ stage: '验收交付', startDate: '2026-09-16', endDate: '2026-09-22' }] })).toThrow('待业务验收')
+    expect(() => run({ description: '只改说明' })).not.toThrow()
+    p.acceptanceStatus = 'returned'
+    run({ expectedLaunchDate: '2026-09-22', expectedDeliveryDate: '2026-09-22', stagePlans: [{ stage: '验收交付', startDate: '2026-09-16', endDate: '2026-09-22' }] })
+    expect(p.expectedLaunchDate).toBe('2026-09-22')
+    expect(p.expectedDeliveryDate).toBe('2026-09-22')
+    expect(p.originalLaunchDate).toBe('2026-09-18')
+  })
   it('主责可编辑待核实项目，协作、无关工程师、业务和非指定管理员无权', () => {
     const {snapshot,p,baseline,edit} = setup()
     for (const user of snapshot.database.users) {

@@ -35,6 +35,9 @@ export function projectState(project: DemoProject) {
   }
 }
 function removeGroup(snapshot: PrototypeSnapshot, demandId?: string | null, projectId?: string) {
+  if (projectId && (snapshot.database.demands.some(d => d.parentProjectId === projectId) ||
+    snapshot.database.projects.some(p => p.parentProjectId === projectId)))
+    throw new WorkflowError('请先处理关联优化需求或项目，再删除原项目')
   for (const proposal of snapshot.database.projectProposals ?? []) {
     if (
       (demandId && proposal.demandId === demandId) ||

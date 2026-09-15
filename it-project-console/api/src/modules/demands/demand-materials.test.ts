@@ -3,7 +3,7 @@ import type { Prisma } from '../../generated/prisma/client.js'
 import { demandData } from './demand-materials.js'
 import type { DemandInput } from './demand-schemas.js'
 const base: DemandInput = {
-  requestId: 'one', name: '项目', description: '说明', submit: true,
+  parentProjectId: null, optimizationOutcome: '', requestId: 'one', name: '项目', description: '说明', submit: true,
   expectedLaunchDate: '2099-12-31', attachmentIds: ['a1'],
   prd: { kind: 'link', url: 'https://example.com/prd' },
   prototype: { kind: 'link', url: 'https://example.com/demo' }

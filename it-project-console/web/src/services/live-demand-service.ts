@@ -3,6 +3,8 @@ import type { ProjectInput } from './workflow-service'
 import { apiRequest } from './api-client'
 
 export interface LiveDemandInput {
+  parentProjectId?: string | null
+  optimizationOutcome?: string
   attachments?: DemoAttachment[]
   name: string
   description: string
@@ -42,6 +44,8 @@ export function saveLiveDemand(
     method: id ? 'PATCH' : 'POST',
     body: {
       ...(attachmentIds ? { attachmentIds } : {}),
+      parentProjectId: input.parentProjectId ?? null,
+      optimizationOutcome: input.optimizationOutcome?.trim() ?? '',
       name: input.name.trim(),
       description: input.description.trim(),
       expectedLaunchDate: input.expectedLaunchDate || null,

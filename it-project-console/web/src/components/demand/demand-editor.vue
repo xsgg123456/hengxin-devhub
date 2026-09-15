@@ -1,7 +1,7 @@
 <template>
   <ElDrawer
     :model-value="true"
-    :title="demand ? '编辑本人需求' : '提交正式项目需求'"
+    :title="isOptimization ? '优化需求' : demand ? '编辑本人需求' : '提交正式项目需求'"
     size="760px"
     :before-close="close"
     append-to-body
@@ -15,8 +15,9 @@
     />
     <ElAlert v-if="failure" :title="failure" type="error" :closable="false" class="mb-5" />
     <PrototypeSaveRecovery v-if="failure && runtimeConfig.isPrototype" />
+    <p v-if="isOptimization" class="mb-4 text-sm text-g-600">原项目：{{ store.database?.projects.find(p => p.id === form.parentProjectId)?.name || form.parentProjectId }}</p>
     <ElForm ref="formRef" :model="form" label-position="top" :disabled="saving" scroll-to-error>
-      <ElFormItem label="项目名称" prop="name" :error="errors.name" required>
+      <ElFormItem :label="isOptimization ? '优化标题' : '项目名称'" prop="name" :error="errors.name" required>
         <ElInput v-model="form.name" maxlength="100" show-word-limit />
       </ElFormItem>
       <ElRow :gutter="20">
@@ -30,7 +31,7 @@
         ></ElCol>
       </ElRow>
       <ElFormItem
-        label="这次要解决什么问题（一句话）"
+        :label="isOptimization ? '当前问题' : '这次要解决什么问题（一句话）'"
         prop="description"
         :error="errors.description"
         required
@@ -42,6 +43,9 @@
           maxlength="300"
           show-word-limit
         />
+      </ElFormItem>
+      <ElFormItem v-if="isOptimization" label="期望效果 / 验收标准" prop="optimizationOutcome" :error="errors.optimizationOutcome" required>
+        <ElInput v-model="form.optimizationOutcome" type="textarea" :rows="3" maxlength="300" show-word-limit />
       </ElFormItem>
       <ElFormItem
         label="期望上线日期"
@@ -56,7 +60,7 @@
           :disabled-date="pastDate"
         />
       </ElFormItem>
-      <ElFormItem label="需求附件" prop="attachments" :error="errors.attachments" required>
+      <ElFormItem label="需求附件" prop="attachments" :error="errors.attachments" :required="!isOptimization">
         <MaterialField
           ref="materialField"
           v-model="form.attachments"
@@ -102,17 +106,20 @@
     type LiveDemandInput
   } from '@/services/live-demand-service'
   import MaterialField from './material-field.vue'
-  const props = defineProps<{ demand?: DemoDemand }>()
+  const props = defineProps<{ demand?: DemoDemand; parentProjectId?: string }>()
   const emit = defineEmits<{ close: []; saved: [] }>()
   const store = usePrototypeStore()
   const formRef = ref<FormInstance>()
   const materialField = ref<{ releaseCleanup: () => void }>()
   const form = reactive({
+    parentProjectId: props.demand?.parentProjectId ?? props.parentProjectId ?? null,
+    optimizationOutcome: props.demand?.optimizationOutcome ?? '',
     name: props.demand?.name || '',
     description: props.demand?.description || '',
     expectedLaunchDate: props.demand?.expectedLaunchDate || '',
     attachments: demandMaterials(props.demand).map(file => ({ ...file }))
   })
+  const isOptimization = computed(() => !!form.parentProjectId)
   function input(): LiveDemandInput {
     const legacyLink = (file?: DemoAttachment | null) =>
       file?.kind === 'link' && form.attachments.some(item => item.kind === 'link' && item.url === file.url)
@@ -175,12 +182,14 @@
   async function save(submit: boolean) {
     if (busy.value) return
     Object.keys(errors).forEach((key) => delete errors[key])
-    if (submit && !form.name.trim()) errors.name = '请填写项目名称'
-    if (submit && !form.description.trim()) errors.description = '请说明要解决的问题'
-    if (submit && (!form.expectedLaunchDate || form.expectedLaunchDate < currentDate()))
+    const requiresMaterials = submit || props.demand?.status === 'pending'
+    if (requiresMaterials && !form.name.trim()) errors.name = '请填写项目名称'
+    if (requiresMaterials && isOptimization.value && !form.optimizationOutcome.trim()) errors.optimizationOutcome = '请填写期望效果 / 验收标准'
+    if (requiresMaterials && !form.description.trim()) errors.description = '请说明要解决的问题'
+    if (requiresMaterials && (!form.expectedLaunchDate || form.expectedLaunchDate < currentDate()))
       errors.expectedLaunchDate = '期望上线日期不能早于今天'
     try {
-      validateMaterials(form.attachments, submit || props.demand?.status === 'pending')
+      validateMaterials(form.attachments, !isOptimization.value && requiresMaterials)
     } catch (cause) {
       errors.attachments = cause instanceof Error ? cause.message : '附件校验失败'
     }

@@ -796,3 +796,11 @@ D. 联动与验收：复用既有项目人员、待办、负载与通知分发�
 1. 复用项目编辑与验收面板，候选与业务负责人同源；原型操作、待办及默认人员同步。标准：所有角色可选且指定人可操作。
 2. API验收人有效性与执行权限移除角色限制，默认立项继承与通知发送同步。标准：管理员/工程师真实验收及推送通过，非指定和停用仍拒绝。
 3. 前后端回归、类型/构建、隔离集成、浏览器验证及独立审查后本地提交。
+
+## 2026-09-15 优化交互预览
+按 [预览计划](it-project-console/docs/OPTIMIZATION-PREVIEW.md) 原位扩展卡片/详情，浏览器截图、类型构建与独立审查后交付。
+
+## 2026-09-15 本轮正式实现
+执行 [OPTIMIZATION-ITERATION](it-project-console/docs/OPTIMIZATION-ITERATION.md) 四步计划，API与前端可隔离实施，主Agent处理工作日默认与图表并集成验证；不发布。
+
+本地实现及验收完成：Web283/API106单测、158隔离集成、14项真实浏览器、57项原型浏览器均有通过记录（两项启动超时独立复跑通过），类型/正式构建、发布9项、Harness20项通过；独立两阶段审查通过。边界复测与截图详见 [OPTIMIZATION-VERIFICATION](it-project-console/docs/OPTIMIZATION-VERIFICATION.md)。未部署生产。

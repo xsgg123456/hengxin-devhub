@@ -37,6 +37,7 @@
               clearable
               style="width: 250px"
           /></ElFormItem>
+<ElFormItem label="项目类型"><ElSelect v-model="projectType" aria-label="项目类型" placeholder="全部类型" style="width: 140px"><ElOption label="全部类型" value="" /><ElOption label="普通项目" value="normal" /><ElOption label="优化项目" value="optimization" /></ElSelect></ElFormItem>
           <ElFormItem label="需求部门"
             ><ElSelect
               v-model="department"
@@ -123,7 +124,7 @@
         ></div
       >
       <div
-        v-if="store.currentUser.role !== 'engineer' || scope !== 'mine'"
+        v-if="store.currentUser.role === 'manager'"
         class="overview-charts mb-5"
         ><ProjectDistribution
           v-if="!loading && !error"
@@ -209,6 +210,7 @@
     includeArchived,
     keyword,
     department,
+    projectType,
     stage,
     projects,
     metrics,
@@ -259,3 +261,6 @@
   )
 </script>
 <style scoped src="./style.css"></style>
+
+
+

@@ -9,7 +9,9 @@ export interface PrototypeStorage {
   setItem(key: string, value: string): void
 }
 
-export const PROTOTYPE_STORAGE_KEY = 'it-project-console.prototype.v1'
+export const PROTOTYPE_STORAGE_KEY = import.meta.env.MODE === 'prototype' && typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('optimizationPreview') === '1'
+  ? 'it-project-console.optimization-preview.v1' : 'it-project-console.prototype.v1'
 
 export class PrototypeDataError extends Error {
   constructor(message = '演示数据无法读取') {

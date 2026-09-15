@@ -10,6 +10,7 @@ const includeArchived = z
   .transform((v) => v === 'true')
 export const monthSchema = z.string().regex(/^[1-9]\d{3}-(0[1-9]|1[0-2])$/)
 const projectFields = {
+  projectType: z.enum(['', 'normal', 'optimization']).default(''),
   scope,
   risk,
   includeArchived,
@@ -37,6 +38,7 @@ export const ganttQuery = z
   .strict()
 export const demandQuery = z
   .object({
+    projectType: z.enum(['', 'normal', 'optimization']).default(''),
     scope,
     department: text,
     keyword: text,

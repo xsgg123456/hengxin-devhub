@@ -69,13 +69,13 @@
               ...barStyle(segment.left, segment.width),
               top: `${43 + segment.lane * 29}px`
             }"
-            :aria-label="stageExplanation(segment)"
+            :aria-label="stageExplanation(segment).replace('验收交付', row.project.parentProjectId ? '优化交付' : '验收交付')"
             @mousemove.stop="showTip($event, row, segment)"
             @focus="showFocus($event, row, segment)"
             @blur="hideTip"
             @click="emit('detail', row.project.id)"
           >
-            {{ segment.width < 1.6 ? segment.stage.slice(2) : segment.stage }}
+            {{ row.project.parentProjectId ? '优化交付' : segment.width < 1.6 ? segment.stage.slice(2) : segment.stage }}
           </button>
           <span class="progress-label"
             >{{
@@ -121,7 +121,7 @@
         <p>{{ projectCode(tip.row.project) }} · {{ tip.row.project.priority }}</p>
         <template v-if="tip.segment">
           <p
-            ><b>{{ tip.segment.stage }}</b> ·
+            ><b>{{ tip.row.project.parentProjectId ? '优化交付' : tip.segment.stage }}</b> ·
             <span :class="{ 'risk-text': tip.segment.lateDays }"
               >{{ tip.segment.label
               }}{{ tip.segment.lateDays ? ` ${tip.segment.lateDays} 天` : '' }}</span

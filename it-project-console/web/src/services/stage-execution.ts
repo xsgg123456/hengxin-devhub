@@ -39,7 +39,8 @@ export function stageExecutions(
   today = shanghaiDay(new Date().toISOString())
 ): StageExecution[] {
   const currentIndex = PROJECT_STAGES.indexOf(project.stage)
-  return PROJECT_STAGES.map((stage, index) => {
+  return (project.parentProjectId ? ['验收交付' as const] : PROJECT_STAGES).map((stage) => {
+    const index = PROJECT_STAGES.indexOf(stage)
     const history = histories.filter((h) => h.projectId === project.id && h.stage === stage).at(-1)
     const isPast =
       index < currentIndex || (index === currentIndex && project.status === 'completed')

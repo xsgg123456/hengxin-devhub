@@ -16,6 +16,7 @@ export function registerHistoricalDelivery(snapshot: PrototypeSnapshot, input: H
   const actor = assertWrite(snapshot)
   const project = snapshot.database.projects.find(p => p.id === input.projectId)
   if (!project) throw new WorkflowError('项目不存在')
+  if (project.parentProjectId) throw new WorkflowError('优化项目必须通过业务验收完成')
   const reason = textValue(input.reason, '补录原因')
   textValue(input.requestId, '请求编号', 200)
   const old = snapshot.database.lifecycleEvents.find(e => e.requestId === input.requestId)

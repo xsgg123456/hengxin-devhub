@@ -69,6 +69,12 @@ export function createFormalProject(
   const name = textValue(input.name, '项目名称', 100)
   const department = textValue(input.department, '需求部门', 100)
   const now = input.now ?? new Date().toISOString()
+  const parentProjectId = snapshot.database.demands.find(d => d.id === demandId)?.parentProjectId ?? null
+  if (parentProjectId) {
+    const parent = snapshot.database.projects.find(p => p.id === parentProjectId)
+    if (!parent || parent.status !== 'completed' || parent.parentProjectId)
+      throw new WorkflowError('原项目状态已变化，不能建立优化项目')
+  }
   backfillProjectCodes(snapshot.database)
   const project: DemoProject = {
     approvedLaunchDate: input.approvedLaunchDate,
@@ -82,6 +88,7 @@ export function createFormalProject(
     ),
     requestId,
     demandId,
+    parentProjectId,
     firstRequestedOn: snapshot.database.demands.find(d => d.id === demandId)?.firstRequestedOn || '',
     businessOwnerId: snapshot.database.demands.find(d => d.id === demandId)?.submitterId || '',
     source: demandId ? ('demand' as const) : ('direct' as const),
@@ -90,7 +97,7 @@ export function createFormalProject(
     priority: input.priority,
     primaryOwnerId: input.primaryOwnerId,
     collaboratorIds: [...input.collaboratorIds],
-    stage: '方案设计' as const,
+    stage: parentProjectId ? '验收交付' : '方案设计',
     simpleStatus: 'not-started' as const,
     overallProgress: 0,
     stagePlans: [],
@@ -112,7 +119,7 @@ export function createFormalProject(
   initializeAcceptance(project, snapshot.database)
   snapshot.database.projects.unshift(project)
   snapshot.database.stageHistories.push(
-    ...PROJECT_STAGES.slice(0, 3).map((stage, index) => ({
+    ...(parentProjectId ? [...PROJECT_STAGES.slice(0, 2), '验收交付' as const] : PROJECT_STAGES.slice(0, 3)).map((stage, index) => ({
       projectId: project.id,
       stage,
       startedAt: now,
@@ -139,7 +146,8 @@ export function reviewDemand(snapshot: PrototypeSnapshot, input: ReviewInput) {
   if (demand.status !== 'pending') throw new WorkflowError('仅待评估需求可处理')
   if (input.decision === 'establish') {
     if (!input.project) throw new WorkflowError('请填写立项信息')
-    validateMaterials(demandMaterials(demand))
+    validateMaterials(demandMaterials(demand), !demand.parentProjectId)
+    if (demand.parentProjectId) textValue(demand.optimizationOutcome ?? '', '期望效果 / 验收标准')
     const project = submitProjectProposal(
       snapshot,
       {

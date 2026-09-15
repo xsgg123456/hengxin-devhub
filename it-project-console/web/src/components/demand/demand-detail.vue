@@ -15,7 +15,8 @@
         demand.expectedLaunchDate || '未填写'
       }}</ElDescriptionsItem>
     </ElDescriptions>
-    <h3 class="font-medium mb-2">项目说明</h3
+    <p v-if="demand.parentProjectId" class="mb-3">优化需求 · 原项目：{{ store.database?.projects.find(p => p.id === demand.parentProjectId)?.name || demand.parentProjectId }}</p>
+    <h3 class="font-medium mb-2">{{ demand.parentProjectId ? '当前问题' : '项目说明' }}</h3
     ><p class="mb-5 whitespace-pre-wrap break-all">{{ demand.description || '暂无说明' }}</p>
     <ElAlert
       v-if="demand.reviewReason"
@@ -28,6 +29,7 @@
       :closable="false"
       class="mb-5"
     />
+    <p v-if="demand.parentProjectId" class="mb-5 whitespace-pre-wrap">期望效果 / 验收标准：{{ demand.optimizationOutcome }}</p>
     <MaterialSummary :demand="demand" />
     <LifecycleHistory :demand-id="demand.id" />
     <template #footer

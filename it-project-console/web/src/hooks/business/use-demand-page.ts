@@ -19,6 +19,7 @@ export function useDemandPage() {
   const scope = ref(prototypeStore.currentUser.role === 'business' ? 'mine' : 'all')
   const dateRange = ref<[string, string] | null>(null)
   const completion = ref('')
+  const projectType = ref('')
   const status = ref('')
   const department = ref('')
   watch(
@@ -60,6 +61,7 @@ export function useDemandPage() {
       dateRange.value = null
       completion.value = ''
       status.value = ''
+      projectType.value = ''
       department.value = ''
       editing.value = false
       selected.value = undefined
@@ -75,6 +77,7 @@ export function useDemandPage() {
       .map((d) => ({ ...d, ...demandCompletion(linkedProject(d.id)) }))
       .filter(
         (d) =>
+          (!projectType.value || (projectType.value === 'optimization') === !!d.parentProjectId) &&
           (scope.value === 'all' || d.submitterId === prototypeStore.currentUser.id) &&
           (!status.value ||
             (status.value === 'pre_establishment'
@@ -99,6 +102,7 @@ export function useDemandPage() {
     error,
     retry
   } = useLiveQuery<DemandStatistics>('/demand-statistics', () => ({
+    projectType: projectType.value,
     scope: scope.value,
     from: dateRange.value?.[0],
     to: dateRange.value?.[1],
@@ -110,10 +114,11 @@ export function useDemandPage() {
     runtimeConfig.isPrototype ? prototypeDemands.value : (statistics.value?.demands ?? [])
   )
   const hasFilters = computed(
-    () => !!(status.value || department.value || completion.value || dateRange.value?.length)
+    () => !!(projectType.value || status.value || department.value || completion.value || dateRange.value?.length)
   )
   function resetFilters() {
     status.value = ''
+    projectType.value = ''
     department.value = ''
     completion.value = ''
     dateRange.value = null
@@ -205,12 +210,13 @@ export function useDemandPage() {
           : '尚未转为项目'
     }
     const state = { active: '进行中', completed: '已完成', cancelled: '已取消' }[project.status]
-    return `已转 ${projectCode(project)} · ${project.stage} · ${state}${project.stage === '验收交付' ? ' · ' + acceptanceLabel(project) : ''}${project.archived ? ' · 已归档' : ''}`
+    return `已转 ${projectCode(project)} · ${project.parentProjectId ? '优化交付' : project.stage} · ${state}${project.stage === '验收交付' ? ' · ' + acceptanceLabel(project) : ''}${project.archived ? ' · 已归档' : ''}`
   }
   const formatDate = (value: string) => value || '—'
   const formatDateTime = displayTime
   return {
     prototypeStore,
+    projectType,
     scope,
     dateRange,
     completion,

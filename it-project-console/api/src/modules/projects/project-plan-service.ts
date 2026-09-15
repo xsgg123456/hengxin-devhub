@@ -14,6 +14,7 @@ export class ProjectPlanService {
       const project = await lockedProject(tx, id, input.version)
       writable(project)
       if (actor.role !== 'MANAGER' && actor.id !== project.primaryOwnerId) throw new AppError(403, 'FORBIDDEN', '只有主负责人或管理人员可以排期')
+      if (project.acceptanceStatus === 'pending') invalid('待验收期间请先撤回验收再调整排期')
       const required = remainingStages(project.stage), old = readStagePlans(project.stagePlans)
       if (input.plans.length !== required.length || input.plans.some((plan, index) => plan.stage !== required[index]))
         invalid('须按顺序一次提交当前和全部后续阶段；已完成阶段不可改写')
@@ -34,7 +35,7 @@ export class ProjectPlanService {
         projectId: id, authorId: actor.id, field: `stage:${change.stage}:${change.field}`,
         oldValue: change.oldValue, newValue: change.newValue, reason: input.changeReason!, description: input.changeDescription!
       } })
-      const launch = plans.find(plan => plan.stage === '上线部署'), delivery = plans.find(plan => plan.stage === '验收交付')
+      const launch = plans.find(plan => plan.stage === (project.parentProjectId ? '验收交付' : '上线部署')), delivery = plans.find(plan => plan.stage === '验收交付')
       const expectedDate = new Date(updated[0]!.endDate)
       const changed = await tx.project.update({ where: { id }, data: {
         stagePlans: plans, stageExpectedDate: expectedDate,

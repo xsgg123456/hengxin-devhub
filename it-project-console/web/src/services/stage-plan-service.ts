@@ -16,6 +16,7 @@ export interface PlanInput {
   now?: string
 }
 export function remainingStages(project: DemoProject) {
+  if (project.parentProjectId) return ['验收交付' as const]
   return PROJECT_STAGES.slice(Math.max(2, PROJECT_STAGES.indexOf(project.stage)))
 }
 export function needsPlan(project: DemoProject) {
@@ -64,6 +65,7 @@ export function saveProjectPlan(snapshot: PrototypeSnapshot, input: PlanInput) {
   if (actor.role !== 'manager' && actor.id !== project.primaryOwnerId)
     throw new WorkflowError('只有主负责人或管理人员可以制定计划')
   if (project.status !== 'active' || project.archived) throw new WorkflowError('当前项目只读')
+  if (project.acceptanceStatus === 'pending') throw new WorkflowError('待业务验收期间请先撤回验收再调整计划')
   validatePlans(project, input)
   const now = input.now ?? new Date().toISOString()
   const beforePlans =
@@ -101,11 +103,11 @@ export function saveProjectPlan(snapshot: PrototypeSnapshot, input: PlanInput) {
   ]
   project.stageExpectedDate =
     project.stagePlans.find((p) => p.stage === project.stage)?.endDate ?? ''
-  project.expectedLaunchDate = project.stagePlans.find((p) => p.stage === '上线部署')?.endDate ?? ''
+  project.expectedLaunchDate = project.stagePlans.find((p) => p.stage === (project.parentProjectId ? '验收交付' : '上线部署'))?.endDate ?? ''
   project.expectedDeliveryDate =
     project.stagePlans.find((p) => p.stage === '验收交付')?.endDate ?? ''
   project.originalLaunchDate ||=
-    project.stagePlans.find((p) => p.stage === '上线部署')?.originalEndDate ?? ''
+    project.stagePlans.find((p) => p.stage === (project.parentProjectId ? '验收交付' : '上线部署'))?.originalEndDate ?? ''
   project.originalDeliveryDate ||=
     project.stagePlans.find((p) => p.stage === '验收交付')?.originalEndDate ?? ''
   project.updatedAt = now

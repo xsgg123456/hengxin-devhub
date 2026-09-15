@@ -60,6 +60,7 @@ export function correctProject(snapshot: PrototypeSnapshot, input: CorrectionInp
   if (project.status !== 'active' || project.archived) throw new WorkflowError('请先重新打开项目')
   if (project.acceptanceStatus === 'pending')
     throw new WorkflowError('待业务验收期间不能纠正阶段，请先由主负责人撤回验收')
+  if (project.parentProjectId && input.stage !== '验收交付') throw new WorkflowError('优化项目仅允许优化交付节点')
   const index = PROJECT_STAGES.indexOf(input.stage)
   const oldIndex = PROJECT_STAGES.indexOf(project.stage)
   if (index < 2 || index > oldIndex + 1) throw new WorkflowError('不得跳过固定阶段')

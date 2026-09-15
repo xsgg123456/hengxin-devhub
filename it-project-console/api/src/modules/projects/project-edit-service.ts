@@ -43,6 +43,12 @@ export class ProjectEditService {
       if (input.verify && (!input.firstRequestedOn || !input.businessOwnerId || !input.acceptanceOwnerId ||
         !input.expectedLaunchDate || !input.expectedDeliveryDate)) invalid('完成核实前请补齐首次提出日期、业务人员及预计上线交付日期')
       if (input.simpleStatus === 'blocked' && !input.blocker) invalid('请填写阻塞说明')
+      if (project.parentProjectId && (input.stage !== '验收交付' || input.stagePlans.some(p => p.stage !== '验收交付')))
+        invalid('优化项目只有优化交付节点')
+      if (project.parentProjectId && (input.expectedLaunchDate !== input.expectedDeliveryDate || input.originalLaunchDate !== input.originalDeliveryDate))
+        invalid('优化上线和交付日期须保持一致')
+      if (project.acceptanceStatus === 'pending' && JSON.stringify(input.stagePlans) !== JSON.stringify(readStagePlans(project.stagePlans).map(({ stage, startDate, endDate }) => ({ stage, startDate, endDate }))))
+        invalid('待验收期间请先撤回验收再调整排期')
       const stageChanged = input.stage !== project.stage
       const progressChanged = stageChanged || input.simpleStatus !== project.simpleStatus || input.blocker !== project.blocker
       if (input.simpleStatus === 'completed' && (stageChanged || project.simpleStatus !== 'completed')) invalid('请通过原进度与业务验收流程完成阶段')
@@ -57,8 +63,10 @@ export class ProjectEditService {
         const old = oldPlans.find(p => p.stage === plan.stage)
         return { ...plan, originalStartDate: old?.originalStartDate ?? plan.startDate, originalEndDate: old?.originalEndDate ?? plan.endDate }
       }).sort((a, b) => STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage))
+      if (project.parentProjectId && (oldPlans.length || progressChanged) && plans.length !== 1)
+        invalid('优化项目开始执行后必须保留完整优化交付排期')
       validatePlanOrder(plans)
-      const launch = plans.find(p => p.stage === '上线部署'), delivery = plans.find(p => p.stage === '验收交付')
+      const launch = plans.find(p => p.stage === (project.parentProjectId ? '验收交付' : '上线部署')), delivery = plans.find(p => p.stage === '验收交付')
       if ((launch && input.expectedLaunchDate !== launch.endDate) || (delivery && input.expectedDeliveryDate !== delivery.endDate))
         invalid('预计上线/交付日期须与对应环节计划结束日期一致')
       const now = new Date(), oldBusiness = project.businessOwnerId

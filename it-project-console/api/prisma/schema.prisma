@@ -110,6 +110,10 @@ model Session {
   @@map("sessions")
 }
 model Demand {
+  parentProjectId String? @map("parent_project_id")
+  parentProject Project? @relation("OptimizationDemands", fields: [parentProjectId], references: [id], onDelete: Restrict)
+  optimizationOutcome String @default("") @map("optimization_outcome")
+  @@index([parentProjectId])
   firstRequestedOn DateTime? @map("first_requested_on") @db.Date
   code String @unique @default(dbgenerated())
   requestId String? @map("request_id")
@@ -155,6 +159,11 @@ model ProjectCodeCounter {
   @@map("project_code_counters")
 }
 model Project {
+  parentProjectId String? @map("parent_project_id")
+  parentProject Project? @relation("OptimizationProjects", fields: [parentProjectId], references: [id], onDelete: Restrict)
+  optimizationProjects Project[] @relation("OptimizationProjects")
+  optimizationDemands Demand[] @relation("OptimizationDemands")
+  @@index([parentProjectId])
   firstRequestedOn DateTime? @map("first_requested_on") @db.Date
   businessOwnerId String? @map("business_owner_id")
   description String @default("")

@@ -1,22 +1,22 @@
 <template>
-  <div class="stage-progress" aria-label="项目七阶段">
-    <div class="stage-blocks">
-      <ElTooltip v-for="item in stages" :key="item.stage" :content="stageExplanation(item)">
+  <div class="stage-progress" :aria-label="project.parentProjectId ? '优化交付' : '项目七阶段'">
+    <div class="stage-blocks" :style="project.parentProjectId ? { gridTemplateColumns: '1fr' } : undefined">
+      <ElTooltip v-for="item in stages" :key="item.stage" :content="stageExplanation(item).replace('验收交付', project.parentProjectId ? '优化交付' : '验收交付')">
         <div
           class="stage-block"
           :class="item.state"
           tabindex="0"
-          :aria-label="stageExplanation(item)"
+          :aria-label="stageExplanation(item).replace('验收交付', project.parentProjectId ? '优化交付' : '验收交付')"
         >
-          <span class="stage-number">0{{ item.index + 1 }}</span>
-          <b>{{ item.stage.slice(0, 2) }}<br />{{ item.stage.slice(2) }}</b>
+          <span class="stage-number">0{{ project.parentProjectId ? 1 : item.index + 1 }}</span>
+          <b>{{ project.parentProjectId ? '优化' : item.stage.slice(0, 2) }}<br />{{ project.parentProjectId ? '交付' : item.stage.slice(2) }}</b>
           <small>{{ item.label }}</small>
         </div>
       </ElTooltip>
     </div>
     <p v-if="lateStages.length" class="delay-note">
       <template v-for="(item, i) in lateStages" :key="item.stage">
-        {{ i ? '；' : '' }}{{ item.stage }}{{ item.label }} {{ item.lateDays }} 天
+        {{ i ? '；' : '' }}{{ project.parentProjectId ? '优化交付' : item.stage }}{{ item.label }} {{ item.lateDays }} 天
       </template>
     </p>
     <p v-else class="normal-note">蓝色：进行中　绿色：按时完成　红色：延期</p>

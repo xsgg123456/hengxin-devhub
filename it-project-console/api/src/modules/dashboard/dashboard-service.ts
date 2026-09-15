@@ -28,6 +28,7 @@ export function filterProjects(
 ) {
   return projects
     .filter((p) => {
+      if (q.projectType && !!p.parentProjectId !== (q.projectType === 'optimization')) return false
       if (!q.includeArchived && p.archived) return false
       if (q.scope === 'mine' && !assigned(p, actorId)) return false
       if (q.person && !assigned(p, q.person)) return false
@@ -125,6 +126,7 @@ export async function dashboard(tx: Prisma.TransactionClient, q: DashboardQuery,
   )
   const pendingDemands = await tx.demand.count({
     where: {
+      ...(q.projectType ? { parentProjectId: q.projectType === 'optimization' ? { not: null } : null } : {}),
       status: { in: ['PENDING', 'AWAITING_ENGINEER'] },
       ...(q.department ? { department: q.department } : {}),
       ...(q.scope === 'mine' ? { ownerId: actorId } : {})
@@ -133,7 +135,7 @@ export async function dashboard(tx: Prisma.TransactionClient, q: DashboardQuery,
   const pendingDirect = await tx.projectProposal.count({ where: { demandId: null, status: { in: ['pending', 'returned'] },
     ...(q.department ? { department: q.department } : {}),
     ...(q.scope === 'mine' ? { OR: [{ primaryOwnerId: actorId }, { createdBy: actorId }] } : {}) } })
-  const pending = pendingDemands + pendingDirect
+  const pending = pendingDemands + (q.projectType === 'optimization' ? 0 : pendingDirect)
   const metrics = [
     {
       label: '在手项目',

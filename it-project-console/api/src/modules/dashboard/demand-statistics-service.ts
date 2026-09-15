@@ -19,6 +19,7 @@ export async function demandStatistics(
   ])
   const filtered = rows.filter(
     (d) =>
+      (!q.projectType || !!d.parentProjectId === (q.projectType === 'optimization')) &&
       (q.scope !== 'mine' || d.ownerId === actorId) &&
       (!q.submitterId || d.ownerId === q.submitterId) &&
       (!q.department || d.department === q.department) &&

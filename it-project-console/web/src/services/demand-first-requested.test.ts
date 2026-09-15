@@ -78,7 +78,7 @@ describe('需求首次提出日期自动记录', () => {
       const [url, options] = vi.mocked(apiRequest).mock.calls.at(-1)!
       expect(url).toBe(id ? '/demands/' + id : '/demands')
       expect(Object.keys(options!.body as object).sort()).toEqual([
-        'name', 'description', 'expectedLaunchDate', 'prd', 'prototype', 'requestId', 'submit', ...(id ? ['version'] : [])
+        'name', 'description', 'parentProjectId', 'optimizationOutcome', 'expectedLaunchDate', 'prd', 'prototype', 'requestId', 'submit', ...(id ? ['version'] : [])
       ].sort())
     }
   })

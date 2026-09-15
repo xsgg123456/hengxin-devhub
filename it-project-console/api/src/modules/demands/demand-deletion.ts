@@ -23,6 +23,9 @@ async function cancelNotification(tx: Prisma.TransactionClient, id: string) {
 }
 async function deleteGroup(tx: Prisma.TransactionClient, actor: Actor, demandId: string | null,
   projectId: string | null, reason: string) {
+  if (projectId && (await tx.demand.count({ where: { parentProjectId: projectId } }) ||
+    await tx.project.count({ where: { parentProjectId: projectId } })))
+    throw new AppError(409, 'HAS_OPTIMIZATIONS', '请先处理关联优化需求和项目，再删除主项目')
   const references = [...(demandId ? [{ demandId }] : []), ...(projectId ? [{ projectId }] : [])]
   const proposals = await tx.projectProposal.findMany({ where: { OR: references } })
   for (const proposal of proposals) {

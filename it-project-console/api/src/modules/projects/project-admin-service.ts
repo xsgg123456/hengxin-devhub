@@ -6,7 +6,7 @@ import { assertManager, command } from '../../lib/business-command.js'
 import { deleteProjectGroup } from '../demands/demand-deletion.js'
 import { actionSchema, correctionSchema, STAGES } from '../progress/progress-schemas.js'
 import { enterStage, invalid, lockedProject, projectState, unchanged, writable, type ProjectChanged } from '../progress/progress-state.js'
-import { readStagePlans } from './project-plan-state.js'
+import { assertScheduled, readStagePlans } from './project-plan-state.js'
 export class ProjectAdminService {
   constructor(private readonly db: PrismaClient, private readonly onProjectChanged: ProjectChanged = unchanged) {}
   async action(actor: Actor, id: string, body: unknown) {
@@ -52,6 +52,8 @@ export class ProjectAdminService {
       const project = await lockedProject(tx, id, input.version)
       writable(project)
       if (project.acceptanceStatus === 'pending') invalid('待业务验收期间请先撤回验收再纠正阶段')
+      if (project.parentProjectId && input.stage !== '验收交付') invalid('优化项目只有优化交付节点')
+      if (project.parentProjectId) assertScheduled(project.stage, project.stagePlans)
       const index = STAGES.indexOf(input.stage), oldIndex = STAGES.indexOf(project.stage as typeof STAGES[number])
       if (index < 2) invalid('受理与立项由系统记录，不能纠正为工程执行阶段')
       if (index > oldIndex + 1) invalid('不得跳过固定阶段')

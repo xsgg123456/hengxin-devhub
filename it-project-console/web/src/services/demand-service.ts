@@ -11,6 +11,8 @@ import {
 } from './workflow-validation'
 import { demandMaterials } from './demand-materials'
 export interface DemandInput {
+  parentProjectId?: string | null
+  optimizationOutcome?: string
   attachments?: DemoAttachment[]
   id?: string
   requestId: string
@@ -44,14 +46,27 @@ export function saveDemand(snapshot: PrototypeSnapshot, input: DemandInput) {
     )
   )
     throw new WorkflowError('需求已进入工程师接单流程，不可编辑')
-  const name = input.submit ? textValue(input.name, '项目名称', 100) : input.name.trim()
-  const description = input.submit
+  const parentProjectId = input.parentProjectId === undefined ? (existing?.parentProjectId ?? null) : input.parentProjectId
+  if (existing && existing.status !== 'draft' && parentProjectId !== (existing.parentProjectId ?? null))
+    throw new WorkflowError('提交后不可更换原项目')
+  if (parentProjectId) {
+    const parent = snapshot.database.projects.find(p => p.id === parentProjectId)
+    if (!parent || parent.status !== 'completed' || parent.parentProjectId)
+      throw new WorkflowError('仅已完成主项目可以提出优化需求')
+  }
+  const requiresMaterials = input.submit || existing?.status === 'pending'
+  const optimizationOutcome = parentProjectId && requiresMaterials
+    ? textValue(input.optimizationOutcome ?? '', '期望效果 / 验收标准')
+    : (input.optimizationOutcome ?? '').trim()
+  if (optimizationOutcome.length > 300) throw new WorkflowError('验收标准最多 300 字')
+  const name = requiresMaterials ? textValue(input.name, '项目名称', 100) : input.name.trim()
+  const description = requiresMaterials
     ? textValue(input.description, '项目说明')
     : input.description.trim()
   if (name.length > 100 || description.length > 300)
     throw new WorkflowError('项目名称或说明超出字数限制')
-  if (input.submit || input.expectedLaunchDate) dateValue(input.expectedLaunchDate, '期望上线日期')
-  if (input.submit && input.expectedLaunchDate < shanghaiDay(now))
+  if (requiresMaterials || input.expectedLaunchDate) dateValue(input.expectedLaunchDate, '期望上线日期')
+  if (requiresMaterials && input.expectedLaunchDate < shanghaiDay(now))
     throw new WorkflowError('期望上线日期不得早于提交日')
   // Legacy prototype drafts stored a synthetic submittedAt; only submitted demands can use it.
   const neverSubmitted = !existing || existing.status === 'draft'
@@ -59,7 +74,7 @@ export function saveDemand(snapshot: PrototypeSnapshot, input: DemandInput) {
     ? (input.submit ? shanghaiDay(now) : '')
     : existing.firstRequestedOn || (input.submit ? shanghaiDay(existing.submittedAt || now) : '')
   const materials = input.attachments ?? demandMaterials(input)
-  validateMaterials(materials, input.submit || existing?.status === 'pending')
+  validateMaterials(materials, !parentProjectId && requiresMaterials)
   const demand = {
     code:
       existing?.code ??
@@ -75,6 +90,8 @@ export function saveDemand(snapshot: PrototypeSnapshot, input: DemandInput) {
           .map((e) => e.entityId)
       ),
     requestId,
+    parentProjectId,
+    optimizationOutcome,
     name,
     description,
     department: actor.department,

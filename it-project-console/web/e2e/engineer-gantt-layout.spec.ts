@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import type { PrototypeSnapshot } from '../src/domain/prototype'
 
-test('工程师本人范围直接展示原项目卡片，全部范围与管理者保留图表', async ({ page }) => {
+test('工程师全部范围均隐藏图表，仅管理者保留图表', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 911 })
   await page.goto('/')
   await page.getByRole('button', { name: '切换演示身份' }).click()
@@ -12,7 +12,7 @@ test('工程师本人范围直接展示原项目卡片，全部范围与管理�
   await expect(page.locator('[data-project-id]').first()).toBeVisible()
   await page.screenshot({ path: '../output/playwright/engineer-projects-implemented.png' })
   await page.locator('.el-radio-button').filter({ hasText: '全部项目' }).click()
-  await expect(page.getByRole('heading', { name: '项目状态分布', exact: true })).toBeVisible()
+  await expect(page.locator('.overview-charts')).toHaveCount(0)
   await page.getByRole('button', { name: '切换演示身份' }).click()
   await page.locator('.identity-menu-item').filter({ hasText: '陈立峰' }).click()
   await page.locator('.el-radio-button').filter({ hasText: '我负责 / 参与' }).click()
@@ -104,3 +104,4 @@ test('甘特铺满宽屏，窄屏内部双向滚动且表头左列固定，标�
     await page.getByRole('button', { name: '下一月', exact: true }).click()
   }
 })
+

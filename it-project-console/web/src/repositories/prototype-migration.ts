@@ -149,6 +149,11 @@ export function migratePrototypeSnapshot(value: unknown): PrototypeSnapshot {
       if (complete && completedAt) project.status = 'completed'
     }
   }
+  for (const demand of snapshot.database.demands) {
+    demand.parentProjectId ??= null
+    demand.optimizationOutcome ??= ''
+  }
+  for (const project of snapshot.database.projects) project.parentProjectId ??= null
   backfillProjectCodes(snapshot.database)
   for (const project of snapshot.database.projects) initializeAcceptance(project, snapshot.database)
   backfillDemandCodes(snapshot.database)

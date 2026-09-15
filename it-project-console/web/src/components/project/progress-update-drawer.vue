@@ -35,11 +35,11 @@
           <ElFormItem label="当前阶段"
             ><ElSelect v-if="correction" v-model="correctionStage" aria-label="纠正阶段"
               ><ElOption
-                v-for="stage in correctionStages"
+                v-for="stage in (project.parentProjectId ? ['验收交付'] : correctionStages)"
                 :key="stage"
-                :label="stage"
+                :label="project.parentProjectId ? '优化交付' : stage"
                 :value="stage" /></ElSelect
-            ><ElInput v-else :model-value="project.stage" readonly
+            ><ElInput v-else :model-value="project.parentProjectId ? '优化交付' : project.stage" readonly
           /></ElFormItem>
           <ElFormItem v-if="!correction" label="计划区间">
             <p>{{

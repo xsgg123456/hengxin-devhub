@@ -41,6 +41,8 @@ export interface DemoAttachment {
   status: 'ready' | 'failed' | 'uploading'
 }
 export interface DemoDemand {
+  parentProjectId?: string | null
+  optimizationOutcome?: string
   firstRequestedOn?: string
   code?: string
   createdAt?: string
@@ -98,6 +100,7 @@ export interface AcceptanceHistory {
   ownerId: string | null
 }
 export interface DemoProject {
+  parentProjectId?: string | null
   firstRequestedOn?: string
   businessOwnerId?: string
   description?: string

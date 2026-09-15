@@ -29,6 +29,7 @@
           ><ElTag effect="plain" round>共 {{ demands.length }} 条</ElTag></div
         >
         <ElForm inline label-position="top" class="mb-3">
+          <ElFormItem label="需求类型"><ElSelect v-model="projectType" clearable placeholder="全部类型" style="width: 150px"><ElOption label="普通需求" value="normal" /><ElOption label="优化需求" value="optimization" /></ElSelect></ElFormItem>
           <ElFormItem label="需求部门"
             ><ElSelect
               v-model="department"
@@ -129,6 +130,7 @@
               ></template
             ></ElTableColumn
           >
+          <ElTableColumn label="类型 / 归属" min-width="150"><template #default="{ row }">{{ row.parentProjectId ? '优化 · ' + (prototypeStore.database?.projects.find(p => p.id === row.parentProjectId)?.name || row.parentProjectId) : '普通需求' }}</template></ElTableColumn>
           <ElTableColumn prop="department" label="提出部门" min-width="105" />
           <ElTableColumn label="提出人" min-width="80"
             ><template #default="{ row }">{{ userName(row.submitterId) }}</template></ElTableColumn
@@ -239,6 +241,7 @@
   import { useDemandPage } from '@/hooks/business/use-demand-page'
   const {
     prototypeStore,
+    projectType,
     scope,
     dateRange,
     completion,

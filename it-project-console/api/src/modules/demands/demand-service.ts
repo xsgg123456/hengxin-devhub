@@ -19,6 +19,7 @@ export class DemandService {
   async create(actor: Actor, body: unknown) {
     const input = demandSchema.parse(body)
     return command(this.db, actor, input.requestId, { operation: 'create-demand', input }, async tx => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':notification-flush', 0))::text`
       const id = randomUUID()
       const data = await demandData(tx, id, input)
       const now = new Date()
@@ -36,6 +37,7 @@ export class DemandService {
   async save(actor: Actor, id: string, body: unknown) {
     const input = demandUpdateSchema.parse(body)
     return command(this.db, actor, input.requestId, { operation: 'save-demand', id, input }, async tx => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':notification-flush', 0))::text`
       const old = await lockedDemand(tx, id, input.version)
       assertOwner(actor, old)
       if (old.proposals.some(row => ['pending', 'returned'].includes(row.status))) throw new AppError(409, 'READ_ONLY', '需求已进入工程师接单或管理重新评估，不可修改或撤回')
@@ -61,6 +63,7 @@ export class DemandService {
   async withdraw(actor: Actor, id: string, body: unknown) {
     const input = commandSchema.parse(body)
     return command(this.db, actor, input.requestId, { operation: 'withdraw-demand', id, input }, async tx => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':notification-flush', 0))::text`
       const old = await lockedDemand(tx, id, input.version)
       assertOwner(actor, old)
       if (old.proposals.some(row => ['pending', 'returned'].includes(row.status))) throw new AppError(409, 'READ_ONLY', '需求已进入工程师接单或管理重新评估，不可修改或撤回')

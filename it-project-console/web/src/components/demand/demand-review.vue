@@ -12,6 +12,7 @@
       >{{ demand.department }} · 期望上线 {{ demand.expectedLaunchDate }}</p
     >
     <p class="mb-5 whitespace-pre-wrap break-all">{{ demand.description }}</p>
+    <p v-if="demand.parentProjectId" class="mb-5 whitespace-pre-wrap">期望效果 / 验收标准：{{ demand.optimizationOutcome }}</p>
     <MaterialSummary :demand="demand" />
     <ElDivider />
     <ElForm label-position="top" :disabled="saving">

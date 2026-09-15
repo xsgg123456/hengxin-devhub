@@ -51,6 +51,16 @@ export function saveProjectEditPreview(
     throw new Error('业务验收结果请通过原验收入口处理')
   if (current.acceptanceStatus === 'pending' && ['stage', 'simpleStatus', 'acceptanceUrl', 'acceptanceSummary'].some(key => edited[key as keyof DemoProject] !== current[key as keyof DemoProject]))
     throw new Error('项目正在业务验收，请先撤回验收后调整阶段、状态或交付材料')
+  if (current.parentProjectId && (edited.expectedLaunchDate !== edited.expectedDeliveryDate || edited.originalLaunchDate !== edited.originalDeliveryDate))
+    throw new Error('优化上线和交付日期须保持一致')
+  if (current.parentProjectId && current.stagePlans?.some(p => p.startDate && p.endDate) &&
+    !edited.stagePlans?.some(p => p.stage === '验收交付' && p.startDate && p.endDate))
+    throw new Error('优化项目已有计划不能清空')
+  const planDates = (project: DemoProject) => JSON.stringify((project.stagePlans ?? []).filter(p => p.startDate || p.endDate).map(({ stage, startDate, endDate }) => ({ stage, startDate, endDate })))
+  if (current.acceptanceStatus === 'pending' && planDates(edited) !== planDates(current))
+    throw new Error('待业务验收期间请先撤回验收再调整计划')
+  if (current.parentProjectId && (edited.stage !== '验收交付' || edited.stagePlans?.some(p => p.stage !== '验收交付')))
+    throw new Error('优化项目仅允许优化交付节点')
   for (const plan of edited.stagePlans ?? []) {
     if (plan.startDate) dateValue(plan.startDate, `${plan.stage}计划开始`)
     if (plan.endDate) dateValue(plan.endDate, `${plan.stage}计划结束`)
@@ -120,6 +130,10 @@ export function saveProjectEditPreview(
   const demand = snapshot.database.demands.find(d => d.id === current.demandId)
   if (demand) demand.firstRequestedOn = firstRequestedOn
   current.stagePlans = current.stagePlans?.filter(p => p.startDate && p.endDate)
+  if (current.parentProjectId) {
+    const delivery = current.stagePlans?.find(p => p.stage === '验收交付')
+    if (delivery) current.expectedLaunchDate = current.expectedDeliveryDate = delivery.endDate
+  }
   current.name = current.name.trim()
   if (wasPending && !verify) {
     current.migrationVerified = false

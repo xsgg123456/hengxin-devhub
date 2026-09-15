@@ -23,9 +23,10 @@ export class ApprovalService {
       if (input.decision === 'approve') {
         // Revalidate persisted materials, but the original submission date may now be in the past.
         if (!demand.name || !demand.description || !demand.expectedLaunchDate ||
-          !demand.attachmentIds.length)
+          (demand.parentProjectId ? !demand.optimizationOutcome : !demand.attachmentIds.length))
           throw new AppError(400, 'MISSING_FIELDS', '需求材料不完整')
         await demandData(tx, id, {
+          parentProjectId: demand.parentProjectId, optimizationOutcome: demand.optimizationOutcome,
           requestId: input.requestId, name: demand.name, description: demand.description, submit: false,
           expectedLaunchDate: demand.expectedLaunchDate.toISOString().slice(0, 10), attachmentIds: demand.attachmentIds,
           prd: demand.prdAttachmentId ? { kind: 'file', attachmentId: demand.prdAttachmentId } : demand.prdUrl ? { kind: 'link', url: demand.prdUrl } : null,

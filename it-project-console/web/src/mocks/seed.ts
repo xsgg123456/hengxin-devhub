@@ -169,6 +169,17 @@ export function createInitialPrototypeSnapshot(): PrototypeSnapshot {
       project.description = '从旧系统迁入的项目资料，请结合实际推进情况核对人员与计划。'
     })
   }
+  if (import.meta.env.MODE === 'prototype' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('optimizationPreview') === '1') {
+    const project = snapshot.database.projects[0]
+    Object.assign(project, {
+      name: '亚马逊站外客服自动回复（恒鑫智邮）', department: '客服组', priority: 'P2',
+      status: 'completed', stage: '验收交付', simpleStatus: 'completed', overallProgress: 100,
+      firstRequestedOn: '2026-08-01', expectedLaunchDate: '2026-08-25',
+      expectedDeliveryDate: '2026-09-01', originalLaunchDate: '2026-08-25',
+      originalDeliveryDate: '2026-08-30', actualCompletedAt: '2026-09-01T09:00:00+08:00',
+      lastOverallUpdatedAt: '2026-09-15T13:26:00+08:00', risks: [], blocker: ''
+    })
+  }
   return snapshot
 }
 import { initializeAcceptance } from '@/services/acceptance-service'

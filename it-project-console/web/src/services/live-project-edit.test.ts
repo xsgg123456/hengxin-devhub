@@ -32,6 +32,15 @@ describe('正式完整编辑请求', () => {
     expect(project).toEqual(baseline)
     expect(api.mock.calls[0]).toEqual(api.mock.calls[1])
   })
+  it('优化完整编辑从单节点结束同步里程碑且不修改表单', async () => {
+    const p = createInitialPrototypeSnapshot().database.projects[0]!
+    p.version = 1; p.parentProjectId = 'parent'
+    p.stagePlans = [{ stage: '验收交付', startDate: '2026-09-16', endDate: '2026-09-22' }]
+    const before = structuredClone(p)
+    await editLiveProject(p, '调整优化交付', false, 'optimization-edit')
+    expect(api.mock.calls[0]![1]!.body).toMatchObject({ expectedLaunchDate: '2026-09-22', expectedDeliveryDate: '2026-09-22' })
+    expect(p).toEqual(before)
+  })
   it('版本缺失与原因空白均不能发出写请求', () => {
     const project = createInitialPrototypeSnapshot().database.projects[0]!
     delete project.version

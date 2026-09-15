@@ -17,6 +17,8 @@ export const materialSchema = z.discriminatedUnion('kind', [
 export const commandSchema = z.object({ requestId: idSchema, version: z.number().int().positive() }).strict()
 export const demandSchema = z.object({
   requestId: idSchema, name: z.string().trim().max(100),
+  parentProjectId: idSchema.nullable().default(null),
+  optimizationOutcome: z.string().trim().max(1000).default(''),
   description: z.string().trim().max(300).default(''),
   expectedLaunchDate: z.union([dateSchema, z.literal(''), z.null()]).default(null),
   attachmentIds: z.array(idSchema).optional(),

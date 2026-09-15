@@ -6,7 +6,7 @@ export async function snapshot(page: Page): Promise<PrototypeSnapshot> {
   return page.evaluate((k) => JSON.parse(localStorage.getItem(k)!), key)
 }
 export const card = (page: Page, name: string) =>
-  page.locator('[data-project-id]').filter({ hasText: name })
+  page.locator('[data-project-id]').filter({ has: page.getByRole('heading', { name, exact: true }) })
 export const row = (page: Page, name: string) => page.getByRole('row').filter({ hasText: name })
 export async function identity(page: Page, name: string) {
   if ((await page.getByRole('button', { name: '切换演示身份' }).textContent())?.includes(name)) return

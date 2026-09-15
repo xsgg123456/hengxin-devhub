@@ -16,6 +16,7 @@
         >{{ projectCode(project) }} · {{ project.source === 'direct' ? '直接创建' : '需求立项' }}</p
       >
       <RiskTag :risks="risks" />
+      <OptimizationPreview v-if="project.parentProjectId || project.status === 'completed'" :project="project" />
       <ElAlert
         v-if="approvedLaunchOverrun(project.approvedLaunchDate, project.expectedLaunchDate) > 0"
         class="mt-3"
@@ -35,9 +36,9 @@
         <ElDescriptionsItem label="协作人员">{{
           project.collaboratorIds.map(userName).join('、') || '无'
         }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="当前环节">{{ project.stage }}</ElDescriptionsItem>
+        <ElDescriptionsItem label="当前环节">{{ projectStageLabel(project, project.stage) }}</ElDescriptionsItem>
         <ElDescriptionsItem label="阶段状态">{{
-          statusLabel[project.simpleStatus]
+          project.parentProjectId ? optimizationStatus(project) : statusLabel[project.simpleStatus]
         }}</ElDescriptionsItem>
         <ElDescriptionsItem label="原计划上线">{{
           project.originalLaunchDate || '—'
@@ -77,7 +78,7 @@
           :timestamp="displayTime(update.createdAt)"
           ><p
             >{{ userName(update.authorId) }} ·
-            {{ update.kind === 'overall' ? '整体更新' : '个人进展' }} · {{ update.stage }} ·
+            {{ update.kind === 'overall' ? '整体更新' : '个人进展' }} · {{ projectStageLabel(project, update.stage) }} ·
             {{ statusLabel[update.status] }}</p
           ><p class="mt-1 whitespace-pre-wrap">{{ update.summary }}</p
           ><p v-if="update.blocker" class="text-danger mt-1"
@@ -96,7 +97,7 @@
       <p v-if="!demand" class="text-sm text-g-600">直接创建项目，无关联需求材料</p>
       <template v-else
         ><p class="mb-3 whitespace-pre-wrap">{{ demand.description }}</p
-        ><MaterialSummary :demand="demand"
+        ><p v-if="demand.parentProjectId" class="mb-3 whitespace-pre-wrap">期望效果 / 验收标准：{{ demand.optimizationOutcome }}</p><MaterialSummary :demand="demand"
       /></template>
     </template>
     <template #footer
@@ -121,6 +122,8 @@
   import { approvedLaunchOverrun } from '@/utils/approved-launch'
   import { projectCode } from '@/utils/project-code'
   import { computed, ref } from 'vue'
+  import OptimizationPreview from './optimization-preview.vue'
+  import { projectStageLabel, optimizationStatus } from '@/utils/optimization-display'
   import ProjectEditDrawer from './project-edit-drawer.vue'
   import { canEditProject } from '@/utils/project-edit-permission'
   import { projectBusinessOwner } from '@/utils/project-business-owner'
@@ -208,3 +211,4 @@
     overflow-wrap: anywhere;
   }
 </style>
+
