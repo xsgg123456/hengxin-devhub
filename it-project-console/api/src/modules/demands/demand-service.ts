@@ -5,6 +5,8 @@ import { AppError } from '../../lib/errors.js'
 import { command, lockedDemand } from '../../lib/business-command.js'
 import { demandSchema, demandUpdateSchema, commandSchema } from './demand-schemas.js'
 import { demandData, queueAttachmentDeletion } from './demand-materials.js'
+import { projectApproverRecipients } from '../../lib/project-approver.js'
+import { lifecycleEvent } from '../notifications/lifecycle-event-service.js'
 
 function assertOwner(actor: Actor, demand: Demand) {
   if (demand.ownerId !== actor.id) throw new AppError(403, 'FORBIDDEN', '只有提交人可以维护需求')
@@ -12,7 +14,7 @@ function assertOwner(actor: Actor, demand: Demand) {
     throw new AppError(409, 'READ_ONLY', '当前需求不可编辑')
 }
 export class DemandService {
-  constructor(private readonly db: PrismaClient) {}
+  constructor(private readonly db: PrismaClient, private readonly approverId = '') {}
   async create(actor: Actor, body: unknown) {
     const input = demandSchema.parse(body)
     return command(this.db, actor, input.requestId, { operation: 'create-demand', input }, async tx => {
@@ -22,6 +24,8 @@ export class DemandService {
         ...data, id, ownerId: actor.id, department: actor.department, requestId: input.requestId,
         status: input.submit ? 'PENDING' : 'DRAFT', submittedAt: input.submit ? new Date() : null
       } })
+      if (input.submit) await lifecycleEvent(tx, { eventType: 'DEMAND_SUBMITTED', requestId: `${actor.id}:${input.requestId}`,
+        demandId: row.id, submittedAt: row.submittedAt!.toISOString(), recipientIds: await projectApproverRecipients(tx, this.approverId) })
       return { id: row.id, version: row.version, status: row.status }
     })
   }
@@ -35,12 +39,14 @@ export class DemandService {
       const data = await demandData(tx, id, { ...input, submit: input.submit || old.status === 'PENDING' }, old)
       const row = await tx.demand.update({ where: { id }, data: {
         ...data, status: input.submit ? 'PENDING' : old.status === 'PENDING' ? 'PENDING' : old.status,
-        submittedAt: input.submit ? new Date() : old.submittedAt,
+        submittedAt: input.submit && old.status !== 'PENDING' ? new Date() : old.submittedAt,
         reviewReason: input.submit ? null : old.reviewReason, version: { increment: 1 }
       } })
       const kept = data.attachmentIds
       const removed = [...new Set([...old.attachmentIds, old.prdAttachmentId, old.prototypeAttachmentId])].filter((item): item is string => !!item && !kept.includes(item))
       await queueAttachmentDeletion(tx, removed)
+      if (input.submit && old.status !== 'PENDING') await lifecycleEvent(tx, { eventType: 'DEMAND_SUBMITTED', requestId: `${actor.id}:${input.requestId}`,
+        demandId: row.id, submittedAt: row.submittedAt!.toISOString(), recipientIds: await projectApproverRecipients(tx, this.approverId) })
       return { id: row.id, version: row.version, status: row.status }
     })
   }

@@ -21,6 +21,7 @@ await isolatedIntegration(async ({ run }) => {
     'src/modules/notifications/acceptance-notifications.integration.test.ts',
     'src/modules/notifications/robot-notifications.integration.test.ts',
     'src/modules/notifications/manager-risk-digest.integration.test.ts',
+    'src/modules/notifications/submission-notifications.integration.test.ts',
     '--maxWorkers=1',
     '--no-file-parallelism'
   ])

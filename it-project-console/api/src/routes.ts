@@ -28,7 +28,7 @@ export async function registerRoutes(
     await refreshProjectRisks(tx, id)
   })
   registerWorkspaceRoutes(app, db, auth.authenticate, env.PROJECT_APPROVER_DING_USER_ID)
-  registerDemandRoutes(app, db, auth.authenticate)
+  registerDemandRoutes(app, db, auth.authenticate, env.PROJECT_APPROVER_DING_USER_ID)
   registerApprovalRoutes(app, db, auth.authenticate, env.PROJECT_APPROVER_DING_USER_ID)
   registerProjectRoutes(app, db, auth.authenticate, env.PROJECT_APPROVER_DING_USER_ID)
   if (env.NODE_ENV !== 'production' && env.DEV_LOGIN) {

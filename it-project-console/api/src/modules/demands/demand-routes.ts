@@ -6,9 +6,9 @@ import { AppError } from '../../lib/errors.js'
 import { deleteDemand } from './demand-deletion.js'
 import { DemandService } from './demand-service.js'
 import { demandSchema, demandUpdateSchema, commandSchema, idSchema } from './demand-schemas.js'
-export async function registerDemandRoutes(app: FastifyInstance, db: PrismaClient, authenticate: preHandlerHookHandler) {
+export async function registerDemandRoutes(app: FastifyInstance, db: PrismaClient, authenticate: preHandlerHookHandler, approverId = '') {
   const api = app.withTypeProvider<ZodTypeProvider>()
-  const service = new DemandService(db)
+  const service = new DemandService(db, approverId)
   const params = z.object({ id: idSchema })
   api.get('/api/demands', { preHandler: authenticate }, async () => ({
     data: await db.demand.findMany({ orderBy: { submittedAt: 'desc' }, include: { attachments: true } })
