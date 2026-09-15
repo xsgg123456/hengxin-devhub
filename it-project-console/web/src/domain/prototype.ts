@@ -191,6 +191,8 @@ export interface PrototypeDatabase {
   lifecycleEvents: DemoLifecycleEvent[]
 }
 export interface DemoLifecycleEvent {
+  requestId?: string
+  requestVersion?: number
   id: string
   entityType: 'project' | 'demand' | 'user' | 'proposal'
   entityId: string
@@ -204,6 +206,7 @@ export interface DemoLifecycleEvent {
     | 'return'
     | 'plan'
     | 'complete'
+    | 'historical-complete'
     | 'cancel'
     | 'archive'
     | 'reopen'

@@ -32,6 +32,7 @@
     return: '退回管理评估',
     plan: '保存项目计划',
     complete: '完成项目',
+    'historical-complete': '登记历史已交付',
     cancel: '取消项目',
     archive: '归档项目',
     reopen: '重新打开',

@@ -1,4 +1,5 @@
 import { AcceptanceService } from './acceptance-service.js'
+import { HistoricalDeliveryService, historicalDeliverySchema } from './historical-delivery-service.js'
 import { ProjectEditService } from './project-edit-service.js'
 import { projectEditSchema } from './project-edit-schemas.js'
 import { acceptanceSchema } from './acceptance-schemas.js'
@@ -13,6 +14,8 @@ export async function registerProjectRoutes(app: FastifyInstance, db: PrismaClie
   const api = app.withTypeProvider<ZodTypeProvider>()
   const service = new ProjectService(db, approverId)
   const editor = new ProjectEditService(db, approverId)
+  const historical = new HistoricalDeliveryService(db, approverId)
+  api.post<{ Params: { id: string } }>('/api/projects/:id/historical-delivery', { preHandler: authenticate, schema: { body: historicalDeliverySchema } }, async request => ({ data: await historical.complete(request.actor!, request.params.id, request.body) }))
   api.post<{ Params: { id: string } }>('/api/projects/:id/edit', { preHandler: authenticate, schema: { body: projectEditSchema } }, async request => ({ data: await editor.save(request.actor!, request.params.id, request.body) }))
   const acceptance = new AcceptanceService(db)
   api.post<{ Params: { id: string } }>('/api/projects/:id/acceptance', { preHandler: authenticate, schema: { body: acceptanceSchema } }, async request => ({ data: await acceptance.act(request.actor!, request.params.id, request.body) }))

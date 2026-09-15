@@ -39,7 +39,7 @@
         ><dt>需求部门</dt><dd>{{ project.department }}</dd></div
       >
       <div
-        ><dt>提出人</dt><dd>{{ demand ? userName(demand.submitterId) : '直接创建' }}</dd></div
+        ><dt>业务负责人</dt><dd>{{ businessOwnerId ? userName(businessOwnerId) : '未设置' }}</dd></div
       >
       <div
         ><dt>需求首次提出日期</dt><dd>{{ project.firstRequestedOn || demand?.firstRequestedOn || '待核实' }}</dd></div
@@ -101,6 +101,7 @@
   import { computed, ref } from 'vue'
   import ProjectEditDrawer from './project-edit-drawer.vue'
   import { canEditProject } from '@/utils/project-edit-permission'
+  import { projectBusinessOwner } from '@/utils/project-business-owner'
   const editOpen = ref(false)
   import { projectCode } from '@/utils/project-code'
   import type { DemoProject } from '@/domain/prototype'
@@ -115,6 +116,7 @@
   const props = defineProps<{ project: DemoProject }>()
   defineEmits<{ detail: [id: string]; update: [id: string] }>()
   const store = usePrototypeStore()
+  const businessOwnerId = computed(() => projectBusinessOwner(props.project, store.database?.demands ?? []))
   const userName = (id: string) =>
     store.database?.users.find((u) => u.id === id)?.name ?? '未知人员'
   const demand = computed(() =>

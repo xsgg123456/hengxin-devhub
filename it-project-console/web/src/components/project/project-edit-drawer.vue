@@ -44,7 +44,8 @@
       </ElForm>
       <ElAlert v-if="error" class="mt-4" :title="error" type="error" :closable="false" show-icon />
     </template>
-    <template #footer><div class="edit-footer"><span class="hint">{{ dirty ? '有未保存的修改' : '尚未修改' }}</span><div><ElButton :disabled="busy" @click="beforeClose(() => emit('update:modelValue', false))">取消</ElButton><ElButton :loading="busy" :disabled="!dirty" :type="pending ? 'default' : 'primary'" @click="prepare(false)">保存修改</ElButton><ElButton v-if="pending" type="primary" :loading="busy" @click="prepare(true)">保存并完成核实</ElButton></div></div></template>
+    <template #footer><div class="edit-footer"><span class="hint">{{ dirty ? '有未保存的修改' : '尚未修改' }}</span><div><ElButton v-if="canRegisterHistory" :disabled="busy" @click="openHistorical">登记历史已交付</ElButton><ElButton :disabled="busy" @click="beforeClose(() => emit('update:modelValue', false))">取消</ElButton><ElButton :loading="busy" :disabled="!dirty" :type="pending ? 'default' : 'primary'" @click="prepare(false)">保存修改</ElButton><ElButton v-if="pending" type="primary" :loading="busy" @click="prepare(true)">保存并完成核实</ElButton></div></div></template>
+    <HistoricalDeliveryDialog v-model="historicalOpen" :project="project" :dirty="dirty" @completed="emit('update:modelValue', false)" />
     <ElDialog v-model="confirmOpen" title="确认本次修改" width="min(560px, 92vw)" append-to-body :close-on-click-modal="false" :show-close="!busy" :close-on-press-escape="!busy">
       <p class="mb-3">{{ verifying ? '保存全部修改，并解除迁移待核实标记。' : '以下修改将同步到项目相关页面。' }}</p>
       <ElAlert v-if="store.currentUser.role === 'engineer' && (verifying || form?.primaryOwnerId !== store.currentUser.id)" title="保存后你将不再拥有此项目的完整编辑权限；后续资料纠正可联系指定管理员。" type="warning" :closable="false" class="mb-3" />
@@ -57,6 +58,8 @@
 </template>
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import HistoricalDeliveryDialog from './historical-delivery-dialog.vue'
+import { canEditProject } from '@/utils/project-edit-permission'
 import { runtimeConfig } from '@/config/runtime'
 import { editLiveProject } from '@/services/live-project-service'
 import { liveOperationKey } from '@/services/live-demand-service'
@@ -77,6 +80,12 @@ const futureDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth
 const form = ref<DemoProject>()
 const baseline = ref(''), initialForm = ref(''), tab = ref('basic'), reason = ref(''), error = ref('')
 const confirmOpen = ref(false), verifying = ref(false)
+const historicalOpen = ref(false)
+const canRegisterHistory = computed(() => canEditProject(store.currentUser, props.project) && props.project.status === 'active' && !props.project.archived)
+function openHistorical() {
+  if (dirty.value) { error.value = '有未保存的修改，请先保存或放弃修改，再登记历史交付'; return }
+  error.value = ''; historicalOpen.value = true
+}
 const busy = computed(() => store.saving)
 const dirty = computed(() => props.modelValue && JSON.stringify(form.value) !== initialForm.value)
 const { beforeClose } = useUnsavedForm('project-edit', dirty, busy)
@@ -122,7 +131,7 @@ watch(() => props.modelValue, open => {
   form.value.firstRequestedOn ||= store.database?.demands.find(d => d.id === form.value!.demandId)?.firstRequestedOn || ''
   form.value.stagePlans = PROJECT_STAGES.map(stage => form.value!.stagePlans?.find(p => p.stage === stage) ?? { stage, startDate: '', endDate: '' })
   initialForm.value = JSON.stringify(form.value)
-  tab.value = 'basic'; reason.value = ''; error.value = ''; confirmOpen.value = false
+  tab.value = 'basic'; reason.value = ''; error.value = ''; confirmOpen.value = false; historicalOpen.value = false
 }, { immediate: true })
 function prepare(verify: boolean) { verifying.value = verify; error.value = ''; confirmOpen.value = true }
 async function save() {
@@ -159,6 +168,5 @@ async function save() {
 .change-row { padding:8px 0; border-bottom:1px solid var(--el-border-color-lighter); overflow-wrap:anywhere; }
 @media(max-width:600px) { .edit-grid { grid-template-columns:1fr; } .plan-row { grid-template-columns:1fr 1fr; } .plan-row > span { grid-column:1 / -1; } }
 </style>
-
 
 

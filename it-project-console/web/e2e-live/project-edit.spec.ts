@@ -81,3 +81,29 @@ test('正式迁移项目仅主责可核实，核实后完整编辑入口收回',
   await expect(detail).toBeVisible()
   await expect(detail.getByRole('button', { name: '编辑项目', exact: true })).toHaveCount(0)
 })
+
+test('正式历史交付补录保存实际日期，刷新保留历史完成状态', async ({ page }) => {
+  test.setTimeout(90000)
+  await login(page, 'user-manager-chen')
+  const before = await workspace(page)
+  const project = before.database.projects.find(p => p.name === '正常项目完整编辑测试')!
+  expect(project).toBeTruthy()
+  await page.goto('/#/project-overview?projectId=' + project.id)
+  const detail = page.getByRole('dialog', {name:'项目详情',exact:true})
+  await detail.getByRole('button', {name:'编辑项目',exact:true}).click()
+  const editor = page.getByRole('dialog', {name:'编辑项目',exact:true})
+  await editor.getByRole('button', {name:'登记历史已交付',exact:true}).click()
+  const historical = page.getByRole('dialog', {name:'登记历史已交付',exact:true})
+  await date(historical, '实际交付日期', '2026-08-01')
+  await historical.getByLabel('补录原因', {exact:true}).fill('核对历史交付凭据后补录')
+  const saved = page.waitForResponse(r=>new URL(r.url()).pathname===`/api/projects/${project.id}/historical-delivery`&&r.request().method()==='POST')
+  await historical.getByRole('button', {name:'确认登记',exact:true}).click()
+  const response = await saved
+  expect(response.ok(), await response.text()).toBeTruthy()
+  await expect(editor).not.toBeVisible()
+  await page.reload()
+  await expect(detail).toContainText('历史完成 / 无业务验收记录')
+  await expect(detail).toContainText('登记历史已交付')
+  const changed=(await workspace(page)).database.projects.find(p=>p.id===project.id)!
+  expect(changed).toMatchObject({status:'completed',migrationVerified:true,actualCompletedAt:'2026-08-01T00:00:00.000Z'})
+})

@@ -39,6 +39,47 @@ function input(p:Awaited<ReturnType<typeof row>>,extra:Record<string,unknown>={}
 }
 const save=(id:string,payload:Record<string,unknown>,user=manager)=>runtime.app.inject({method:'POST',url:`/api/projects/${id}/edit`,payload,headers:{cookie:cookies[user],origin:env.WEB_ORIGIN}})
 describe('正式完整编辑API',()=>{
+  const complete = (id:string, payload:Record<string,unknown>, user=manager) => runtime.app.inject({method:'POST',url:`/api/projects/${id}/historical-delivery`,payload,headers:{cookie:cookies[user],origin:env.WEB_ORIGIN}})
+  it('历史交付权限、日期及关闭状态受服务端保护',async()=>{
+    const p=await fixture(), body={requestId:key(),version:p.version,deliveredOn:'2024-06-01',reason:'核对旧系统交付记录'}
+    expect((await complete(p.id,body,collab)).statusCode).toBe(403)
+    expect((await complete(p.id,{...body,deliveredOn:'2099-01-01'})).statusCode).toBe(400)
+    expect((await complete(p.id,{...body,deliveredOn:'2023-12-31'})).statusCode).toBe(400)
+    expect((await complete(p.id,{...body,reason:''})).statusCode).toBe(400)
+    expect((await complete(p.id,{...body,acceptanceStatus:'accepted'})).statusCode).toBe(400)
+    const normal=await fixture(false), normalBody={...body,requestId:key(),version:normal.version}
+    expect((await complete(normal.id,normalBody,engineer)).statusCode).toBe(403)
+    expect((await complete(normal.id,normalBody)).statusCode).toBe(200)
+    expect((await complete(normal.id,{...normalBody,requestId:key(),version:normal.version+1})).statusCode).toBe(409)
+    expect((await row(p.id)).status).toBe('ACTIVE')
+  })
+  it('历史交付使用实际日期且不伪造验收，取消旧待办，重复请求不重复补录或通知',async()=>{
+    const p=await fixture()
+    const previousAcceptance={id:key(),action:'submit',actorId:engineer,createdAt:'2026-01-01T00:00:00.000Z',round:1,summary:'原验收提交记录',ownerId:business,url:''}
+    await db.project.update({where:{id:p.id},data:{acceptanceStatus:'pending',acceptanceRound:1,acceptanceHistory:[previousAcceptance],blocker:'旧阻塞',risks:['延期']}})
+    await db.stageHistory.create({data:{projectId:p.id,stage:'开发编码',status:'current',enteredAt:new Date()}})
+    const pending=await db.notificationOutbox.create({data:{projectId:p.id,recipientId:business,eventType:'ACCEPTANCE_SUBMITTED',idempotencyKey:key(),payload:{acceptanceRound:1}}})
+    const sent=await db.notificationOutbox.create({data:{projectId:p.id,recipientId:business,eventType:'ACCEPTANCE_SUBMITTED',idempotencyKey:key(),payload:{acceptanceRound:1},status:'SENT',deliveryLog:{create:{state:'SENT',channel:'robot',taskId:'receipt-preserved'}}}})
+    const body={requestId:key(),version:p.version,deliveredOn:'2024-06-01',reason:'补录旧系统已交付事实'}
+    const response=await complete(p.id,body,engineer)
+    expect(response.statusCode).toBe(200)
+    const replay=await complete(p.id,body,engineer)
+    expect(replay.json()).toEqual(response.json())
+    expect((await complete(p.id,{...body,reason:'修改重放内容'},engineer)).statusCode).toBe(409)
+    const changed=await row(p.id)
+    expect(changed).toMatchObject({status:'COMPLETED',simpleStatus:'completed',stage:'验收交付',overallProgress:100,migrationVerified:true,acceptanceStatus:'none',blocker:'',risks:[]})
+    expect(changed.actualCompletedAt?.toISOString()).toBe('2024-06-01T00:00:00.000Z')
+    expect(changed.acceptanceHistory).toEqual([previousAcceptance,expect.objectContaining({action:'invalidate',actorId:engineer})])
+    expect(changed.name).not.toContain('【迁移待核实】')
+    expect(changed.updatedAt.getTime()).toBeGreaterThan(changed.actualCompletedAt!.getTime())
+    expect(await db.stageHistory.count({where:{projectId:p.id,completedAt:{not:null}}})).toBe(1)
+    expect(await db.stageHistory.count({where:{projectId:p.id,stage:'开发编码',completedAt:null,interruptedAt:{not:null}}})).toBe(1)
+    expect((await db.notificationLog.findUniqueOrThrow({where:{outboxId:pending.id}})).state).toBe('SKIPPED')
+    expect((await db.notificationLog.findUniqueOrThrow({where:{outboxId:sent.id}})).taskId).toBe('receipt-preserved')
+    expect(await db.notificationOutbox.count({where:{projectId:p.id}})).toBe(2)
+    expect(await db.lifecycleEvent.count({where:{entityId:p.id,action:'historical-complete'}})).toBe(1)
+    expect((await complete(p.id,{...body,requestId:key(),version:changed.version},engineer)).statusCode).toBe(403)
+  })
   it('显式清空业务负责人不恢复原提出人，后续完成通知只按当前人员产生',async()=>{
     const p=await fixture(), next=await db.user.create({data:{name:'业务验收专员',department:'业务',role:'BUSINESS'}})
     const plan={stage:'验收交付',startDate:'2026-12-02',endDate:'2026-12-02',originalStartDate:'2026-12-02',originalEndDate:'2026-12-02'}

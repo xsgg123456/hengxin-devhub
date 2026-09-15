@@ -275,6 +275,7 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
         'return',
         'plan',
         'complete',
+        'historical-complete',
         'cancel',
         'archive',
         'reopen',

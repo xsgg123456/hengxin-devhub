@@ -25,8 +25,8 @@
       />
       <ElDescriptions class="mt-5 mb-5" :column="2" border>
         <ElDescriptionsItem label="需求部门">{{ project.department }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="提出人">{{
-          demand ? userName(demand.submitterId) : '直接创建'
+        <ElDescriptionsItem label="业务负责人">{{
+          businessOwnerId ? userName(businessOwnerId) : '未设置'
         }}</ElDescriptionsItem>
         <ElDescriptionsItem label="主负责人">{{
           userName(project.primaryOwnerId)
@@ -123,6 +123,7 @@
   import { computed, ref } from 'vue'
   import ProjectEditDrawer from './project-edit-drawer.vue'
   import { canEditProject } from '@/utils/project-edit-permission'
+  import { projectBusinessOwner } from '@/utils/project-business-owner'
   const editOpen = ref(false)
   import type { DemoProject } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'
@@ -146,6 +147,7 @@
   const project = computed(
     () => store.visibleProjects.find((p) => p.id === props.project?.id) ?? null
   )
+  const businessOwnerId = computed(() => project.value ? projectBusinessOwner(project.value, store.database?.demands ?? []) : null)
   const userName = (id: string) =>
     store.database?.users.find((u) => u.id === id)?.name ?? '未知人员'
   const demand = computed(() =>
