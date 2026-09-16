@@ -1,7 +1,7 @@
 <template>
   <BusinessPageState>
     <div>
-      <div class="flex-cb mb-5">
+      <div class="flex-cb flex-wrap gap-3 mb-5">
         <div
           ><h2 class="text-xl font-medium text-g-900">我的需求 / 需求池</h2
           ><p class="mt-1.5 text-sm text-g-500"
@@ -21,7 +21,13 @@
           :closable="false"
           class="mb-4"
         />
-        <ElButton class="mt-4" type="primary" @click="openEditor()">提交正式项目需求</ElButton>
+        <div v-if="prototypeStore.currentUser.role === 'business'" class="mb-4">
+          <SubmissionGuide />
+        </div>
+        <div class="mt-4 flex flex-wrap gap-3">
+          <ElButton type="primary" @click="openEditor()">提交正式项目需求</ElButton>
+          <ElButton type="primary" plain class="!ml-0" @click="openOptimizationEditor()">提交优化需求</ElButton>
+        </div>
       </div>
       <div class="art-card p-5 mb-5">
         <div class="art-card-header mb-4"
@@ -214,6 +220,7 @@
       <DemandEditor
         v-if="editing"
         :demand="selected"
+        :optimization="creatingOptimization"
         @close="editing = false"
         @saved="editing = false"
       />
@@ -233,6 +240,7 @@
   import { demandCode } from '@/utils/demand-code'
   import { dateRangeShortcuts } from '@/utils/date-range-shortcuts'
   import BusinessPageState from '@/components/system/business-page-state.vue'
+  import SubmissionGuide from '@/components/demand/submission-guide.vue'
   import DemandEditor from '@/components/demand/demand-editor.vue'
   import DemandDetail from '@/components/demand/demand-detail.vue'
   import DemandReview from '@/components/demand/demand-review.vue'
@@ -254,6 +262,8 @@
     demands,
     metrics,
     editing,
+    creatingOptimization,
+    openOptimizationEditor,
     selected,
     detail,
     deepLinkError,

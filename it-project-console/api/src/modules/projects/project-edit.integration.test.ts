@@ -39,6 +39,40 @@ function input(p:Awaited<ReturnType<typeof row>>,extra:Record<string,unknown>={}
 }
 const save=(id:string,payload:Record<string,unknown>,user=manager)=>runtime.app.inject({method:'POST',url:`/api/projects/${id}/edit`,payload,headers:{cookie:cookies[user],origin:env.WEB_ORIGIN}})
 describe('正式完整编辑API',()=>{
+  it('最终名称和日期只同步来源需求一次，保留子优化及历史，并发旧版本全部拒绝',async()=>{
+    const p=await fixture(false), demand=await db.demand.findUniqueOrThrow({where:{id:p.demandId!}})
+    const child=await db.demand.create({data:{name:'独立优化标题',ownerId:business,parentProjectId:p.id}})
+    const body=input(p,{name:'统一新名称',firstRequestedOn:'2023-12-15'})
+    const results=await Promise.all([save(p.id,body),save(p.id,body)])
+    expect(results.map(r=>r.statusCode)).toEqual([200,200])
+    expect(results[0].json()).toEqual(results[1].json())
+    const changed=await db.demand.findUniqueOrThrow({where:{id:demand.id}})
+    expect(changed).toMatchObject({name:'统一新名称',version:demand.version+1,firstRequestedOn:new Date('2023-12-15')})
+    const event=await db.lifecycleEvent.findFirstOrThrow({where:{entityType:'demand',entityId:demand.id}})
+    expect(event).toMatchObject({authorId:manager,reason:body.reason,before:{name:demand.name},after:{name:'统一新名称',firstRequestedOn:'2023-12-15'}})
+    expect((await save(p.id,input(p,{name:'过期覆盖'}))).statusCode).toBe(409)
+    expect((await save(p.id,{...body,name:'复用请求覆盖'})).statusCode).toBe(409)
+    expect(await db.demand.findUniqueOrThrow({where:{id:demand.id}})).toEqual(changed)
+    expect((await db.demand.findUniqueOrThrow({where:{id:child.id}})).name).toBe('独立优化标题')
+    expect((await save(p.id,input(await row(p.id)))).statusCode).toBe(200)
+    expect(await db.demand.findUniqueOrThrow({where:{id:demand.id}})).toEqual(changed)
+    expect(await db.lifecycleEvent.findUniqueOrThrow({where:{id:event.id}})).toEqual(event)
+  })
+  it('审计失败使项目和需求改名全部回滚，原请求可重试；直接项目不触碰需求',async()=>{
+    const p=await fixture(false), demand=await db.demand.findUniqueOrThrow({where:{id:p.demandId!}})
+    const body=input(p,{name:'回滚改名'})
+    await db.$executeRaw`ALTER TABLE lifecycle_events ADD CONSTRAINT name_sync_test_fault CHECK (entity_type <> 'demand') NOT VALID`
+    try {
+      expect((await save(p.id,body)).statusCode).toBe(500)
+      expect(await row(p.id)).toEqual(p)
+      expect(await db.demand.findUniqueOrThrow({where:{id:demand.id}})).toEqual(demand)
+    } finally { await db.$executeRaw`ALTER TABLE lifecycle_events DROP CONSTRAINT name_sync_test_fault` }
+    expect((await save(p.id,body)).statusCode).toBe(200)
+    await db.project.update({where:{id:p.id},data:{demandId:null}})
+    const linked=await db.demand.findUniqueOrThrow({where:{id:demand.id}})
+    expect((await save(p.id,input(await row(p.id),{name:'直接项目新名称'}))).statusCode).toBe(200)
+    expect(await db.demand.findUniqueOrThrow({where:{id:demand.id}})).toEqual(linked)
+  })
   const complete = (id:string, payload:Record<string,unknown>, user=manager) => runtime.app.inject({method:'POST',url:`/api/projects/${id}/historical-delivery`,payload,headers:{cookie:cookies[user],origin:env.WEB_ORIGIN}})
   it('历史交付权限、日期及关闭状态受服务端保护',async()=>{
     const p=await fixture(), body={requestId:key(),version:p.version,deliveredOn:'2024-06-01',reason:'核对旧系统交付记录'}
@@ -71,6 +105,7 @@ describe('正式完整编辑API',()=>{
     expect(changed.actualCompletedAt?.toISOString()).toBe('2024-06-01T00:00:00.000Z')
     expect(changed.acceptanceHistory).toEqual([previousAcceptance,expect.objectContaining({action:'invalidate',actorId:engineer})])
     expect(changed.name).not.toContain('【迁移待核实】')
+    expect((await db.demand.findUniqueOrThrow({where:{id:p.demandId!}})).name).toBe(changed.name)
     expect(changed.updatedAt.getTime()).toBeGreaterThan(changed.actualCompletedAt!.getTime())
     expect(await db.stageHistory.count({where:{projectId:p.id,completedAt:{not:null}}})).toBe(1)
     expect(await db.stageHistory.count({where:{projectId:p.id,stage:'开发编码',completedAt:null,interruptedAt:{not:null}}})).toBe(1)

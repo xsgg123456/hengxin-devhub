@@ -12,6 +12,7 @@ import { cancelAcceptanceNotifications } from '../notifications/acceptance-notif
 import { refreshProjectRisks } from '../risks/risk-scan-job.js'
 import { mapProject } from '../workspace/read-model.js'
 import { readStagePlans } from './project-plan-state.js'
+import { auditDemandName } from './proposal-service.js'
 
 export const historicalDeliverySchema = commandSchema.extend({
   deliveredOn: dateSchema.refine(value => value <= new Intl.DateTimeFormat('en-CA', {
@@ -26,6 +27,8 @@ export class HistoricalDeliveryService {
     const input = historicalDeliverySchema.parse(body)
     return command(this.db, actor, input.requestId, { operation: 'historical-delivery', id, input }, async tx => {
       await notificationLock(tx)
+      const source = await tx.project.findUnique({ where: { id }, select: { demandId: true } })
+      if (source?.demandId) await tx.$queryRaw`SELECT id FROM demands WHERE id = ${source.demandId} FOR UPDATE`
       const project = await lockedProject(tx, id, input.version)
       await tx.$queryRaw`SELECT id FROM users WHERE id = ${actor.id} FOR SHARE`
       const user = await tx.user.findUnique({ where: { id: actor.id } })
@@ -53,6 +56,13 @@ export class HistoricalDeliveryService {
         acceptanceHistory: acceptanceHistory(project, 'invalidate', actor.id, now, `历史交付补录：${input.reason}`),
         lastOverallUpdatedAt: now, updatedAt: now, version: { increment: 1 }
       }, include: { members: true } })
+      if (changed.demandId) {
+        const demand = await tx.demand.findUniqueOrThrow({ where: { id: changed.demandId } })
+        if (demand.name !== changed.name) {
+          await tx.demand.update({ where: { id: demand.id }, data: { name: changed.name, version: { increment: 1 } } })
+          await auditDemandName(tx, actor, demand, changed.name, input.reason)
+        }
+      }
       await refreshProjectRisks(tx, id, now)
       const after = await tx.project.findUniqueOrThrow({ where: { id }, include: { members: true } })
       await tx.lifecycleEvent.create({ data: { entityType: 'project', entityId: id, authorId: actor.id, action: 'historical-complete',

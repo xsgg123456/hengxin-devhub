@@ -17,6 +17,35 @@ function setup() {
   return { snapshot, p, baseline, edit }
 }
 describe('全局编辑本地预览', () => {
+  it('按最终核实名称和日期同步来源需求一次，不改子优化及历史；冲突不写入', () => {
+    const {snapshot,p,baseline,edit}=setup()
+    const demand=snapshot.database.demands.find(d=>d.id===p.demandId)!
+    const child={...structuredClone(demand),id:'child-name-test',name:'独立优化名称',parentProjectId:p.id}
+    snapshot.database.demands.push(child)
+    snapshot.database.lifecycleEvents.push({id:'L-000001',entityType:'demand',entityId:demand.id,action:'edit',authorId:snapshot.activeUserId,createdAt:'2024-01-01T00:00:00.000Z',reason:'原事件',before:{name:'历史名称'},after:{name:demand.name}})
+    const old=structuredClone(demand), history=structuredClone(snapshot.database.lifecycleEvents)
+    edit.name='【迁移待核实】统一名称'; edit.firstRequestedOn='2024-01-01'
+    saveProjectEditPreview(snapshot,edit,baseline,'核实名称日期',true)
+    expect(p.name).toBe('统一名称')
+    expect(demand).toMatchObject({name:p.name,firstRequestedOn:'2024-01-01',version:(old.version??1)+1})
+    expect(child.name).toBe('独立优化名称')
+    expect(snapshot.database.lifecycleEvents.find(e=>e.entityType==='demand' && e.entityId===demand.id)).toMatchObject({authorId:snapshot.activeUserId,reason:'核实名称日期',before:{name:old.name},after:{name:p.name,firstRequestedOn:'2024-01-01'}})
+    expect(snapshot.database.lifecycleEvents.slice(-history.length)).toEqual(history)
+    snapshot.activeUserId='user-manager-chen'
+    const saved=JSON.stringify(snapshot.database)
+    expect(()=>saveProjectEditPreview(snapshot,edit,baseline,'过期提交',false)).toThrow('更新')
+    expect(JSON.stringify(snapshot.database)).toBe(saved)
+    saveProjectEditPreview(snapshot,structuredClone(p),JSON.stringify(p),'无字段变更',false)
+    expect(demand.version).toBe((old.version??1)+1)
+  })
+  it('无关联需求的直接项目改名不改变任何需求', () => {
+    const {snapshot,p}=setup()
+    p.demandId=null
+    const demands=structuredClone(snapshot.database.demands)
+    saveProjectEditPreview(snapshot,{...structuredClone(p),name:'直接项目名称'},JSON.stringify(p),'改名',false)
+    expect(snapshot.database.demands).toEqual(demands)
+    expect(p.name).toBe('【迁移待核实】直接项目名称')
+  })
   it('优化单节点完整编辑维护日期并拒绝待验收改计划、清空及原里程碑分叉', () => {
     const { snapshot, p } = setup()
     snapshot.activeUserId = 'user-manager-chen'
@@ -169,5 +198,3 @@ describe('全局编辑本地预览', () => {
     expect(isPrototypeSnapshot(snapshot)).toBe(true)
   })
 })
-
-

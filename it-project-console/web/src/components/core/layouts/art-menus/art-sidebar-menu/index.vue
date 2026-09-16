@@ -318,7 +318,7 @@
    * 监听窗口尺寸变化，自动处理移动端菜单
    */
   watch(width, (newWidth) => {
-    if (newWidth < MOBILE_BREAKPOINT) {
+    if (newWidth < 1024) {
       settingStore.setMenuOpen(false)
       if (!menuOpen.value) {
         showMobileModal.value = false
@@ -326,7 +326,7 @@
     } else {
       showMobileModal.value = false
     }
-  })
+  }, { immediate: true })
 
   /**
    * 监听菜单开关状态变化

@@ -1,5 +1,3 @@
-export const MIN_DESKTOP_WIDTH = 1024
-
 export function isMobileUserAgent(userAgent: string): boolean {
   return /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(userAgent)
 }
@@ -7,8 +5,8 @@ export function isMobileUserAgent(userAgent: string): boolean {
 export function isSupportedDevice(): boolean {
   if (typeof window === 'undefined') return true
 
-  const wideEnough = window.innerWidth >= MIN_DESKTOP_WIDTH
-  const primaryPointerIsCoarse = window.matchMedia?.('(pointer: coarse)').matches ?? false
-
-  return wideEnough && !primaryPointerIsCoarse && !isMobileUserAgent(window.navigator.userAgent)
+  const { userAgent, maxTouchPoints = 0 } = window.navigator
+  // iPadOS may identify as Macintosh; touch-enabled Windows desktops remain supported.
+  const desktopModeIPad = /Macintosh/i.test(userAgent) && maxTouchPoints > 1
+  return !isMobileUserAgent(userAgent) && !desktopModeIPad
 }

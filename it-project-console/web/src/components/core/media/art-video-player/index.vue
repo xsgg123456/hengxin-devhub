@@ -39,6 +39,8 @@
     muted: false
   })
 
+  const emit = defineEmits<{ error: [error: unknown] }>()
+
   // 设置属性默认值
 
   // 播放器实例引用
@@ -99,6 +101,7 @@
     // 错误事件监听器
     playerInstance.value.on('error', (error) => {
       console.error('Error occurred:', error)
+      emit('error', error)
     })
   })
 

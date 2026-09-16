@@ -9,7 +9,7 @@
       <p class="mt-3 text-sm leading-7 text-g-500"
         >第一版仅支持电脑浏览器或电脑钉钉客户端打开，业务数据尚未加载。</p
       >
-      <ElTag class="mt-6" effect="plain" round>最低工作区宽度 1024px</ElTag>
+      <ElTag class="mt-6" effect="plain" round>暂不支持手机和平板</ElTag>
     </section>
   </main>
 </template>

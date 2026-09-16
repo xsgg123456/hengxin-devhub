@@ -40,6 +40,7 @@ export function useDemandPage() {
     { immediate: true }
   )
   const editing = ref(false)
+  const creatingOptimization = ref(false)
   const selected = ref<DemoDemand>()
   const detail = ref<DemoDemand>()
   const { deepLinkError, closeDetail } = useDemandDeepLink(
@@ -140,7 +141,13 @@ export function useDemandPage() {
     else review.value = demand
   }
   function openEditor(demand?: DemoDemand) {
+    creatingOptimization.value = false
     selected.value = demand
+    editing.value = true
+  }
+  function openOptimizationEditor() {
+    selected.value = undefined
+    creatingOptimization.value = true
     editing.value = true
   }
   function openProject(demandId: string) {
@@ -230,6 +237,8 @@ export function useDemandPage() {
     demands,
     metrics,
     editing,
+    creatingOptimization,
+    openOptimizationEditor,
     selected,
     detail,
     deepLinkError,

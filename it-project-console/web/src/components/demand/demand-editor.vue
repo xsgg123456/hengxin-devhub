@@ -2,7 +2,7 @@
   <ElDrawer
     :model-value="true"
     :title="isOptimization ? '优化需求' : demand ? '编辑本人需求' : '提交正式项目需求'"
-    size="760px"
+    size="min(760px, 100vw)"
     :before-close="close"
     append-to-body
   >
@@ -15,9 +15,10 @@
     />
     <ElAlert v-if="failure" :title="failure" type="error" :closable="false" class="mb-5" />
     <PrototypeSaveRecovery v-if="failure && runtimeConfig.isPrototype" />
-    <p v-if="isOptimization" class="mb-4 text-sm text-g-600">原项目：<ElButton link type="primary" @click="router.push({ path: '/project-overview', query: { projectId: form.parentProjectId! } })">{{ store.visibleProjects.find(p => p.id === form.parentProjectId)?.name || '查看原项目' }}</ElButton></p>
     <ElAlert v-if="stale" :title="stale" type="warning" :closable="false" class="mb-5" />
     <ElForm ref="formRef" :model="form" :rules="rules" label-position="top" :disabled="saving" scroll-to-error>
+      <DemandParentSelect v-if="isOptimization" v-model="form.parentProjectId" :locked="!!liveId || !!props.parentProjectId || draftLocked" :error="errors.parentProjectId" />
+      <p v-if="isOptimization && draftLocked && !liveId" class="mb-4 text-xs text-g-500">{{ busy ? '正在确认草稿，关联原项目暂时锁定。' : '草稿创建结果待确认，请重试保存或上传以恢复；关联原项目暂时锁定。' }}</p>
       <ElFormItem :label="isOptimization ? '优化标题' : '项目名称'" prop="name" :error="errors.name" required>
         <ElInput v-model="form.name" maxlength="100" show-word-limit />
       </ElFormItem>
@@ -65,7 +66,7 @@
         <MaterialField
           ref="materialField"
           v-model="form.attachments"
-          :disabled="saving"
+          :disabled="saving || (isOptimization && !form.parentProjectId)"
           :ensure-demand="ensureDraft"
           :optional="isOptimization"
           @busy="uploading = $event"
@@ -99,7 +100,6 @@
   import { saveDemand } from '@/services/workflow-service'
   import { validateMaterials } from '@/services/workflow-validation'
   import { demandMaterials } from '@/services/demand-materials'
-  import { useRouter } from 'vue-router'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { currentDate } from '@/utils/project-display'
   import { ApiError } from '@/services/api-client'
@@ -109,10 +109,11 @@
     type LiveDemandInput
   } from '@/services/live-demand-service'
   import MaterialField from './material-field.vue'
-  const props = defineProps<{ demand?: DemoDemand; parentProjectId?: string }>()
+  import DemandParentSelect from './demand-parent-select.vue'
+  import { useDemandDraftRequest } from '@/hooks/business/use-demand-draft-request'
+  const props = defineProps<{ demand?: DemoDemand; parentProjectId?: string; optimization?: boolean }>()
   const emit = defineEmits<{ close: []; saved: [] }>()
   const store = usePrototypeStore()
-  const router = useRouter()
   const formRef = ref<FormInstance>()
   const materialField = ref<{ releaseCleanup: () => void }>()
   const form = reactive({
@@ -123,7 +124,7 @@
     expectedLaunchDate: props.demand?.expectedLaunchDate || '',
     attachments: demandMaterials(props.demand).map(file => ({ ...file }))
   })
-  const isOptimization = computed(() => !!form.parentProjectId)
+  const isOptimization = computed(() => props.optimization || !!form.parentProjectId)
   const rules = computed<FormRules>(() => ({
     name: [{ required: true, whitespace: true, message: isOptimization.value ? '请填写优化标题' : '请填写项目名称', trigger: 'blur' }],
     description: [{ required: true, whitespace: true, message: '请说明要解决的问题', trigger: 'blur' }],
@@ -152,11 +153,12 @@
       : latest.version !== liveVersion.value ? '该需求已被更新；填写内容已保留，请复制需要保留的内容，关闭后重新打开核对。' : ''
   })
   const operationKey = liveOperationKey()
-  let draftInput: LiveDemandInput | undefined
-  let draftPromise: Promise<string> | undefined
   const submitting = ref(false)
   const failure = ref('')
   const requestId = props.demand?.requestId || crypto.randomUUID()
+  const { requestDraft, draftLocked } = useDemandDraftRequest(
+    (value, key) => store.runLiveCommand(() => saveLiveDemand(value, key, false)), requestId
+  )
   watch(dirty, (value) => store.setDirty('demand-form', value))
   onBeforeUnmount(() => store.setDirty('demand-form', false))
   function pastDate(date: Date) {
@@ -165,21 +167,12 @@
     return label < currentDate()
   }
   async function ensureDraft(): Promise<string> {
+    if (isOptimization.value && !form.parentProjectId) throw new Error('请先选择关联原项目')
     if (liveId.value) return liveId.value
-    if (!draftPromise) {
-      draftInput ??= { ...input(), attachments: [], prd: null, prototype: null }
-      draftPromise = store
-        .runLiveCommand(() => saveLiveDemand(draftInput!, requestId, false))
-        .then((result) => {
-          liveId.value = result.id
-          liveVersion.value = result.version
-          return result.id
-        })
-        .finally(() => {
-          draftPromise = undefined
-        })
-    }
-    return draftPromise
+    const result = await requestDraft(input())
+    liveId.value = result.id
+    liveVersion.value = result.version
+    return result.id
   }
   async function close() {
     if (busy.value) return
@@ -200,6 +193,7 @@
     if (busy.value) return
     if (stale.value) { failure.value = stale.value; return }
     Object.keys(errors).forEach((key) => delete errors[key])
+    if (isOptimization.value && !form.parentProjectId) errors.parentProjectId = '请选择关联原项目'
     const requiresMaterials = submit || props.demand?.status === 'pending'
     if (requiresMaterials && !form.name.trim()) errors.name = isOptimization.value ? '请填写优化标题' : '请填写项目名称'
     if (requiresMaterials && isOptimization.value && !form.optimizationOutcome.trim()) errors.optimizationOutcome = '请填写期望效果 / 验收标准'

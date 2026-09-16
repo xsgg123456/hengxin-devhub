@@ -128,7 +128,6 @@ export function saveProjectEditPreview(
   for (const key of editable) Object.assign(current, { [key]: edited[key] })
   current.firstRequestedOn = firstRequestedOn
   const demand = snapshot.database.demands.find(d => d.id === current.demandId)
-  if (demand) demand.firstRequestedOn = firstRequestedOn
   current.stagePlans = current.stagePlans?.filter(p => p.startDate && p.endDate)
   if (current.parentProjectId) {
     const delivery = current.stagePlans?.find(p => p.stage === '验收交付')
@@ -142,6 +141,15 @@ export function saveProjectEditPreview(
   if (verify) {
     current.migrationVerified = true
     current.name = current.name.replace(/^【迁移待核实】\s*/, '')
+  }
+  if (demand && (demand.name !== current.name || (demand.firstRequestedOn || '') !== firstRequestedOn)) {
+    const before = { name: demand.name, firstRequestedOn: demand.firstRequestedOn || '', version: demand.version ?? 1 }
+    demand.name = current.name
+    demand.firstRequestedOn = firstRequestedOn
+    demand.version = before.version + 1
+    recordLifecycle(snapshot, { entityType: 'demand', entityId: demand.id, action: 'edit',
+      createdAt: now, reason: reason.trim(), before,
+      after: { name: demand.name, firstRequestedOn, version: demand.version } })
   }
   const index = PROJECT_STAGES.indexOf(current.stage)
   current.stageExpectedDate =

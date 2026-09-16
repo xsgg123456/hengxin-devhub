@@ -34,6 +34,32 @@ beforeAll(async () => {
 })
 afterAll(async () => { await runtime?.app.close(); await db.$disconnect() })
 describe('工程师接单隔离数据库闭环', () => {
+  it('待接单重新评估同事务同步名称，重试幂等，接单纠正旧名称且保留日期和历史', async () => {
+    const demand=await db.demand.create({data:{name:'旧需求名称',ownerId:business,status:'AWAITING_ENGINEER',firstRequestedOn:new Date('2024-01-01')}})
+    const p=await db.projectProposal.create({data:{...input(),approvedLaunchDate:new Date('2099-10-08'),demandId:demand.id,createdBy:manager}})
+    const body={...input(),version:p.version,name:'重新评估名称'}
+    const path=`/api/project-proposals/${p.id}/resubmit`
+    await db.$executeRaw`ALTER TABLE notification_outbox ADD CONSTRAINT name_resubmit_test_fault CHECK (event_type <> 'PROPOSAL_ASSIGNED') NOT VALID`
+    try {
+      expect((await call('POST',path,body)).statusCode).toBe(500)
+      expect(await db.demand.findUniqueOrThrow({where:{id:demand.id}})).toEqual(demand)
+      expect(await db.projectProposal.findUniqueOrThrow({where:{id:p.id}})).toEqual(p)
+      expect(await db.lifecycleEvent.count({where:{entityType:'demand',entityId:demand.id}})).toBe(0)
+    } finally { await db.$executeRaw`ALTER TABLE notification_outbox DROP CONSTRAINT name_resubmit_test_fault` }
+    const responses=await Promise.all([call('POST',path,body),call('POST',path,body)])
+    expect(responses.map(r=>r.statusCode)).toEqual([200,200])
+    expect(responses[0].json()).toEqual(responses[1].json())
+    expect(await db.demand.findUniqueOrThrow({where:{id:demand.id}})).toMatchObject({name:body.name,version:2,firstRequestedOn:demand.firstRequestedOn})
+    expect((await call('POST',path,{...body,requestId:key(),name:'过期名称'})).statusCode).toBe(409)
+    const history=await db.lifecycleEvent.findFirstOrThrow({where:{entityType:'demand',entityId:demand.id}})
+    expect(history).toMatchObject({authorId:manager,reason:'接单前重新评估项目名称',before:{name:demand.name},after:{name:body.name}})
+    await db.demand.update({where:{id:demand.id},data:{name:'存量不一致'}})
+    const accepted=await confirm(p.id,2)
+    expect(accepted.statusCode,accepted.body).toBe(200)
+    expect(await db.demand.findUniqueOrThrow({where:{id:demand.id}})).toMatchObject({name:body.name,version:3})
+    expect(await db.project.findUniqueOrThrow({where:{id:accepted.json().data.projectId}})).toMatchObject({name:body.name,firstRequestedOn:demand.firstRequestedOn})
+    expect(await db.lifecycleEvent.findUniqueOrThrow({where:{id:history.id}})).toEqual(history)
+  })
   it('直接创建只存提案，通知深链，工程师唯一权限、幂等和并发接单', async () => {
     const demands = await db.demand.count(), projects = await db.project.count(), stages = await db.stageHistory.count()
     const body = input()

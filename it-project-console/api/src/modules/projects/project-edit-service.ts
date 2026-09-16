@@ -114,10 +114,11 @@ export class ProjectEditService {
       const changed = await tx.project.update({ where: { id }, data, include: { members: true } })
       if (project.demandId) {
         const demand = await tx.demand.findUniqueOrThrow({ where: { id: project.demandId } })
-        if (demand.firstRequestedOn?.getTime() !== date(input.firstRequestedOn)?.getTime()) {
-          await tx.demand.update({ where: { id: demand.id }, data: { firstRequestedOn: date(input.firstRequestedOn), version: { increment: 1 } } })
+        if (demand.name !== changed.name || demand.firstRequestedOn?.getTime() !== changed.firstRequestedOn?.getTime()) {
+          await tx.demand.update({ where: { id: demand.id }, data: { name: changed.name, firstRequestedOn: changed.firstRequestedOn, version: { increment: 1 } } })
           await tx.lifecycleEvent.create({ data: { entityType: 'demand', entityId: demand.id, authorId: actor.id, action: 'edit', reason: input.reason,
-            before: { firstRequestedOn: demand.firstRequestedOn?.toISOString().slice(0, 10) ?? '' }, after: { firstRequestedOn: input.firstRequestedOn ?? '' } } })
+            before: { name: demand.name, firstRequestedOn: demand.firstRequestedOn?.toISOString().slice(0, 10) ?? '', version: demand.version },
+            after: { name: changed.name, firstRequestedOn: changed.firstRequestedOn?.toISOString().slice(0, 10) ?? '', version: demand.version + 1 } } })
         }
       }
       if (acceptanceChanged || ownerChanged) {

@@ -40,6 +40,13 @@ function proposalState(p: ProjectProposal) {
     projectId: p.projectId ?? ''
   }
 }
+function syncDemandName(snapshot: PrototypeSnapshot, demand: PrototypeSnapshot['database']['demands'][number], name: string, reason: string, now: string) {
+  if (demand.name === name) return
+  const before = { name: demand.name, version: demand.version ?? 1 }
+  demand.name = name
+  recordLifecycle(snapshot, { entityType: 'demand', entityId: demand.id, action: 'edit',
+    reason, createdAt: now, before, after: { name, version: before.version + 1 } })
+}
 function log(
   snapshot: PrototypeSnapshot,
   proposal: ProjectProposal,
@@ -138,6 +145,7 @@ export function confirmProjectProposal(
   proposal.version++
   const demand = snapshot.database.demands.find((row) => row.id === proposal.demandId)
   if (demand) {
+    if (decision === 'accept') syncDemandName(snapshot, demand, proposal.name, '工程师接单确认项目名称', now)
     demand.status = decision === 'accept' ? 'established' : 'pending'
     demand.reviewReason = reviewReason
     demand.version = (demand.version ?? 1) + 1
@@ -154,10 +162,10 @@ export function resubmitProjectProposal(
   const actor = assertWrite(snapshot)
   if (!canApproveProjects(actor)) throw new WorkflowError('仅指定立项审批人可以重新评估')
   const proposal = snapshot.database.projectProposals?.find((row) => row.id === id)
-  if (!proposal || proposal.version !== version || proposal.status !== 'returned')
+  if (!proposal || proposal.version !== version || !['pending', 'returned'].includes(proposal.status))
     throw new WorkflowError('记录已更新，请刷新后重试')
   const linkedDemand = snapshot.database.demands.find((row) => row.id === proposal.demandId)
-  if (proposal.demandId && linkedDemand?.status !== 'pending')
+  if (proposal.demandId && (!linkedDemand || !['pending', 'awaiting_engineer'].includes(linkedDemand.status)))
     throw new WorkflowError('关联需求状态已变化，请重新评估')
   const before = proposalState(proposal)
   Object.assign(proposal, fields(snapshot, input), {
@@ -168,6 +176,7 @@ export function resubmitProjectProposal(
   })
   const demand = snapshot.database.demands.find((row) => row.id === proposal.demandId)
   if (demand) {
+    syncDemandName(snapshot, demand, proposal.name, '接单前重新评估项目名称', proposal.updatedAt)
     demand.status = 'awaiting_engineer'
     demand.reviewReason = ''
     demand.version = (demand.version ?? 1) + 1

@@ -8,6 +8,14 @@ import { proposalConfirmSchema, proposalResubmitSchema, type ProjectInput } from
 import { createProject, validateProjectMembers } from './project-service.js'
 import { lifecycleEvent } from '../notifications/lifecycle-event-service.js'
 
+export async function auditDemandName(tx: Prisma.TransactionClient, actor: Actor,
+  demand: { id: string; name: string; version: number }, name: string, reason: string) {
+  if (demand.name === name) return
+  await tx.lifecycleEvent.create({ data: { entityType: 'demand', entityId: demand.id,
+    authorId: actor.id, action: 'edit', reason,
+    before: { name: demand.name, version: demand.version }, after: { name, version: demand.version + 1 } } })
+}
+
 function proposalSnapshot(row: ProjectProposal) {
   return { version: row.version, name: row.name, department: row.department,
     primaryOwnerId: row.primaryOwnerId, collaboratorIds: row.collaboratorIds.join(','),
@@ -76,7 +84,11 @@ export class ProposalService {
       if (input.decision === 'accept') {
         const project = await createProject(tx, { ...row, requestId: row.requestId, priority: row.priority as ProjectInput['priority'], approvedLaunchDate: row.approvedLaunchDate.toISOString().slice(0, 10) }, row.demandId ?? undefined)
         projectId = project.id
-        if (row.demandId) await tx.demand.update({ where: { id: row.demandId }, data: { status: 'APPROVED', version: { increment: 1 } } })
+        if (row.demandId) {
+          const source = await tx.demand.findUniqueOrThrow({ where: { id: row.demandId } })
+          await tx.demand.update({ where: { id: row.demandId }, data: { name: project.name, status: 'APPROVED', version: { increment: 1 } } })
+          await auditDemandName(tx, actor, source, project.name, '工程师接单确认项目名称')
+        }
         const demand = row.demandId ? await tx.demand.findUniqueOrThrow({ where: { id: row.demandId } }) : null
         await lifecycleEvent(tx, { eventType: demand ? 'DEMAND_APPROVED' : 'PROJECT_ASSIGNED', requestId: `${actor.id}:${input.requestId}`,
           demandId: row.demandId ?? undefined, projectId, recipientIds: [...(demand ? [demand.ownerId] : []), row.primaryOwnerId, ...row.collaboratorIds] })
@@ -104,7 +116,8 @@ export class ProposalService {
       if (row.demandId) {
         const demand = await tx.demand.findUniqueOrThrow({ where: { id: row.demandId } })
         if (!['PENDING', 'AWAITING_ENGINEER'].includes(demand.status)) throw new AppError(409, 'INVALID_STATE', '需求已撤回或退回业务，需重新评估')
-        await tx.demand.update({ where: { id: row.demandId }, data: { status: 'AWAITING_ENGINEER', reviewReason: null, reviewedBy: actor.id, reviewedAt: new Date(), version: { increment: 1 } } })
+        await tx.demand.update({ where: { id: row.demandId }, data: { name: input.name, status: 'AWAITING_ENGINEER', reviewReason: null, reviewedBy: actor.id, reviewedAt: new Date(), version: { increment: 1 } } })
+        await auditDemandName(tx, actor, demand, input.name, '接单前重新评估项目名称')
       }
       const updated = await tx.projectProposal.update({ where: { id }, data: { name: input.name, department: input.department,
         priority: input.priority, primaryOwnerId: input.primaryOwnerId, collaboratorIds: input.collaboratorIds,

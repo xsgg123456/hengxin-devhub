@@ -49,13 +49,13 @@ test('重置演示数据会恢复固定业务数据并保留当前身份', async
   await expect(page.getByRole('button', { name: '切换演示身份' })).toContainText('赵清越')
 })
 
-test.describe('窄屏首次访问门禁', () => {
+test.describe('电脑小窗口首次访问', () => {
   test.use({ viewport: { width: 900, height: 800 } })
-  test('小于 1024px 时在读取业务数据前给出桌面端提示', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: '请在电脑端使用' })).toBeVisible()
-    await expect(page.getByText('最低工作区宽度 1024px')).toBeVisible()
+  test('小于1024px仍加载电脑业务页面', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: '项目总览', exact: true, level: 2 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '请在电脑端使用' })).toHaveCount(0)
     expect(
       await page.evaluate(() => localStorage.getItem('it-project-console.prototype.v1'))
-    ).toBeNull()
+    ).not.toBeNull()
   })
 })

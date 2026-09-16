@@ -14,6 +14,33 @@ import { isPrototypeSnapshot } from '@/repositories/prototype-validation'
 import { responsibilityTasks, filterPendingTasks } from './task-service'
 
 describe('工程师接单', () => {
+  it.each(['pending', 'returned'] as const)('重新评估%s提案同步名称且冲突不写入，接单最终保持一致', (status) => {
+    const snapshot=fresh(), savedDemand=saveDemand(snapshot,demandInput)
+    const demand=snapshot.database.demands.find(d=>d.id===savedDemand.id)!
+    snapshot.activeUserId='user-manager-chen'
+    const proposal=reviewDemand(snapshot,{demandId:demand.id,decision:'establish',project:projectInput})
+    const p=snapshot.database.projectProposals!.find(p=>p.id===proposal.id)!
+    if(status==='returned') {
+      snapshot.activeUserId=p.primaryOwnerId
+      confirmProjectProposal(snapshot,p.id,p.version,'return','调整名称')
+      snapshot.activeUserId='user-manager-chen'
+    }
+    const beforeVersion=demand.version??1, oldName=demand.name, firstRequestedOn=demand.firstRequestedOn
+    resubmitProjectProposal(snapshot,p.id,p.version,{...projectInput,name:'重新评估名称'})
+    expect(demand).toMatchObject({name:'重新评估名称',version:beforeVersion+1})
+    expect(demand.firstRequestedOn).toBe(firstRequestedOn)
+    const event=snapshot.database.lifecycleEvents.find(e=>e.entityType==='demand' && e.entityId===demand.id && e.reason==='接单前重新评估项目名称')!
+    expect(event).toMatchObject({authorId:snapshot.activeUserId,before:{name:oldName},after:{name:p.name}})
+    const saved=JSON.stringify(snapshot.database)
+    expect(()=>resubmitProjectProposal(snapshot,p.id,p.version-1,{...projectInput,name:'过期'})).toThrow('更新')
+    expect(JSON.stringify(snapshot.database)).toBe(saved)
+    demand.name='存量不一致'
+    snapshot.activeUserId=p.primaryOwnerId
+    confirmProjectProposal(snapshot,p.id,p.version,'accept')
+    expect(demand.name).toBe(snapshot.database.projects.find(row=>row.id===p.projectId)!.name)
+    expect(demand.name).toBe('重新评估名称')
+    expect(event.before.name).toBe(oldName)
+  })
   it('审批只入待办，主责接单后生成一次正式项目，其他用户不能确认', () => {
     const snapshot = fresh()
     snapshot.activeUserId = 'user-manager-chen'
