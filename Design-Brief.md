@@ -3,6 +3,8 @@
 > 2026-09-14 已确认并开始开发：[重点项目、上线基准与工程师接单](it-project-console/docs/PRIORITY-ACCEPTANCE-ITERATION.md)。本轮规则覆盖旧单级立项及管理审批不填日期规则，正式部署另需授权。
 > 2026-09-11 第二轮已确认并开始开发：[界面优化与双排甘特图](it-project-console/docs/UI-ROUND2-CONFIRMATION.md)，本轮新增规则以该文正式验收条款为准。
 > 2026-09-11 本轮已确认并开始实施：[先排期后执行与需求池统一筛选](it-project-console/docs/STAGE-PLAN-ITERATION.md)。该文逐条为当前验收标准，覆盖旧人工百分比、滚动填日期、验收后二次完成与自动归档规则。保留旧章节作历史参照，实施以本轮为准；正式部署另需明确授权。
+> 2026-09-16 素材接入：保留 CMP-012A 现有资源双卡、弹窗、按钮与小窗口布局。视频卡从待上传变为“点击播放”；ZIP 按实际 29.8 KB 展示并启用下载，文件名 business-prd-prototype.zip。不增加强制辅导流程。
+
 # 轻量化 IT 项目管理系统 · Design Brief
 
 > 版本：v1.2

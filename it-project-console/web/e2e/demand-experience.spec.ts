@@ -1,15 +1,28 @@
 import { expect, test } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
 import { identity, snapshot, key, date } from './review-helpers'
 
-test('教程资源诚实占位，电脑缩放保留表单内容与路由', async ({ page }) => {
+test('真实教程播放下载，电脑缩放保留表单内容与路由', async ({ page }) => {
   await page.goto('/')
   await identity(page, '李思敏')
   await expect(page.getByText('business-prd-prototype.zip', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: '下载 Skill 成品包' })).toBeDisabled()
+  const downloadButton = page.getByRole('button', { name: '下载 Skill 成品包' })
+  await expect(downloadButton).toBeEnabled()
+  const downloadPromise = page.waitForEvent('download')
+  await downloadButton.click()
+  const download = await downloadPromise
+  expect(download.suggestedFilename()).toBe('business-prd-prototype.zip')
+  expect(await readFile((await download.path())!)).toEqual(
+    await readFile('public/training/20260916/business-prd-prototype.zip')
+  )
   await page.getByRole('button', { name: '观看教程', exact: true }).click()
   const video = page.getByRole('dialog', { name: '视频教程 · 如何正确提 0→1 项目需求' })
-  await expect(video).toContainText('视频素材待放入')
+  const media = video.locator('video')
+  await expect(media).toBeAttached()
+  await media.evaluate(async (element: HTMLVideoElement) => { element.muted = true; await element.play() })
+  await expect.poll(() => media.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(0)
   await video.getByRole('button', { name: '关闭', exact: true }).click()
+  await expect(page.locator('video')).toHaveCount(0)
   await page.screenshot({ path: '../output/playwright/demand-experience-desktop.png', animations: 'disabled' })
   await page.getByRole('button', { name: '提交正式项目需求', exact: true }).click()
   const editor = page.getByRole('dialog', { name: '提交正式项目需求', exact: true })
@@ -28,6 +41,29 @@ test('教程资源诚实占位，电脑缩放保留表单内容与路由', async
   await expect(page.locator('.el-menu--collapse')).toBeVisible()
   await page.screenshot({ path: '../output/playwright/demand-experience-narrow.png', animations: 'disabled' })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+})
+
+test('教程文件获取失败有提示且可重试', async ({ page }) => {
+  await page.goto('/')
+  await identity(page, '李思敏')
+  const zipPath = '**/training/20260916/business-prd-prototype.zip'
+  await page.route(zipPath, route => route.fulfill({ status: 404, body: 'Not found' }))
+  await page.getByRole('button', { name: '下载 Skill 成品包' }).click()
+  await expect(page.getByText('Skill 成品包暂时无法获取，请稍后重试或联系管理员。')).toBeVisible()
+  await page.unroute(zipPath)
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: '下载 Skill 成品包' }).click()
+  expect((await download).suggestedFilename()).toBe('business-prd-prototype.zip')
+  await expect(page.getByText('Skill 成品包暂时无法获取，请稍后重试或联系管理员。')).toHaveCount(0)
+  const videoPath = '**/training/20260916/business-prd-prototype-tutorial.mp4'
+  await page.route(videoPath, route => route.fulfill({ status: 404, body: 'Not found' }))
+  await page.getByRole('button', { name: '观看教程', exact: true }).click()
+  await expect(page.getByText('视频暂时无法加载')).toBeVisible()
+  await page.unroute(videoPath)
+  await page.getByRole('button', { name: '重新加载', exact: true }).click()
+  await expect(page.locator('video')).toBeAttached()
+  await page.locator('video').evaluate(async (element: HTMLVideoElement) => { element.muted = true; await element.play() })
+  await expect.poll(() => page.locator('video').evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(0)
 })
 
 test('需求池选择已完成主项目、按编号搜索、草稿再提交，关联不会误变为正式需求', async ({ page }) => {

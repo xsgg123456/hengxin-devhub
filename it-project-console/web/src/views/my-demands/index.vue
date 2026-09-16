@@ -22,7 +22,11 @@
           class="mb-4"
         />
         <div v-if="prototypeStore.currentUser.role === 'business'" class="mb-4">
-          <SubmissionGuide />
+          <SubmissionGuide
+            video-url="/training/20260916/business-prd-prototype-tutorial.mp4"
+            package-url="/training/20260916/business-prd-prototype.zip"
+            package-size="ZIP 压缩包 · 29.8 KB"
+          />
         </div>
         <div class="mt-4 flex flex-wrap gap-3">
           <ElButton type="primary" @click="openEditor()">提交正式项目需求</ElButton>
