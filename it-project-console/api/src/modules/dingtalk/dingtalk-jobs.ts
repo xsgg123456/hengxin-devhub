@@ -2,6 +2,9 @@ import type { FastifyBaseLogger } from 'fastify'
 import type { DingtalkDirectory } from './dingtalk-directory.js'
 import type { NotificationService } from '../notifications/notification-service.js'
 import { flushNotifications } from '../notifications/notification-job.js'
+
+const DIRECTORY_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000
+
 export function startDingTalkJobs(directory: DingtalkDirectory, notifications: NotificationService,
   syncEnabled: boolean, log: FastifyBaseLogger) {
   let sync: Promise<void> | undefined, delivery: Promise<void> | undefined, stopped = false
@@ -23,7 +26,7 @@ export function startDingTalkJobs(directory: DingtalkDirectory, notifications: N
       delivery = undefined
     })()
   }
-  const syncTimer = setInterval(syncDirectory, 15*60*1000), deliveryTimer = setInterval(flush,60000)
+  const syncTimer = setInterval(syncDirectory, DIRECTORY_SYNC_INTERVAL_MS), deliveryTimer = setInterval(flush,60000)
   syncTimer.unref(); deliveryTimer.unref(); syncDirectory()
   return async () => {
     stopped=true;clearInterval(syncTimer);clearInterval(deliveryTimer)
