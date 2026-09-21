@@ -1,7 +1,9 @@
 import { canApproveProjects } from '@/utils/project-approver'
 import { projectCode } from '@/utils/project-code'
-import type { DemoUser, PrototypeDatabase } from '@/domain/prototype'
+import type { DemoDemand, DemoUser, PrototypeDatabase } from '@/domain/prototype'
 import { computeProjectRisks } from './risk-service'
+import { currentDemandOwner as demandOwnerId, effectiveDemand } from './demand-view'
+import { isEngineerEligible } from '@/utils/engineer-eligibility'
 
 export interface ResponsibilityTask {
   id: string
@@ -47,6 +49,10 @@ export function responsibilityTasks(
   user: DemoUser,
   now = new Date().toISOString()
 ): ResponsibilityTask[] {
+  // A directory change can revoke engineering eligibility while project
+  // membership remains for history. Do not expose actionable plan/progress/
+  // acceptance work to that account until an administrator requalifies it.
+  if (user.role === 'engineer' && !isEngineerEligible(user)) return []
   const tasks: ResponsibilityTask[] = []
   for (const p of db.projectProposals ?? []) {
     if (p.status === 'confirmed') continue
@@ -65,7 +71,9 @@ export function responsibilityTasks(
         days: 0
       })
   }
-  for (const d of db.demands) {
+  for (const source of db.demands) {
+    const d = effectiveDemand(db, source)
+    const currentOwnerId = demandOwnerId(d)
     if (
       canApproveProjects(user) &&
       d.status === 'pending' &&
@@ -81,7 +89,7 @@ export function responsibilityTasks(
         severity: 4,
         days: 0
       })
-    } else if (d.submitterId === user.id && d.status === 'returned') {
+    } else if (currentOwnerId === user.id && d.status === 'returned') {
       tasks.push({
         id: d.id,
         demandId: d.id,
@@ -165,6 +173,11 @@ export function responsibilityTasks(
   return tasks.sort((a, b) => compareTasks(a, b, user.role === 'manager'))
 }
 
+function currentDemandOwner(db: PrototypeDatabase, demand: DemoDemand) {
+  const current = effectiveDemand(db, demand)
+  return demandOwnerId(current)
+}
+
 export function filterPendingTasks(
   tasks: ResponsibilityTask[],
   db: PrototypeDatabase,
@@ -178,22 +191,24 @@ export function filterPendingTasks(
       const p = db.projectProposals?.find((p) => p.id === task.proposalId)
       if (!p) return false
       const demand = db.demands.find((d) => d.id === p.demandId)
+      const current = demand ? effectiveDemand(db, demand) : undefined
       return (
-        (!projectType || (projectType === 'optimization') === !!demand?.parentProjectId) &&
-        (!department || p.department === department) &&
+        (!projectType || (projectType === 'optimization') === !!current?.parentProjectId) &&
+        (!department || (current?.department ?? p.department) === department) &&
         (scope !== 'mine' ||
           (demand
-            ? demand.submitterId === userId
+            ? currentDemandOwner(db, demand) === userId
             : p.primaryOwnerId === userId || p.createdBy === userId))
       )
     }
     const demand =
       task.action === 'review' ? db.demands.find((d) => d.id === task.demandId) : undefined
+    const current = demand ? effectiveDemand(db, demand) : undefined
     return (
-      !!demand &&
-      (!projectType || (projectType === 'optimization') === !!demand.parentProjectId) &&
-      (!department || demand.department === department) &&
-      (scope !== 'mine' || demand.submitterId === userId)
+      !!current &&
+      (!projectType || (projectType === 'optimization') === !!current.parentProjectId) &&
+      (!department || current.department === department) &&
+      (scope !== 'mine' || currentDemandOwner(db, current) === userId)
     )
   })
 }

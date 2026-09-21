@@ -53,7 +53,8 @@
 
   async function retryLive() {
     try {
-      await prototypeStore.refreshLive()
+      const result = await prototypeStore.refreshLive()
+      if (result.status !== 'applied') return
       syncPrototypeShell(prototypeStore.currentUser.role)
       await router.replace(getHomePath(prototypeStore.currentUser.role))
     } catch {

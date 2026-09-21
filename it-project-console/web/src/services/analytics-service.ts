@@ -139,11 +139,11 @@ export function demandDistribution(
     { key: string; name: string; value: number; demands: DemoDemand[] }
   >()
   demands.forEach((demand) => {
-    const key = by === 'department' ? demand.department : demand.submitterId
+    const key = by === 'department' ? demand.department : (demand.currentOwnerId ?? '')
     const name =
       by === 'department'
         ? demand.department
-        : users.find((u) => u.id === key)?.name || '未知提出人'
+        : users.find((u) => u.id === key)?.name || '未设置业务负责人'
     const group = groups.get(key) || { key, name, value: 0, demands: [] }
     group.demands.push(demand)
     group.value++

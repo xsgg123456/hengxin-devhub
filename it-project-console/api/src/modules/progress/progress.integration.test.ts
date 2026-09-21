@@ -16,12 +16,12 @@ const key = () => randomUUID()
 function call(path: string, body: Record<string, unknown>, user = owner) {
   return runtime.app.inject({ method: 'POST', url: path, payload: body, headers: { cookie: cookies[user], origin: env.WEB_ORIGIN } })
 }
-async function create() {
+async function create(primaryOwnerId = owner, collaboratorIds = [collab], confirmer = owner) {
   const response = await call('/api/projects', { requestId: key(), approvedLaunchDate: '2099-10-10', name: '排期集成项目', department: '财务部', priority: 'P1',
-    primaryOwnerId: owner, collaboratorIds: [collab] }, manager)
+    primaryOwnerId, collaboratorIds }, manager)
   expect(response.statusCode, response.body).toBe(200)
   const proposalId = response.json<{ data: { id: string } }>().data.id
-  const accepted = await call(`/api/project-proposals/${proposalId}/confirm`, { requestId: key(), version: 1, decision: 'accept' })
+  const accepted = await call(`/api/project-proposals/${proposalId}/confirm`, { requestId: key(), version: 1, decision: 'accept' }, confirmer)
   expect(accepted.statusCode, accepted.body).toBe(200)
   return accepted.json<{ data: { projectId: string } }>().data.projectId
 }
@@ -108,6 +108,27 @@ describe('先排期后执行的真实事务', () => {
     expect((await row(id)).currentDeliveryDate?.toISOString().slice(0, 10)).toBe('2099-10-11')
     expect(await db.scheduleChange.count({ where: { projectId: id } })).toBe(0)
     expect(await db.lifecycleEvent.count({ where: { entityId: id, action: 'plan' } })).toBe(1)
+  })
+  it('工程师调离 IT 部门后，排期和整体进度均在写入前拒绝', async () => {
+    const id = await create(), before = await row(id)
+    const original = await db.user.findUniqueOrThrow({ where: { id: owner } })
+    // 角色仍是 ENGINEER，但部门已变更；资格必须由当前目录状态实时判断，不能沿用旧资格。
+    await db.user.update({ where: { id: owner }, data: { department: '财务部' } })
+    try {
+      expect((await schedule(id)).statusCode).toBe(403)
+      expect((await call(`/api/projects/${id}/progress`, overall(before.version), owner)).statusCode).toBe(403)
+
+      const after = await row(id)
+      expect(after.version).toBe(before.version)
+      expect(after.stagePlans).toEqual(before.stagePlans)
+      expect(await db.progressUpdate.count({ where: { projectId: id } })).toBe(0)
+      expect(await db.scheduleChange.count({ where: { projectId: id } })).toBe(0)
+    } finally {
+      await db.user.update({ where: { id: owner }, data: {
+        department: original.department, role: original.role, active: original.active,
+        engineerOverride: original.engineerOverride
+      } })
+    }
   })
   it('同key并发排期幂等、冲突回滚、调整逐字段记日志并保留最初计划', async () => {
     const id = await create(), url = `/api/projects/${id}/plan`

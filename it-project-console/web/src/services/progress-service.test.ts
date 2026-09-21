@@ -13,6 +13,23 @@ function setup() {
   return { snapshot, project }
 }
 describe('先排期后执行', () => {
+  it('工程师调离 IT 或资格失效后，原主责不能继续排期或更新整体进度', () => {
+    const { snapshot, project } = setup()
+    const owner = snapshot.database.users.find((user) => user.id === project.primaryOwnerId)!
+    const plans = remainingStages(project).map((stage) => ({
+      stage,
+      startDate: '2026-09-10',
+      endDate: '2026-09-10'
+    }))
+    snapshot.activeUserId = owner.id
+    owner.engineerEligible = false
+    expect(() => saveProjectPlan(snapshot, { projectId: project.id, plans })).toThrow('主负责人')
+    owner.engineerEligible = true
+    saveProjectPlan(snapshot, { projectId: project.id, plans })
+    owner.engineerEligible = false
+    expect(() => updateProgress(snapshot, { projectId: project.id, kind: 'overall', summary: '', status: 'in-progress' })).toThrow('主负责人')
+  })
+
   it('无日期立项可以保存，排期前不能执行，迁移不伪造旧时间', () => {
     const { snapshot, project } = setup()
     expect(project.expectedDeliveryDate).toBe('')

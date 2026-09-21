@@ -3,6 +3,7 @@ import { projectState, recordLifecycle } from './lifecycle-service'
 import { PROJECT_STAGES, type PrototypeSnapshot, type SimpleStatus } from '@/domain/prototype'
 import { assertWrite, nextId, textValue, WorkflowError } from './workflow-validation'
 import { computeProjectRisks } from './risk-service'
+import { isEngineerEligible } from '@/utils/engineer-eligibility'
 export interface ProgressInput {
   projectId: string
   kind: 'overall' | 'personal'
@@ -24,10 +25,11 @@ export function updateProgress(snapshot: PrototypeSnapshot, input: ProgressInput
   const project = snapshot.database.projects.find((row) => row.id === input.projectId)
   if (!project) throw new WorkflowError('项目不存在')
   if (project.status !== 'active' || project.archived) throw new WorkflowError('当前项目只读')
-  const overall = actor.role === 'manager' || actor.id === project.primaryOwnerId
+  const engineer = actor.role === 'engineer' && isEngineerEligible(actor)
+  const overall = actor.role === 'manager' || (engineer && actor.id === project.primaryOwnerId)
   if (input.kind === 'overall' && !overall)
     throw new WorkflowError('只有主负责人或管理人员能更新整体进度')
-  if (input.kind === 'personal' && !project.collaboratorIds.includes(actor.id) && !overall)
+  if (input.kind === 'personal' && !overall && !(engineer && project.collaboratorIds.includes(actor.id)))
     throw new WorkflowError('只有项目成员可以提交进展')
   if (!['overall', 'personal'].includes(input.kind)) throw new WorkflowError('进度记录类型无效')
   const overallKeys = [

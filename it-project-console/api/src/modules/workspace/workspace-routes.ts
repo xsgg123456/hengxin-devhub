@@ -9,13 +9,16 @@ export function registerWorkspaceRoutes(
   approverId = ''
 ) {
   app.get('/api/workspace', { preHandler: authenticate }, async (request) => {
-    const database = await db.$transaction(
+    const workspace = await db.$transaction(
       async (tx) => {
         const [users, demands, projects, progressUpdates, scheduleChanges, lifecycleEvents, projectProposals] =
           await Promise.all([
             tx.user.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
             tx.demand.findMany({
-              include: { attachments: true },
+              include: {
+                attachments: true,
+                project: { select: { id: true, department: true, businessOwnerId: true } }
+              },
               orderBy: [{ submittedAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }]
             }),
             tx.project.findMany({
@@ -27,38 +30,48 @@ export function registerWorkspaceRoutes(
             tx.lifecycleEvent.findMany({ orderBy: { createdAt: 'desc' } }),
             tx.projectProposal.findMany({ orderBy: { createdAt: 'desc' } })
           ])
+        const revision = await tx.$queryRaw<Array<{ revision: string }>>
+          `SELECT revision::text FROM workspace_revision WHERE id = 1`
         return {
-          schemaVersion: 2,
-          users: users.map(user => ({ ...mapUser(user), canApproveProjects: canApproveProjects(user, approverId) })),
-          demands: demands.map(mapDemand),
-          projects: projects.map(mapProject),
-          projectProposals: projectProposals.map(row => ({ ...row, approvedLaunchDate: row.approvedLaunchDate.toISOString().slice(0, 10), createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() })),
-          stageHistories: projects.flatMap((project) =>
-            project.stageHistories
-              .filter((item) => item.enteredAt || item.completedAt || item.interruptedAt)
-              .map((item) => ({
-                projectId: project.id,
-                stage: item.stage,
-                startedAt: item.enteredAt?.toISOString() ?? '',
-                completedAt: item.completedAt?.toISOString() ?? null,
-                plannedStartDate: item.plannedStartDate?.toISOString().slice(0, 10) ?? null,
-                plannedEndDate: item.plannedEndDate?.toISOString().slice(0, 10) ?? null,
-                interruptedAt: item.interruptedAt?.toISOString()
-              }))
-          ),
-          progressUpdates: progressUpdates.map((row) => ({
-            ...row,
-            overallProgress: row.overallProgress ?? undefined,
-            createdAt: row.createdAt.toISOString()
-          })),
-          scheduleChanges: scheduleChanges.map((row) => ({
-            ...row,
-            createdAt: row.createdAt.toISOString()
-          })),
-          lifecycleEvents: lifecycleEvents.map((row) => ({
-            ...row,
-            createdAt: row.createdAt.toISOString()
-          }))
+          database: {
+            schemaVersion: 2,
+            users: users.map(user => ({ ...mapUser(user), canApproveProjects: canApproveProjects(user, approverId) })),
+            demands: demands.map(mapDemand),
+            projects: projects.map(mapProject),
+            projectProposals: projectProposals.map(row => ({
+              ...row,
+              approvedLaunchDate: row.approvedLaunchDate.toISOString().slice(0, 10),
+              createdAt: row.createdAt.toISOString(),
+              updatedAt: row.updatedAt.toISOString()
+            })),
+            stageHistories: projects.flatMap((project) =>
+              project.stageHistories
+                .filter((item) => item.enteredAt || item.completedAt || item.interruptedAt)
+                .map((item) => ({
+                  projectId: project.id,
+                  stage: item.stage,
+                  startedAt: item.enteredAt?.toISOString() ?? '',
+                  completedAt: item.completedAt?.toISOString() ?? null,
+                  plannedStartDate: item.plannedStartDate?.toISOString().slice(0, 10) ?? null,
+                  plannedEndDate: item.plannedEndDate?.toISOString().slice(0, 10) ?? null,
+                  interruptedAt: item.interruptedAt?.toISOString()
+                }))
+            ),
+            progressUpdates: progressUpdates.map((row) => ({
+              ...row,
+              overallProgress: row.overallProgress ?? undefined,
+              createdAt: row.createdAt.toISOString()
+            })),
+            scheduleChanges: scheduleChanges.map((row) => ({
+              ...row,
+              createdAt: row.createdAt.toISOString()
+            })),
+            lifecycleEvents: lifecycleEvents.map((row) => ({
+              ...row,
+              createdAt: row.createdAt.toISOString()
+            }))
+          },
+          workspaceRevision: revision[0]?.revision ?? ''
         }
       },
       { isolationLevel: 'RepeatableRead' }
@@ -69,7 +82,8 @@ export function registerWorkspaceRoutes(
         revision: Date.now(),
         activeUserId: request.actor!.id,
         scenario: 'normal',
-        database,
+        database: workspace.database,
+        workspaceRevision: workspace.workspaceRevision,
         updatedAt: new Date().toISOString()
       }
     }

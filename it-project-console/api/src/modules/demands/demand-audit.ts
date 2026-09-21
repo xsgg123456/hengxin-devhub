@@ -2,7 +2,7 @@ import type { Demand, Prisma } from '../../generated/prisma/client.js'
 import type { Actor } from '../../plugins/auth.js'
 
 function snapshot(row: Demand) {
-  return { parentProjectId: row.parentProjectId, optimizationOutcome: row.optimizationOutcome, status: row.status, version: row.version, reviewReason: row.reviewReason ?? '',
+  return { name: row.name, department: row.department, ownerId: row.ownerId, parentProjectId: row.parentProjectId, optimizationOutcome: row.optimizationOutcome, status: row.status, version: row.version, reviewReason: row.reviewReason ?? '',
     firstRequestedOn: row.firstRequestedOn?.toISOString().slice(0, 10) ?? '',
     submittedAt: row.submittedAt?.toISOString() ?? '' }
 }

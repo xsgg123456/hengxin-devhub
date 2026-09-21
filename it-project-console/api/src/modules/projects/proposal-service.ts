@@ -7,6 +7,7 @@ import { commandSchema } from '../demands/demand-schemas.js'
 import { proposalConfirmSchema, proposalResubmitSchema, type ProjectInput } from './project-schemas.js'
 import { createProject, validateProjectMembers } from './project-service.js'
 import { lifecycleEvent } from '../notifications/lifecycle-event-service.js'
+import { auditDemand } from '../demands/demand-audit.js'
 
 export async function auditDemandName(tx: Prisma.TransactionClient, actor: Actor,
   demand: { id: string; name: string; version: number }, name: string, reason: string) {
@@ -116,8 +117,9 @@ export class ProposalService {
       if (row.demandId) {
         const demand = await tx.demand.findUniqueOrThrow({ where: { id: row.demandId } })
         if (!['PENDING', 'AWAITING_ENGINEER'].includes(demand.status)) throw new AppError(409, 'INVALID_STATE', '需求已撤回或退回业务，需重新评估')
-        await tx.demand.update({ where: { id: row.demandId }, data: { name: input.name, status: 'AWAITING_ENGINEER', reviewReason: null, reviewedBy: actor.id, reviewedAt: new Date(), version: { increment: 1 } } })
+        const updatedDemand = await tx.demand.update({ where: { id: row.demandId }, data: { name: input.name, department: input.department, status: 'AWAITING_ENGINEER', reviewReason: null, reviewedBy: actor.id, reviewedAt: new Date(), version: { increment: 1 } } })
         await auditDemandName(tx, actor, demand, input.name, '接单前重新评估项目名称')
+        await auditDemand(tx, actor, updatedDemand, 'resubmit', '接单前重新评估项目资料', demand)
       }
       const updated = await tx.projectProposal.update({ where: { id }, data: { name: input.name, department: input.department,
         priority: input.priority, primaryOwnerId: input.primaryOwnerId, collaboratorIds: input.collaboratorIds,

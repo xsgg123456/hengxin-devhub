@@ -112,6 +112,9 @@
       <ElAlert v-if="error" :title="error" type="error" :closable="false" class="mb-5"
         ><ElButton @click="retry">重新加载</ElButton></ElAlert
       >
+      <ElAlert v-if="refreshError" :title="refreshError" type="warning" :closable="false" class="mb-5"
+        ><ElButton @click="retry">重新加载</ElButton></ElAlert
+      >
       <ElSkeleton v-if="loading" :rows="5" animated class="mb-5" />
       <div class="metrics mb-5"
         ><button
@@ -202,6 +205,7 @@
     total,
     loading,
     error,
+    refreshError,
     retry,
     scope,
     status,

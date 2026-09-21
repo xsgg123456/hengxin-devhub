@@ -21,7 +21,7 @@
             :width="340"
           >
             <template #reference
-              ><button class="quantity-row" @click="showDemands(item)"
+              ><button class="quantity-row" @click="showDemands(item, index)"
                 ><span>{{ item.name }}</span
                 ><span class="quantity-track"
                   ><i
@@ -65,7 +65,7 @@
       :model-value="!!selected.length"
       :title="selectedTitle + ' · 对应需求'"
       width="min(560px, 95vw)"
-      @close="selected = []"
+      @close="closeSelection"
       ><div class="demand-links"
         ><ElButton v-for="d in selected" :key="d.id" text @click="openDemand(d.id)"
           >{{ d.name }} · {{ d.department }}</ElButton
@@ -85,6 +85,7 @@
     demandMonthlyTrend
   } from '@/services/analytics-service'
   import { shanghaiDay } from '@/services/workflow-validation'
+  import { currentDemandOwner } from '@/services/demand-view'
   import { useChartComponent } from '@/hooks/core/useChart'
   import type { EChartsOption } from '@/plugins/echarts'
   const props = defineProps<{
@@ -96,13 +97,22 @@
   const emit = defineEmits<{ detail: [demandId: string] }>()
   const selected = ref<DemoDemand[]>([])
   const selectedTitle = ref('')
-  function showDemands(item: { name: string; demands: DemoDemand[] }) {
+  const selectedKey = ref('')
+  const selectedPanel = ref(0)
+  type DistributionItem = { key: string; name: string; demands: DemoDemand[] }
+  function showDemands(item: DistributionItem, panel: number) {
+    selectedKey.value = item.key
+    selectedPanel.value = panel
     selected.value = item.demands
     selectedTitle.value = item.name
   }
   function openDemand(id: string) {
     emit('detail', id)
+    closeSelection()
+  }
+  function closeSelection() {
     selected.value = []
+    selectedKey.value = ''
   }
   const submitters = computed(() =>
     runtimeConfig.isPrototype
@@ -123,12 +133,19 @@
     { title: '需求提出人分布', items: submitters.value },
     { title: '需求部门分布', items: departments.value }
   ])
-  watch(
-    () => props.demands,
-    () => {
+  function restoreSelectedGroup() {
+    if (!selectedKey.value) return
+    const items = selectedPanel.value === 0 ? submitters.value : departments.value
+    const current = items.find((item) => item.key === selectedKey.value)
+    if (!current) {
       selected.value = []
+      selectedKey.value = ''
+      return
     }
-  )
+    selected.value = current.demands
+    selectedTitle.value = current.name
+  }
+  watch([submitters, departments], restoreSelectedGroup, { deep: true })
   function detailTooltip(title: string, demands: DemoDemand[]) {
     const root = document.createElement('div')
     root.style.cssText = 'max-height:280px;max-width:340px;overflow:auto;white-space:normal'
@@ -137,7 +154,8 @@
     root.append(heading)
     demands.forEach((d) => {
       const button = document.createElement('button')
-      button.textContent = `${d.name} · ${props.users.find((u) => u.id === d.submitterId)?.name || '未知提出人'} · ${d.department}`
+      const ownerId = currentDemandOwner(d)
+      button.textContent = `${d.name} · ${props.users.find((u) => u.id === ownerId)?.name || '未设置业务负责人'} · ${d.department}`
       button.style.cssText =
         'display:block;white-space:normal;text-align:left;padding:8px 0;width:100%;cursor:pointer;border-bottom:1px solid #eee'
       button.onclick = () => emit('detail', d.id)

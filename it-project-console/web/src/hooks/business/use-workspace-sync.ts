@@ -1,7 +1,7 @@
 import { onScopeDispose, watch } from 'vue'
 import { runtimeConfig } from '@/config/runtime'
 import { apiRequest } from '@/services/api-client'
-import { usePrototypeStore } from '@/store/modules/prototype'
+import { usePrototypeStore, type RefreshLiveResult } from '@/store/modules/prototype'
 
 // 每个前台应用只有一个连接；事件仅作失效通知，数据仍由鉴权接口读取。
 export function useWorkspaceSync() {
@@ -14,7 +14,20 @@ export function useWorkspaceSync() {
       document.visibilityState === 'hidden' || !navigator.onLine) return
     let stopped = false, running = false, pending = false
     let known = '', wanted = '', force = false
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
     const controller = new AbortController()
+    function cancelRetry() {
+      if (retryTimer === undefined) return
+      clearTimeout(retryTimer)
+      retryTimer = undefined
+    }
+    function scheduleRetry() {
+      if (stopped || retryTimer !== undefined) return
+      retryTimer = setTimeout(() => {
+        retryTimer = undefined
+        void refresh(wanted, true)
+      }, 1000)
+    }
     async function refresh(revision = '', unconditional = false) {
       if (stopped) return
       wanted = revision || wanted
@@ -29,9 +42,26 @@ export function useWorkspaceSync() {
           force = false
           if (!mustRefresh && target === known) continue
           try {
-            await store.refreshLive({ background: true, signal: controller.signal })
-            if (!stopped) known = target
-          } catch { /* 保留页面，下一事件或兜底重试。 */ }
+            const result: RefreshLiveResult = await store.refreshLive({
+              background: true,
+              signal: controller.signal
+            })
+            if (stopped) continue
+            if (result.status === 'applied') {
+              // 以服务端实际返回的快照版本为准；抢占或旧快照不能推进水位。
+              known = String(result.revision)
+              if (target && known !== target) {
+                // 事件可能在本次读取开始后才提交；再补一次无目标强制读取，
+                // 避免把已经处理过的旧事件版本保留为永久重试目标。
+                wanted = ''
+                scheduleRetry()
+              } else cancelRetry()
+            } else {
+              scheduleRetry()
+            }
+          } catch {
+            scheduleRetry()
+          }
         }
       } finally { running = false }
     }
@@ -62,7 +92,13 @@ export function useWorkspaceSync() {
     }
     const timer = setInterval(() => { void check() }, 30000)
     void refresh('', true)
-    dispose = () => { stopped = true; source.close(); controller.abort(); clearInterval(timer) }
+    dispose = () => {
+      stopped = true
+      source.close()
+      controller.abort()
+      clearInterval(timer)
+      cancelRetry()
+    }
   }
   watch([() => store.ready, () => store.authRequired, () => store.currentUser.id], restart, { immediate: true })
   document.addEventListener('visibilitychange', restart)

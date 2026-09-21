@@ -15,6 +15,19 @@
           >刷新数据</ElButton
         >
       </ElAlert>
+      <ElAlert
+        v-if="store.syncError"
+        :title="store.syncError"
+        type="warning"
+        :closable="false"
+        class="mb-4"
+      >
+        <ElButton
+          :disabled="store.saving || store.uploading || store.hasUnsavedChanges"
+          @click="refresh"
+          >重新同步</ElButton
+        >
+      </ElAlert>
       <slot />
     </template>
   </div>

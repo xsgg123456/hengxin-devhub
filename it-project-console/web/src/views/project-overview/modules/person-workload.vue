@@ -15,6 +15,9 @@
     <ElAlert v-if="error" :title="error" type="error" :closable="false"
       ><ElButton @click="retry">重新加载</ElButton></ElAlert
     >
+    <ElAlert v-if="refreshError" :title="refreshError" type="warning" :closable="false"
+      ><ElButton @click="retry">重新加载</ElButton></ElAlert
+    >
     <ElSkeleton v-if="loading" :rows="4" animated />
     <ElEmpty v-if="!loading && !error && !rows.length" description="该月当前范围暂无人员项目" />
     <div
@@ -86,14 +89,14 @@
   const emit = defineEmits<{ detail: [projectId: string] }>()
   const currentMonth = () => shanghaiDay(new Date().toISOString()).slice(0, 7)
   const month = ref(currentMonth())
-  const { data, loading, error, retry } = useLiveQuery<WorkloadResult>('/workload', () => ({
+  const { data, loading, error, refreshError, retry } = useLiveQuery<WorkloadResult>('/workload', () => ({
     ...props.query,
     month: month.value
   }))
   const rows = computed(() =>
     runtimeConfig.isPrototype
       ? personWorkload(props.projects, props.users, month.value)
-      : (data.value ?? [])
+      : (data.value?.rows ?? [])
   )
   const riskColumns = [
     { key: 'delayed', label: '延期', type: 'danger' },

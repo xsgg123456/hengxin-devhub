@@ -88,7 +88,7 @@ export class ProjectEditService {
         acceptanceUrl: input.acceptanceUrl, acceptanceSummary: input.acceptanceSummary,
         migrationVerified: input.verify ? true : project.migrationVerified, version: { increment: 1 },
         ...(progressChanged ? { lastOverallUpdatedAt: now } : {}),
-        ...(acceptanceChanged ? { acceptanceHistory: acceptanceHistory(project, 'assign', actor.id, now, input.reason, input.acceptanceOwnerId) } : {})
+        ...(acceptanceChanged ? { acceptanceHistory: acceptanceHistory(project, 'assign', actor.id, now, input.reason, input.acceptanceOwnerId, undefined, '', input.requestId) } : {})
       }
       if (!data.name) invalid('项目名称不能为空')
       // Renaming a pending project cannot silently remove the visible verification reminder.
@@ -131,10 +131,20 @@ export class ProjectEditService {
       const newMembers = [changed.primaryOwnerId, ...input.collaboratorIds, ...(changed.businessOwnerId ? [changed.businessOwnerId] : [])]
       const oldMembers = new Set([project.primaryOwnerId, ...project.members.map(m => m.userId), ...(oldBusiness ? [oldBusiness] : [])])
       await lifecycleEvent(tx, { eventType: 'PROJECT_ASSIGNED', requestId: `${actor.id}:${input.requestId}`, projectId: id,
-        demandId: project.demandId ?? undefined, recipientIds: newMembers.filter(userId => !oldMembers.has(userId)), reason: input.reason })
+        demandId: project.demandId ?? undefined,
+        recipientIds: [...new Set([
+          ...newMembers.filter(userId => !oldMembers.has(userId)),
+          ...(ownerChanged ? [changed.primaryOwnerId] : [])
+        ])], reason: input.reason })
       await tx.lifecycleEvent.create({ data: { entityType: 'project', entityId: id, authorId: actor.id,
         action: input.verify ? 'verify' : 'edit', reason: input.reason, before, after: state(changed) } })
-      await refreshProjectRisks(tx, id, now)
+      const riskChanged = await refreshProjectRisks(tx, id, now)
+      const risks = Array.isArray(changed.risks) ? changed.risks.filter((risk): risk is string => typeof risk === 'string') : []
+      const alertRisks = risks.filter((risk) => /临期|延期|未更新|阻塞/.test(risk))
+      if (ownerChanged && !riskChanged && alertRisks.length && changed.status === 'ACTIVE' && !changed.archived) {
+        await lifecycleEvent(tx, { eventType: 'PROJECT_RISKS_CHANGED', requestId: `${actor.id}:${input.requestId}:owner-risk`, projectId: id,
+          demandId: changed.demandId ?? undefined, recipientIds: [changed.primaryOwnerId], riskVersion: changed.riskVersion, risks: alertRisks, reason: '主负责人已变更，请关注当前项目风险' })
+      }
       return { id, version: changed.version }
     })
   }

@@ -12,6 +12,7 @@
         <ElTabPane v-for="group in groups" :key="group.key" :label="group.label + ' ' + group.rows.length" :name="group.key" />
       </ElTabs>
       <ElAlert v-if="error" :title="error" type="error" :closable="false"><ElButton @click="retry">重新加载</ElButton></ElAlert>
+      <ElAlert v-if="refreshError" :title="refreshError" type="warning" :closable="false"><ElButton @click="retry">重新加载</ElButton></ElAlert>
       <ElSkeleton v-if="loading" :rows="4" animated />
       <div v-for="group in visibleGroups" :key="group.key" class="art-card p-5 mb-5">
         <div class="art-card-header mb-3"><div class="title"><h4>{{ group.label }} <ElTag size="small">{{ group.rows.length }}</ElTag></h4><p class="text-xs text-g-500 mt-2">{{ group.hint }}</p></div></div>
@@ -99,25 +100,34 @@
   )
   function closeProposal() {
     proposalId.value = ''
-    const { proposalId: _, ...query } = route.query
+    const query = { ...route.query }
+    delete query.proposalId
     void router.replace({ query })
   }
   const heading = computed(
     () =>
       ({ manager: '今日待办', engineer: '我的待办', business: '我的待办' })[store.currentUser.role]
   )
-  const { data, loading, error, retry } = useLiveQuery<DashboardResult>('/dashboard', () => ({
+  const { data, loading, error, refreshError, retry } = useLiveQuery<DashboardResult>('/dashboard', () => ({
     scope: 'all'
   }))
+  type WorkspaceRevisionSnapshot = { revision: number; workspaceRevision?: string }
+  const snapshotRevision = computed(() => {
+    const current = store.snapshot as unknown as WorkspaceRevisionSnapshot | null
+    return current?.workspaceRevision ?? (current ? String(current.revision) : '')
+  })
+  const dashboardRevisionMatches = computed(() =>
+    Boolean(data.value?.revision && snapshotRevision.value && data.value.revision === snapshotRevision.value)
+  )
   const taskRows = computed(() => {
     if (!store.database) return []
-    if (runtimeConfig.isPrototype) return responsibilityTasks(store.database, store.currentUser)
-    if (!data.value) return []
-    const database = { ...store.database, projects: data.value.projects }
-    return responsibilityTasks(database, store.currentUser)
+    const currentTasks = responsibilityTasks(store.database, store.currentUser)
+    if (runtimeConfig.isPrototype) return currentTasks
+    const attentionDays = dashboardRevisionMatches.value ? data.value?.attentionDays : undefined
+    return currentTasks
       .map((task) => ({
         ...task,
-        days: task.projectId ? (data.value!.attentionDays[task.projectId] ?? task.days) : task.days
+        days: task.projectId ? (attentionDays?.[task.projectId] ?? task.days) : task.days
       }))
       .sort((a, b) => compareTasks(a, b, store.currentUser.role === 'manager'))
   })

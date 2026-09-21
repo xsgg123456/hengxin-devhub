@@ -5,7 +5,10 @@ import { sendWorkMessage, workMessageResult, type MessageClient } from '../dingt
 import { prepareManagerRiskDigest } from './manager-risk-digest.js'
 import { sendRobotMessage, robotMessageResult, type RobotClient } from '../dingtalk/dingtalk-robot-message.js'
 import { recipientScope, skipHistoricalNotifications, type NotificationScope } from './notification-scope.js'
-import { notificationProjectLabels } from './notification-project.js'
+import { riskState } from '../risks/risk-state.js'
+import { isEngineerEligible } from '../../lib/it-department.js'
+import { notificationContent } from './notification-content.js'
+export { notificationContent } from './notification-content.js'
 
 const supported = new Set(['DEMAND_SUBMITTED', 'ACCEPTANCE_SUBMITTED', 'ACCEPTANCE_RETURNED', 'PROPOSAL_ASSIGNED', 'PROPOSAL_RETURNED', 'MANAGER_RISK_DIGEST', 'PROJECT_RISKS_CHANGED', 'DEMAND_RETURNED', 'DEMAND_APPROVED', 'PROJECT_ASSIGNED', 'PROJECT_COMPLETED'])
 const samples = new Set(['user-manager-chen', 'user-business-li', 'user-engineer-wang', 'user-engineer-zhao'])
@@ -18,66 +21,6 @@ export type NotificationOptions = NotificationScope & {
   channel?: 'work' | 'robot'; robotCode?: string
 }
 export type NotificationOutcome = { accepted: number; sent: number; failed: number; skipped: number; unknown: number }
-
-export function notificationContent(item: Omit<Item, 'project'> & { project: Omit<NonNullable<Item['project']>, 'members'> | null }, origin: string) {
-  const payload = item.payload && typeof item.payload === 'object' && !Array.isArray(item.payload) ? item.payload : {}
-  if (item.eventType === 'MANAGER_RISK_DIGEST') {
-    const projects = Array.isArray(payload.projects) ? payload.projects : []
-    const blocks = projects.flatMap(project => {
-      if (!project || typeof project !== 'object' || Array.isArray(project) || typeof project.projectId !== 'string') return []
-      const labels = notificationProjectLabels(typeof project.parentProjectId === 'string' ? project.parentProjectId : null,
-        typeof project.stage === 'string' ? project.stage : '',
-        Array.isArray(project.risks) ? project.risks.filter((risk): risk is string => typeof risk === 'string') : [])
-      return [[`${labels.type}：${project.name}`, `负责人：${project.owner}`, ...(labels.stage ? [`阶段：${labels.stage}`] : []),
-        ...labels.risks,
-        `查看详情：${new URL(`/#/project-overview?projectId=${encodeURIComponent(project.projectId)}`, origin).href}`].join('\n')]
-    })
-    const overview = `查看全部：${new URL('/#/project-overview', origin).href}`
-    const reserve = Buffer.byteLength(`\n其余 ${blocks.length} 个项目请点总览\n${overview}`, 'utf8')
-    let content = '项目风险汇总', shown = 0
-    for (const block of blocks) {
-      if (Buffer.byteLength(`${content}\n${block}`, 'utf8') + reserve > 1800) break
-      content += `\n${block}`
-      shown++
-    }
-    return shown < blocks.length ? `${content}\n其余 ${blocks.length - shown} 个项目请点总览\n${overview}` : content
-  }
-  const title: Record<string, string> = {
-    DEMAND_SUBMITTED: '新需求待立项审批，请及时处理',
-    ACCEPTANCE_SUBMITTED: '项目待业务验收', ACCEPTANCE_RETURNED: '业务验收退回整改',
-    PROPOSAL_ASSIGNED: '项目待确认接单', PROPOSAL_RETURNED: '工程师退回管理评估',
-    PROJECT_RISKS_CHANGED: '项目风险提醒', DEMAND_RETURNED: '需求已退回',
-    DEMAND_APPROVED: '需求已正式立项', PROJECT_ASSIGNED: '项目已分配', PROJECT_COMPLETED: '项目已完成'
-  }
-  if (item.recipient.role === 'ENGINEER' && item.project?.primaryOwnerId === item.recipientId) {
-    title.DEMAND_APPROVED = '需求已正式立项，请制定计划'
-    title.PROJECT_ASSIGNED = '项目已正式立项，请制定计划'
-  }
-  const optimization = !!(item.project?.parentProjectId ?? item.demand?.parentProjectId)
-  if (optimization) {
-    Object.assign(title, {
-      DEMAND_SUBMITTED: '项目优化待审批，请及时处理',
-      DEMAND_APPROVED: '项目优化已批准', PROJECT_ASSIGNED: '项目优化已分配',
-      PROPOSAL_ASSIGNED: '项目优化待确认接单', PROPOSAL_RETURNED: '项目优化退回管理评估',
-      ACCEPTANCE_SUBMITTED: '项目优化待完成验收', ACCEPTANCE_RETURNED: '项目优化验收退回整改',
-      PROJECT_COMPLETED: '项目优化已完成', DEMAND_RETURNED: '项目优化需求已退回',
-      PROJECT_RISKS_CHANGED: '项目优化风险提醒'
-    })
-    if (item.recipient.role === 'ENGINEER' && item.project?.primaryOwnerId === item.recipientId) {
-      title.DEMAND_APPROVED = '项目优化已批准，请制定计划'
-      title.PROJECT_ASSIGNED = '项目优化已批准，请制定计划'
-    }
-  }
-  const risks = Array.isArray(payload.risks) ? payload.risks.filter((risk): risk is string =>
-    typeof risk === 'string' && (item.recipient.role === 'MANAGER' || /临期|延期|未更新|阻塞/.test(risk))) : []
-  const path = typeof payload.proposalId === 'string' ? `/#/today-tasks?proposalId=${encodeURIComponent(payload.proposalId)}` : item.projectId ? `/#/project-overview?projectId=${encodeURIComponent(item.projectId)}` :
-    `/#/my-demands?demandId=${encodeURIComponent(item.demandId ?? '')}`
-  return [title[item.eventType], `${optimization ? '项目优化' : '正式项目'}：${item.project?.name ?? item.demand?.name ?? payload.name ?? '需求'}`,
-    item.project ? `负责人：${item.project.primaryOwner.name}` : '',
-    ...notificationProjectLabels(optimization ? 'optimization' : null, item.project?.stage ?? '', risks).risks,
-    typeof payload.reason === 'string' ? `原因：${payload.reason}` : '',
-    `查看详情：${new URL(path, origin).href}`].filter(Boolean).join('\n')
-}
 
 export class NotificationService {
   constructor(private readonly db: PrismaClient, private readonly client: MessageClient & Partial<RobotClient>, private readonly options: NotificationOptions) {}
@@ -126,7 +69,29 @@ export class NotificationService {
     }
   }
 
-  private skip(item: Item) {
+  /**
+   * Serialize the final notification decision with the rows it describes.
+   * Project edits and progress/plan writes already lock these rows; taking the
+   * same row locks here means a flush cannot send a pre-edit snapshot while a
+   * change is committing.
+   */
+  private async lockCurrentTargets(tx: Prisma.TransactionClient, item: Item) {
+    const demandIds = item.demandId ? [item.demandId] : []
+    const projectIds = item.projectId ? [item.projectId] : []
+    const payload = item.payload && typeof item.payload === 'object' && !Array.isArray(item.payload) ? item.payload : {}
+    if (item.eventType === 'MANAGER_RISK_DIGEST' && Array.isArray(payload.projects)) {
+      for (const project of payload.projects) {
+        if (project && typeof project === 'object' && !Array.isArray(project) && typeof project.projectId === 'string')
+          projectIds.push(project.projectId)
+      }
+    }
+    for (const id of [...new Set(demandIds)].sort())
+      await tx.$queryRaw`SELECT id FROM demands WHERE id = ${id} FOR UPDATE`
+    for (const id of [...new Set(projectIds)].sort())
+      await tx.$queryRaw`SELECT id FROM projects WHERE id = ${id} FOR UPDATE`
+  }
+
+  private async skip(item: Item, tx: Prisma.TransactionClient) {
     const payload = item.payload && typeof item.payload === 'object' && !Array.isArray(item.payload) ? item.payload : {}
     const submissionExpired = item.eventType === 'DEMAND_SUBMITTED' && (
       !item.demand || item.demand.status !== 'PENDING' ||
@@ -137,17 +102,85 @@ export class NotificationService {
       payload.acceptanceRound !== item.project.acceptanceRound ||
       (item.eventType === 'ACCEPTANCE_SUBMITTED' && (item.project.acceptanceStatus !== 'pending' || item.project.acceptanceOwnerId !== item.recipientId)) ||
       (item.eventType === 'ACCEPTANCE_RETURNED' && (item.project.acceptanceStatus !== 'returned' || item.project.primaryOwnerId !== item.recipientId)))
-    const assignmentExpired = item.eventType === 'PROJECT_ASSIGNED' && (!item.project || ![
+    const currentProjectRecipients = item.project ? [
       item.project.primaryOwnerId, ...item.project.members.map(member => member.userId),
       item.project.businessOwnerId
-    ].includes(item.recipientId))
-    return submissionExpired || acceptanceExpired || assignmentExpired || (item.eventType !== 'MANAGER_RISK_DIGEST' && !item.projectId && !item.demandId && typeof payload.proposalId !== 'string') ||
+    ] : []
+    const currentProjectRecipient = currentProjectRecipients.includes(item.recipientId)
+    const recipientQualified = item.recipient.role !== 'ENGINEER' || isEngineerEligible(item.recipient)
+    const assignmentExpired = item.eventType === 'PROJECT_ASSIGNED' && (
+      !item.project || !currentProjectRecipient || !recipientQualified
+    )
+    const completedExpired = item.eventType === 'PROJECT_COMPLETED' && (
+      !item.project ||
+      item.project.status !== 'COMPLETED' ||
+      item.project.archived ||
+      item.project.simpleStatus !== 'completed' ||
+      item.project.acceptanceStatus !== 'accepted' ||
+      !item.project.actualCompletedAt ||
+      !currentProjectRecipient ||
+      !recipientQualified
+    )
+    const demandApprovedExpired = item.eventType === 'DEMAND_APPROVED' && (
+      !item.demand || (item.project
+        ? !currentProjectRecipient || !recipientQualified
+        : item.recipientId !== item.demand.ownerId)
+    )
+    const currentRisks = Array.isArray(item.project?.risks) ? item.project.risks.filter((risk): risk is string => typeof risk === 'string') : []
+    const payloadRisks = Array.isArray(payload.risks) ? payload.risks.filter((risk): risk is string => typeof risk === 'string') : []
+    const payloadRiskVersion = typeof payload.riskVersion === 'number' ? payload.riskVersion : undefined
+    const currentAlertRisks = currentRisks.filter(risk => /临期|延期|未更新|阻塞/.test(risk))
+    const payloadAlertRisks = payloadRisks.filter(risk => /临期|延期|未更新|阻塞/.test(risk))
+    const riskPayloadMatches = item.recipient.role === 'MANAGER'
+      ? JSON.stringify(payloadRisks) === JSON.stringify(currentRisks)
+      : JSON.stringify(payloadAlertRisks) === JSON.stringify(currentAlertRisks)
+    const riskExpired = item.eventType === 'PROJECT_RISKS_CHANGED' && (
+      !item.project || item.project.status !== 'ACTIVE' || item.project.archived ||
+      payloadRiskVersion === undefined || payloadRiskVersion !== item.project.riskVersion ||
+      !riskPayloadMatches ||
+      (item.recipient.role === 'MANAGER'
+        ? riskState(payloadRisks) !== riskState(currentRisks)
+        : riskState(payloadAlertRisks) !== riskState(currentAlertRisks))
+    )
+    let digestExpired = false
+    if (item.eventType === 'MANAGER_RISK_DIGEST') {
+      const digestProjects: Record<string, unknown>[] = (Array.isArray(payload.projects) ? payload.projects : [])
+        .flatMap(project => project && typeof project === 'object' && !Array.isArray(project)
+          ? [project as Record<string, unknown>]
+          : [])
+      const ids = [...new Set(digestProjects.flatMap(project => typeof project.projectId === 'string' ? [project.projectId] : []))]
+      if (!ids.length || ids.length !== digestProjects.length) digestExpired = true
+      else {
+        const currentProjects = await tx.project.findMany({ where: { id: { in: ids } }, include: { primaryOwner: { select: { name: true } } } })
+        const currentById = new Map(currentProjects.map(project => [project.id, project]))
+        digestExpired = digestProjects.some((entry) => {
+          const project = currentById.get(entry.projectId as string)
+          // Deletion cleanup owns entries whose foreign key no longer exists;
+          // only projects that still exist can make a digest stale.
+          if (!project) return false
+          const snapshotFields = ['name', 'stage', 'parentProjectId', 'owner', 'risks', 'riskVersion']
+          // Existing projects must carry the complete snapshot written by the
+          // current producer. A legacy partial payload cannot prove that its
+          // details are still current, so it is discarded. Deleted projects
+          // are handled by cleanup and may be discarded without a lookup.
+          if (!snapshotFields.every(key => key in entry)) return true
+          if (typeof entry.riskVersion !== 'number' || !Array.isArray(entry.risks)) return true
+          if (project.status !== 'ACTIVE' || project.archived) return true
+          if (entry.name !== project.name || entry.stage !== project.stage || entry.parentProjectId !== project.parentProjectId || entry.owner !== project.primaryOwner.name) return true
+          if (JSON.stringify(entry.risks) !== JSON.stringify(project.risks)) return true
+          if (entry.riskVersion !== project.riskVersion) return true
+          return false
+        })
+      }
+    }
+    return submissionExpired || acceptanceExpired || assignmentExpired || completedExpired || demandApprovedExpired || riskExpired || digestExpired || (item.eventType !== 'MANAGER_RISK_DIGEST' && !item.projectId && !item.demandId && typeof payload.proposalId !== 'string') ||
       (item.eventType === 'MANAGER_RISK_DIGEST' && (!Array.isArray(payload.projects) || payload.projects.length === 0)) ||
       !supported.has(item.eventType) || !item.recipient.active || !item.recipient.dingUserId ||
       (item.eventType === 'PROPOSAL_RETURNED' && !canApproveProjects(item.recipient, this.options.projectApproverDingUserId ?? '')) ||
       (item.eventType === 'MANAGER_RISK_DIGEST' && item.recipient.role !== 'MANAGER') ||
       (item.eventType === 'PROJECT_RISKS_CHANGED' && item.recipient.role !== 'MANAGER' &&
-        !(item.project?.acceptanceStatus !== 'pending' && item.recipient.role === 'ENGINEER' && item.project?.primaryOwnerId === item.recipientId)) ||
+        !(item.project?.acceptanceStatus !== 'pending' && item.recipient.role === 'ENGINEER' &&
+          isEngineerEligible(item.recipient) && item.project?.primaryOwnerId === item.recipientId)) ||
       samples.has(item.recipientId) || item.projectId === 'project-demo' || item.demandId === 'demand-demo-owned'
       || [item.recipientId,item.projectId,item.demandId].some(id=>id?.startsWith('sample-'))
   }
@@ -165,7 +198,16 @@ export class NotificationService {
       // the lock so a batch cannot hold deletion behind five network requests.
       await this.db.$transaction(async tx => {
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':notification-flush', 0))::text`
-        const item = await tx.notificationOutbox.findUnique({ where: { id: claimed.id }, include })
+        let item = await tx.notificationOutbox.findUnique({ where: { id: claimed.id }, include })
+        if (!item || item.status === 'SENT' || !['CLAIMED', 'SENDING', 'POLLING'].includes(item.deliveryLog?.state ?? '')) {
+          outcome.skipped++
+          return
+        }
+        await this.lockCurrentTargets(tx, item)
+        // The claim query intentionally loads a small batch. Re-read all
+        // relations after row locks so responsibility, risk and lifecycle
+        // checks use the version that won the write race.
+        item = await tx.notificationOutbox.findUnique({ where: { id: claimed.id }, include })
         if (!item || item.status === 'SENT' || !['CLAIMED', 'SENDING', 'POLLING'].includes(item.deliveryLog?.state ?? '')) {
           outcome.skipped++
           return
@@ -212,7 +254,7 @@ export class NotificationService {
           outcome.skipped++
           return
         }
-        if (this.skip(item)) {
+        if (await this.skip(item, tx)) {
           await this.record(tx, item, 'SKIPPED', now, '目标停用、未绑定、样例数据或事件不支持')
           outcome.skipped++
           return

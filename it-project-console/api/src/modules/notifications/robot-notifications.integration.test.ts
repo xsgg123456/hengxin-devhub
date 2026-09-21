@@ -19,11 +19,11 @@ const options: NotificationOptions = { channel: 'robot', robotCode: 'fixture-bot
   webOrigin: 'https://console.example.test', enabled: true, startAt }
 const client = () => ({ legacy: vi.fn(), robot: vi.fn().mockResolvedValue({ processQueryKey: 'fixture-key' }) })
 async function fixture(createdAt = startAt, role: 'ENGINEER' | 'MANAGER' = 'ENGINEER') {
-  const user = await db.user.create({ data: { name: '机器人测试员工', department: '测试部', dingUserId: randomUUID(), role } })
+  const user = await db.user.create({ data: { name: '机器人测试员工', department: role === 'ENGINEER' ? 'IT部' : '测试部', dingUserId: randomUUID(), role } })
   users.push(user.id)
   const project = await db.project.create({ data: { name: '机器人测试项目', primaryOwnerId: user.id, risks: ['交付延期 2 天'] } })
   const item = await db.notificationOutbox.create({ data: { recipientId: user.id, projectId: project.id,
-    eventType: 'PROJECT_RISKS_CHANGED', idempotencyKey: randomUUID(), payload: { risks: ['交付延期 2 天'] }, createdAt, availableAt: startAt } })
+    eventType: 'PROJECT_RISKS_CHANGED', idempotencyKey: randomUUID(), payload: { riskVersion: project.riskVersion, risks: ['交付延期 2 天'] }, createdAt, availableAt: startAt } })
   return { user, project, item }
 }
 const log = (id: string) => db.notificationLog.findUniqueOrThrow({ where: { outboxId: id } })

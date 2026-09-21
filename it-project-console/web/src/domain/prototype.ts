@@ -53,7 +53,12 @@ export interface DemoDemand {
   name: string
   description: string
   department: string
+  originalDepartment?: string
   submitterId: string
+  originalSubmitterId?: string
+  currentOwnerId?: string | null
+  businessOwnerId?: string | null
+  projectId?: string | null
   expectedLaunchDate: string
   prd: DemoAttachment | null
   prototype: DemoAttachment | null
@@ -91,6 +96,7 @@ export interface ProjectProposal {
 export type AcceptanceAction = 'assign' | 'submit' | 'withdraw' | 'return' | 'accept'
 export interface AcceptanceHistory {
   id: string
+  requestId?: string
   action: AcceptanceAction | 'invalidate'
   actorId: string
   createdAt: string
@@ -103,7 +109,7 @@ export interface DemoProject {
   legacyCode?: string | null
   parentProjectId?: string | null
   firstRequestedOn?: string
-  businessOwnerId?: string
+  businessOwnerId?: string | null
   description?: string
   migrationVerified?: boolean
   acceptanceOwnerId?: string | null
@@ -229,6 +235,7 @@ export interface DemoLifecycleEvent {
 export interface PrototypeSnapshot {
   schemaVersion: 2
   revision: number
+  workspaceRevision?: string
   activeUserId: string
   scenario: PrototypeScenario
   database: PrototypeDatabase

@@ -5,6 +5,14 @@ import { getPrototypeDriver } from '@/store/business-runtime'
 import { assertWrite } from '@/services/workflow-validation'
 import { apiRequest, ApiError } from '@/services/api-client'
 import { getNavigation } from '@/router/access'
+import { effectiveDemands } from '@/services/demand-view'
+
+export type RefreshLiveResult =
+  | { status: 'applied'; revision: string }
+  | { status: 'superseded' }
+  | { status: 'failed'; error: string }
+
+type WorkspaceSnapshot = PrototypeSnapshot & { workspaceRevision?: string }
 
 export const usePrototypeStore = defineStore('prototypeStore', () => {
   const snapshot = ref<PrototypeSnapshot | null>(null)
@@ -15,6 +23,7 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
   const saving = ref(false)
   const resetVersion = ref(0)
   const loadError = ref('')
+  const syncError = ref('')
   const authRequired = ref(false)
   const pendingUploads = ref(0)
   const uploading = computed(() => pendingUploads.value > 0)
@@ -51,8 +60,8 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
   })
 
   const visibleDemands = computed(() => {
-    const demands = database.value?.demands ?? []
-    return demands
+    const db = database.value
+    return db ? effectiveDemands(db) : []
   })
 
   function getRepository() {
@@ -63,26 +72,38 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
 
   let requestVersion = 0
   watch(authRequired, () => { requestVersion++ }, { flush: 'sync' })
-  async function refreshLive(options: { background?: boolean; signal?: AbortSignal } = {}): Promise<void> {
+  async function refreshLive(
+    options: { background?: boolean; signal?: AbortSignal } = {}
+  ): Promise<RefreshLiveResult> {
     const request = ++requestVersion
     try {
-      const result = await apiRequest<PrototypeSnapshot>('/workspace', {
+      const result = await apiRequest<WorkspaceSnapshot>('/workspace', {
         signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(30000)]) : undefined
       })
-      if (request !== requestVersion || options.signal?.aborted) return
+      if (request !== requestVersion || options.signal?.aborted)
+        return { status: 'superseded' }
       snapshot.value = result
       loadError.value = ''
+      syncError.value = ''
       authRequired.value = false
       ready.value = true
+      return {
+        status: 'applied',
+        revision: result.workspaceRevision ?? String(result.revision)
+      }
     } catch (error) {
-      if (request !== requestVersion || options.signal?.aborted) throw error
+      if (request !== requestVersion || options.signal?.aborted)
+        return { status: 'superseded' }
       if (error instanceof ApiError && error.status === 401) {
         snapshot.value = null
         authRequired.value = true
         ready.value = false
       }
-      if (!options.background) loadError.value = error instanceof Error ? error.message : '数据加载失败'
-      throw error
+      const rawMessage = error instanceof Error ? error.message : ''
+      const message = /[\u4e00-\u9fff]/.test(rawMessage) ? rawMessage : '数据加载失败，请重试'
+      if (options.background) syncError.value = message
+      else loadError.value = message
+      return { status: 'failed', error: message }
     }
   }
 
@@ -91,11 +112,9 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
     saving.value = true
     try {
       const result = await command()
-      try {
-        await refreshLive()
-      } catch {
-        if (!authRequired.value) loadError.value = '操作已成功，但数据刷新失败，请刷新后继续'
-      }
+      const refreshed = await refreshLive()
+      if (refreshed.status !== 'applied' && !authRequired.value)
+        loadError.value = '操作已成功，但数据刷新失败，请刷新后继续'
       return result
     } finally {
       saving.value = false
@@ -177,6 +196,7 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
 
   return {
     loadError,
+    syncError,
     authRequired,
     refreshLive,
     runLiveCommand,

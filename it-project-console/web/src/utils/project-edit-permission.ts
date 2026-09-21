@@ -1,6 +1,7 @@
 import type { DemoProject, DemoUser } from '@/domain/prototype'
 import { runtimeConfig } from '@/config/runtime'
 import { canApproveProjects } from './project-approver'
+import { isEngineerEligible } from './engineer-eligibility'
 
 export const isMigrationPending = (project: DemoProject) =>
   project.migrationVerified === false ||
@@ -8,4 +9,4 @@ export const isMigrationPending = (project: DemoProject) =>
 
 export const canEditProject = (user: DemoUser, project: DemoProject) =>
   canApproveProjects(user) ||
-  (user.role === 'engineer' && project.primaryOwnerId === user.id && isMigrationPending(project))
+  (user.role === 'engineer' && isEngineerEligible(user) && project.primaryOwnerId === user.id && isMigrationPending(project))

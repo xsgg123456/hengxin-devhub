@@ -29,11 +29,16 @@ export function registerDashboardRoutes(
       data: await db.$transaction(
         async (tx) => {
           const { projects, users } = await readProjects(tx)
-          return personWorkload(
-            filterProjects(projects, users, request.query, request.actor!.id),
-            users,
-            request.query.month
-          )
+          const revision = await tx.$queryRaw<Array<{ revision: string }>>
+            `SELECT revision::text FROM workspace_revision WHERE id = 1`
+          return {
+            workspaceRevision: revision[0]?.revision ?? '',
+            rows: personWorkload(
+              filterProjects(projects, users, request.query, request.actor!.id),
+              users,
+              request.query.month
+            )
+          }
         },
         { isolationLevel: 'RepeatableRead' }
       )
@@ -46,13 +51,18 @@ export function registerDashboardRoutes(
       data: await db.$transaction(
         async (tx) => {
           const { projects } = await readProjects(tx)
-          return buildGanttRows(
-            projects.filter(
-              (p) => request.query.scope !== 'mine' || assigned(p, request.actor!.id)
-            ),
-            request.query.month,
-            request.query
-          )
+          const revision = await tx.$queryRaw<Array<{ revision: string }>>
+            `SELECT revision::text FROM workspace_revision WHERE id = 1`
+          return {
+            workspaceRevision: revision[0]?.revision ?? '',
+            rows: buildGanttRows(
+              projects.filter(
+                (p) => request.query.scope !== 'mine' || assigned(p, request.actor!.id)
+              ),
+              request.query.month,
+              request.query
+            )
+          }
         },
         { isolationLevel: 'RepeatableRead' }
       )

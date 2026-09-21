@@ -61,6 +61,9 @@
         <ElAlert v-else-if="error" :title="error" type="error" :closable="false"
           ><ElButton @click="retry">重新加载</ElButton></ElAlert
         >
+        <ElAlert v-else-if="refreshError" :title="refreshError" type="warning" :closable="false"
+          ><ElButton @click="retry">重新加载</ElButton></ElAlert
+        >
         <ElAlert
           v-else-if="store.corrupted || !store.database"
           title="项目数据读取失败，请刷新后重试"
@@ -101,13 +104,13 @@
 <script setup lang="ts">
   import { runtimeConfig } from '@/config/runtime'
   import { useLiveQuery } from '@/hooks/business/use-live-query'
-  import type { GanttRow } from '@/services/gantt-service'
+  import type { GanttResult } from '@/services/live-dashboard-types'
+  import { buildGanttRows, shiftMonth } from '@/services/gantt-service'
   import BusinessPageState from '@/components/system/business-page-state.vue'
   import { computed, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { currentDate } from '@/utils/project-display'
-  import { buildGanttRows, shiftMonth } from '@/services/gantt-service'
   import MonthlyGantt from '@/components/project/monthly-gantt.vue'
   import ProjectDetailDrawer from '@/components/project/project-detail-drawer.vue'
   import ProgressUpdateDrawer from '@/components/project/progress-update-drawer.vue'
@@ -143,7 +146,7 @@
       store.database?.scheduleChanges
     )
   )
-  const { data, loading, error, retry } = useLiveQuery<GanttRow[]>('/gantt', () => ({
+  const { data, loading, error, refreshError, retry } = useLiveQuery<GanttResult>('/gantt', () => ({
     month: month.value,
     projectType: projectType.value === 'formal' ? 'normal' : projectType.value === 'optimization' ? 'optimization' : undefined,
     department: department.value,
@@ -152,7 +155,7 @@
     includeArchived: includeArchived.value
   }))
   const rows = computed(() =>
-    (runtimeConfig.isPrototype ? prototypeRows.value : (data.value ?? [])).filter(row => projectType.value === 'all' || (projectType.value === 'optimization') === !!row.project.parentProjectId)
+    (runtimeConfig.isPrototype ? prototypeRows.value : (data.value?.rows ?? [])).filter(row => projectType.value === 'all' || (projectType.value === 'optimization') === !!row.project.parentProjectId)
   )
   const detailOpen = computed(() => typeof route.query.projectId === 'string')
   const selected = computed(

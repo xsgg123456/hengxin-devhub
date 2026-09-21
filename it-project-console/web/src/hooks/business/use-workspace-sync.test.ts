@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { effectScope, nextTick, reactive } from 'vue'
 import { useWorkspaceSync } from './use-workspace-sync'
-const mocks = vi.hoisted(() => ({ request: vi.fn(), refresh: vi.fn(), prototype: false }))
+const mocks = vi.hoisted(() => ({
+  request: vi.fn(),
+  refresh: vi.fn(),
+  prototype: false,
+  appliedRevision: 'initial'
+}))
 const state = reactive({ ready: true, authRequired: false, currentUser: { id: 'one' }, refreshLive: mocks.refresh })
 vi.mock('@/store/modules/prototype', () => ({ usePrototypeStore: () => state }))
 vi.mock('@/services/api-client', () => ({ apiRequest: mocks.request }))
@@ -16,8 +21,8 @@ let doc: EventTarget & { visibilityState: string }
 let win: EventTarget
 let scope: ReturnType<typeof effectScope>
 beforeEach(() => {
-  vi.useFakeTimers(); mocks.request.mockReset(); mocks.refresh.mockReset().mockResolvedValue(undefined)
-  mocks.prototype = false; state.ready = true; state.authRequired = false
+  vi.useFakeTimers(); mocks.request.mockReset(); mocks.refresh.mockReset().mockImplementation(() => Promise.resolve({ status: 'applied', revision: mocks.appliedRevision }))
+  mocks.prototype = false; mocks.appliedRevision = 'initial'; state.ready = true; state.authRequired = false
   doc = Object.assign(new EventTarget(), { visibilityState: 'visible' }); win = new EventTarget()
   vi.stubGlobal('document', doc); vi.stubGlobal('window', win); vi.stubGlobal('navigator', { onLine: true })
   vi.stubGlobal('EventSource', Stream); Stream.instances = []; scope = effectScope()
@@ -26,7 +31,7 @@ afterEach(() => { scope.stop(); vi.unstubAllGlobals(); vi.useRealTimers() })
 it('变更信号去重，并在连接恢复时补拉', async () => {
   scope.run(useWorkspaceSync); await nextTick()
   const stream = Stream.instances[0]
-  stream.change('v1'); await nextTick()
+  mocks.appliedRevision = 'v1'; stream.change('v1'); await nextTick()
   const calls = mocks.refresh.mock.calls.length
   stream.change('v1'); await nextTick()
   expect(mocks.refresh).toHaveBeenCalledTimes(calls)
@@ -37,14 +42,28 @@ it('变更信号去重，并在连接恢复时补拉', async () => {
 })
 it('刷新期间收到新版本合并排队，不漏最后一次修改', async () => {
   let finish!: () => void
-  mocks.refresh.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve }))
+  mocks.refresh.mockImplementationOnce(() => new Promise(resolve => {
+    finish = () => resolve({ status: 'applied', revision: mocks.appliedRevision })
+  }))
   scope.run(useWorkspaceSync)
   const stream = Stream.instances[0]
   stream.change('v2'); stream.change('v3')
   expect(mocks.refresh).toHaveBeenCalledTimes(1)
-  finish(); await nextTick(); await nextTick()
+  mocks.appliedRevision = 'v1'; finish(); mocks.appliedRevision = 'v3'; await nextTick(); await nextTick(); await Promise.resolve()
   expect(mocks.refresh).toHaveBeenCalledTimes(2)
   stream.change('v3'); await nextTick()
+  expect(mocks.refresh).toHaveBeenCalledTimes(2)
+})
+it('已应用快照落后于事件版本时只补拉一次，不把旧事件版本变成死循环目标', async () => {
+  scope.run(useWorkspaceSync); await nextTick()
+  const stream = Stream.instances[0]
+  mocks.refresh.mockReset()
+    .mockResolvedValueOnce({ status: 'applied', revision: 'v1' })
+    .mockResolvedValueOnce({ status: 'applied', revision: 'v2' })
+  stream.change('v2'); await nextTick()
+  await vi.advanceTimersByTimeAsync(1000)
+  expect(mocks.refresh).toHaveBeenCalledTimes(2)
+  await vi.advanceTimersByTimeAsync(5000)
   expect(mocks.refresh).toHaveBeenCalledTimes(2)
 })
 it('SSE不可用时30秒版本兜底，失败不会标记已同步', async () => {
@@ -54,9 +73,10 @@ it('SSE不可用时30秒版本兜底，失败不会标记已同步', async () =>
   await vi.advanceTimersByTimeAsync(30000)
   const calls = mocks.refresh.mock.calls.length
   await vi.advanceTimersByTimeAsync(30000)
-  expect(mocks.refresh).toHaveBeenCalledTimes(calls + 1)
+  expect(mocks.refresh.mock.calls.length).toBeGreaterThan(calls)
+  const recovered = mocks.refresh.mock.calls.length
   await vi.advanceTimersByTimeAsync(30000)
-  expect(mocks.refresh).toHaveBeenCalledTimes(calls + 1)
+  expect(mocks.refresh.mock.calls.length).toBeGreaterThan(recovered)
 })
 it('隐藏、退出和卸载清理连接及计时，回前台重建', async () => {
   scope.run(useWorkspaceSync); await nextTick()

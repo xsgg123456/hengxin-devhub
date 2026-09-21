@@ -15,6 +15,7 @@ import { correctProject } from '@/services/management-service'
 import { usePrototypeStore } from '@/store/modules/prototype'
 import { useUnsavedForm } from '@/hooks/business/use-unsaved-form'
 import { useRecordStaleness } from '@/hooks/business/use-record-staleness'
+import { isEngineerEligible } from '@/utils/engineer-eligibility'
 export function useProgressForm(
   props: { modelValue: boolean; project: DemoProject | null; correction?: boolean },
   emit: (event: 'update:modelValue', value: boolean) => void
@@ -23,9 +24,12 @@ export function useProgressForm(
   let operationKey = liveOperationKey()
   const version = ref<number>()
   const stale = useRecordStaleness('project', () => props.project?.id, () => version.value)
+  const canAct = computed(() =>
+    store.currentUser.role === 'manager' ||
+    (store.currentUser.role === 'engineer' && isEngineerEligible(store.currentUser))
+  )
   const overall = computed(
-    () =>
-      store.currentUser.role === 'manager' || store.currentUser.id === props.project?.primaryOwnerId
+    () => canAct.value && (store.currentUser.role === 'manager' || store.currentUser.id === props.project?.primaryOwnerId)
   )
   const form = ref<ProgressInput>({ projectId: '', kind: 'overall', summary: '' })
   const correctionStage = ref<ProjectStage>('方案设计')
@@ -96,6 +100,7 @@ export function useProgressForm(
     }
   )
   async function save(): Promise<void> {
+    if (!canAct.value) { error.value = '当前账号已无工程师资格，请联系管理员完成交接'; return }
     if (stale.value) { error.value = stale.value; return }
     if (busy.value || !(await formRef.value?.validate().catch(() => false))) return
     if (overall.value && !props.correction && unplanned.value) {
@@ -154,6 +159,7 @@ export function useProgressForm(
   }
   return {
     stale,
+    canAct,
     overall,
     form,
     correctionStage,

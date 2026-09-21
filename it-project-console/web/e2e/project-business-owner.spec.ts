@@ -29,3 +29,31 @@ test('项目卡片和详情展示当前业务负责人，直接创建与原提�
   // The projectId deep link restores the detail drawer after reload.
   await expect(detailOwner()).toContainText('未设置')
 })
+
+test('关联项目改派后，需求列表和深链详情同时显示当前部门、业务负责人并保留原提出人', async ({ page }) => {
+  await page.goto('/')
+  await reset(page)
+  await identity(page, '陈立峰')
+  const data = await snapshot(page)
+  const project = data.database.projects.find((item) => item.status === 'active' && !item.archived)!
+  const demand = data.database.demands.find((item) => item.id === project.demandId)!
+  const business = data.database.users.find((user) => user.role === 'business')!
+  const originalSubmitter = data.database.users.find((user) => user.id === demand.submitterId)!
+  project.department = '业务实际部门'
+  project.businessOwnerId = business.id
+  demand.department = '旧需求部门'
+  demand.submitterId = originalSubmitter.id
+  await page.evaluate(({ key, data }) => localStorage.setItem(key, JSON.stringify(data)), {
+    key: 'it-project-console.prototype.v1',
+    data
+  })
+  await page.reload()
+  await page.goto(`/#/my-demands?demandId=${encodeURIComponent(demand.id)}`)
+  const row = page.locator('.el-table__body-wrapper .el-table__row').filter({ hasText: demand.name })
+  await expect(row).toContainText('业务实际部门')
+  await expect(row).toContainText(business.name)
+  const detail = page.getByRole('dialog', { name: `需求详情 · ${demand.name}` })
+  await expect(detail).toContainText('业务实际部门')
+  await expect(detail).toContainText(`业务负责人${business.name}`)
+  await expect(detail).toContainText(`原始提出人${originalSubmitter.name}`)
+})

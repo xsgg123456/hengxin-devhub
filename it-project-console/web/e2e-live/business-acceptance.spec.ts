@@ -71,16 +71,18 @@ test('真实业务验收：管理指定、工程师提交撤回重提、业务�
   await page.route(`**/api/projects/${id}/acceptance`, async route => {
     const committed = await route.fetch()
     expect(committed.ok(), await committed.text()).toBeTruthy()
-    await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({
-      error: { code: 'UNAVAILABLE', message: '验收保存暂不可用，请重试' }
-    }) })
+    // 模拟服务端已提交、客户端响应断开；前端必须按 requestId 核对最终快照。
+    await route.abort('connectionreset')
   }, { times: 1 })
   await detail.getByRole('button', { name: '提交验收', exact: true }).click()
-  await expect(detail).toContainText('验收保存暂不可用')
-  await expect(detail.getByLabel('交付说明', { exact: true })).toHaveValue('第一轮交付：请检查导出与查询功能')
-  expect((await workspace(page)).database.projects.find(p => p.id === id)?.acceptanceStatus).toBe('pending')
-  await detail.getByRole('button', { name: '提交验收', exact: true }).click()
-  await expect(detail).toContainText('待业务验收')
+  await expect(detail).toContainText(/网络请求失败|本次验收已保存/)
+  const uncertainResult = (await workspace(page)).database.projects.find(p => p.id === id)?.acceptanceStatus
+  expect(uncertainResult).toBe('pending')
+  // 真实服务已经落库但响应被代理断开；页面应识别同一请求已提交，
+  // 同步到待业务验收，而不是让用户再次提交一个已完成的操作。
+  await expect(detail).toContainText('第一轮交付：请检查导出与查询功能')
+  await expect(detail).toContainText('已保存')
+  await expect(detail.getByRole('button', { name: '提交验收', exact: true })).toHaveCount(0)
   await expect(detail.getByRole('button', { name: '验收通过', exact: true })).toHaveCount(0)
   await expect(detail.getByRole('link', { name: '192.168.1.10:8080/acceptance', exact: true }).first()).toHaveAttribute('href', 'http://192.168.1.10:8080/acceptance')
   await detail.getByLabel('撤回原因', { exact: true }).fill('补充验证说明后重新提交')

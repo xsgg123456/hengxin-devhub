@@ -6,7 +6,9 @@ import type {
   personWorkload,
   projectDistribution
 } from './analytics-service'
+import type { GanttRow } from './gantt-service'
 export interface DashboardResult {
+  revision: string
   projects: DemoProject[]
   items: DemoProject[]
   total: number
@@ -17,10 +19,18 @@ export interface DashboardResult {
   attentionDays: Record<string, number>
 }
 export interface DemandStatistics {
+  workspaceRevision: string
   demands: DemandRow[]
   activeProjectCount: number
   submitters: ReturnType<typeof demandDistribution>
   departments: ReturnType<typeof demandDistribution>
   trend: ReturnType<typeof demandMonthlyTrend>
 }
-export type WorkloadResult = ReturnType<typeof personWorkload>
+export interface WorkloadResult {
+  workspaceRevision: string
+  rows: ReturnType<typeof personWorkload>
+}
+export interface GanttResult {
+  workspaceRevision: string
+  rows: GanttRow[]
+}

@@ -46,7 +46,20 @@ export function useLiveQuery<T>(path: string, params: WatchSource<QueryParams>) 
               signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30000)])
             }
           )
-          if (current) data.value = result
+          if (current) {
+            const versioned = result && typeof result === 'object' && !Array.isArray(result)
+              ? result as { workspaceRevision?: unknown; revision?: unknown }
+              : undefined
+            const responseRevision = typeof versioned?.workspaceRevision === 'string'
+              ? versioned.workspaceRevision
+              : typeof versioned?.revision === 'string' ? versioned.revision : ''
+            const snapshot = store.snapshot as (typeof store.snapshot & { workspaceRevision?: string }) | null
+            const currentRevision = snapshot?.workspaceRevision ?? (snapshot ? String(snapshot.revision) : '')
+            if (responseRevision && currentRevision && responseRevision !== currentRevision) {
+              data.value = undefined
+              refreshError.value = '统计数据与当前工作区版本不一致，请重新加载'
+            } else data.value = result
+          }
         } catch (cause) {
           if (current) {
             const message = cause instanceof Error ? cause.message : '数据加载失败，请重试'

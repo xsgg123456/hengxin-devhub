@@ -14,8 +14,9 @@
           ? '需求受理、立项评审已完成，请安排后续五个环节。'
           : '只安排当前及后续未完成环节，已完成环节保持原记录。'
       }}</p>
+      <ElAlert v-if="!canOperate" title="当前账号已无工程师资格，计划操作已撤销，请联系管理员完成交接。" type="warning" :closable="false" class="mb-4" />
       <p v-if="defaultNotice" class="mb-5 text-sm text-g-600">{{ defaultNotice }}</p>
-      <ElForm :disabled="busy" label-position="top" @submit.prevent="save">
+      <ElForm :disabled="busy || !canOperate" label-position="top" @submit.prevent="save">
         <ElTable :data="plans" class="mb-6">
           <ElTableColumn label="环节" width="108"><template #default="{ row }">{{ project.parentProjectId ? '优化完成验收' : row.stage }}</template></ElTableColumn>
           <ElTableColumn label="计划开始日期" min-width="205"
@@ -80,7 +81,7 @@
       <ElButton :disabled="busy" @click="beforeClose(() => emit('update:modelValue', false))"
         >取消</ElButton
       >
-      <ElButton type="primary" :loading="busy" @click="save">保存计划</ElButton>
+      <ElButton type="primary" :loading="busy" :disabled="!canOperate" @click="save">保存计划</ElButton>
     </template>
   </ElDrawer>
 </template>
@@ -95,6 +96,8 @@
     type StagePlan
   } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'
+  import { canApproveProjects } from '@/utils/project-approver'
+  import { isEngineerEligible } from '@/utils/engineer-eligibility'
   import { useUnsavedForm } from '@/hooks/business/use-unsaved-form'
   import { useRecordStaleness } from '@/hooks/business/use-record-staleness'
   import { saveProjectPlan, validatePlans } from '@/services/stage-plan-service'
@@ -117,6 +120,11 @@
     version = ref<number>()
   let operationKey = liveOperationKey()
   const stale = useRecordStaleness('project', () => props.project?.id, () => version.value)
+  const canOperate = computed(() =>
+    canApproveProjects(store.currentUser) ||
+    (store.currentUser.role === 'engineer' && isEngineerEligible(store.currentUser) &&
+      store.currentUser.id === props.project?.primaryOwnerId)
+  )
   const snapshot = () =>
     JSON.stringify({ plans: plans.value, reason: reason.value, description: description.value })
   const dirty = computed(() => props.modelValue && snapshot() !== initial.value)
@@ -152,6 +160,7 @@
   )
   async function save() {
     if (busy.value || !props.project) return
+    if (!canOperate.value) { error.value = '当前账号已无工程师资格，请联系管理员完成交接'; return }
     if (stale.value) { error.value = stale.value; return }
     busy.value = true
     error.value = ''

@@ -53,7 +53,7 @@ export class HistoricalDeliveryService {
         migrationVerified: true, status: 'COMPLETED', stage: '验收交付', simpleStatus: 'completed', overallProgress: 100,
         actualCompletedAt: deliveredAt, blocker: '', acceptanceStatus: 'none', acceptanceSubmittedAt: null,
         stageExpectedDate: deliveryPlan ? new Date(deliveryPlan.endDate) : project.stage === '验收交付' ? project.stageExpectedDate : null,
-        acceptanceHistory: acceptanceHistory(project, 'invalidate', actor.id, now, `历史交付补录：${input.reason}`),
+        acceptanceHistory: acceptanceHistory(project, 'invalidate', actor.id, now, `历史交付补录：${input.reason}`, undefined, undefined, '', input.requestId),
         lastOverallUpdatedAt: now, updatedAt: now, version: { increment: 1 }
       }, include: { members: true } })
       if (changed.demandId) {

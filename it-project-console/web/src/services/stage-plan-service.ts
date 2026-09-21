@@ -7,6 +7,7 @@ import {
 } from '@/domain/prototype'
 import { assertWrite, dateValue, nextId, textValue, WorkflowError } from './workflow-validation'
 import { computeProjectRisks } from './risk-service'
+import { isEngineerEligible } from '@/utils/engineer-eligibility'
 
 export interface PlanInput {
   projectId: string
@@ -63,7 +64,10 @@ export function saveProjectPlan(snapshot: PrototypeSnapshot, input: PlanInput) {
   const actor = assertWrite(snapshot)
   const project = snapshot.database.projects.find((p) => p.id === input.projectId)
   if (!project) throw new WorkflowError('项目不存在')
-  if (actor.role !== 'manager' && actor.id !== project.primaryOwnerId)
+  if (
+    actor.role !== 'manager' &&
+    !(actor.role === 'engineer' && isEngineerEligible(actor) && actor.id === project.primaryOwnerId)
+  )
     throw new WorkflowError('只有主负责人或管理人员可以制定计划')
   if (project.status !== 'active' || project.archived) throw new WorkflowError('当前项目只读')
   if (project.acceptanceStatus === 'pending') throw new WorkflowError('待业务验收期间请先撤回验收再调整计划')

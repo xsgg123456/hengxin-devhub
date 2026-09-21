@@ -2,7 +2,11 @@ import { computed, ref, watch } from 'vue'
 import type { DemoProject } from '@/domain/prototype'
 
 // 草稿属于项目及编辑身份；workspace 刷新替换对象不等于更换编辑对象。
-export function useAcceptanceDraft(project: () => DemoProject, actorId: () => string) {
+export function useAcceptanceDraft(
+  project: () => DemoProject,
+  actorId: () => string,
+  isPresent: () => boolean = () => true
+) {
   const baselineVersion = ref(project().version ?? 0)
   const baseline = ref({ ownerId: '', summary: '', url: '' })
   const ownerId = ref(''),
@@ -11,8 +15,12 @@ export function useAcceptanceDraft(project: () => DemoProject, actorId: () => st
     url = ref('')
   const opinion = ref(''),
     withdrawReason = ref(''),
-    error = ref('')
-  const staleDraft = computed(() => baselineVersion.value !== (project().version ?? 0))
+    error = ref(''),
+    saveNotice = ref('')
+  const projectMissing = computed(() => !isPresent())
+  const staleDraft = computed(
+    () => projectMissing.value || baselineVersion.value !== (project().version ?? 0)
+  )
   const dirty = computed(() =>
     Boolean(
       assignReason.value ||
@@ -38,6 +46,7 @@ export function useAcceptanceDraft(project: () => DemoProject, actorId: () => st
   })
   return {
     baselineVersion,
+    projectMissing,
     staleDraft,
     ownerId,
     assignReason,
@@ -46,6 +55,7 @@ export function useAcceptanceDraft(project: () => DemoProject, actorId: () => st
     opinion,
     withdrawReason,
     error,
+    saveNotice,
     dirty,
     resetForm
   }

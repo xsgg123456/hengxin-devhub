@@ -2,7 +2,7 @@ import { PROJECT_STAGES, type DemoProject, type PrototypeSnapshot } from '@/doma
 import { runtimeConfig } from '@/config/runtime'
 import { canEditProject, isMigrationPending } from '@/utils/project-edit-permission'
 import { isEngineerEligible } from '@/utils/engineer-eligibility'
-import { assertWrite, dateValue, shanghaiDay } from './workflow-validation'
+import { assertWrite, dateFieldLabel, dateValue, shanghaiDay } from './workflow-validation'
 import { recordLifecycle } from './lifecycle-service'
 import { deliveryHref } from '@/utils/delivery-url'
 
@@ -32,7 +32,7 @@ export function saveProjectEditPreview(
     if (firstRequestedOn > shanghaiDay(new Date().toISOString())) throw new Error('需求首次提出日期不能晚于今天')
   }
   if (verify && !firstRequestedOn) throw new Error('完成核实前，请补齐需求首次提出日期（基本资料）')
-  for (const key of ['originalLaunchDate', 'originalDeliveryDate', 'expectedLaunchDate', 'expectedDeliveryDate'] as const) { if (edited[key]) dateValue(edited[key], key); else edited[key] = '' }
+  for (const key of ['originalLaunchDate', 'originalDeliveryDate', 'expectedLaunchDate', 'expectedDeliveryDate'] as const) { if (edited[key]) dateValue(edited[key], dateFieldLabel(key)); else edited[key] = '' }
   const engineers = snapshot.database.users.filter(isEngineerEligible).map((u) => u.id)
   if (!engineers.includes(edited.primaryOwnerId))
     throw new Error('请选择有效主负责工程师（人员关联）')

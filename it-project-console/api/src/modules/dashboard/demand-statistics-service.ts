@@ -11,19 +11,20 @@ export async function demandStatistics(
   q: DemandQuery,
   actorId: string
 ) {
-  const [rows, userRows] = await Promise.all([
+  const [rows, userRows, revisionRows] = await Promise.all([
     tx.demand.findMany({
       include: { project: true, proposals: true },
       orderBy: [{ submittedAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }]
     }),
-    tx.user.findMany({ where: { active: true }, orderBy: { name: 'asc' } })
+    tx.user.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+    tx.$queryRaw<Array<{ revision: string }>>`SELECT revision::text FROM workspace_revision WHERE id = 1`
   ])
   const filtered = rows.filter(
     (d) =>
       (!q.projectType || !!d.parentProjectId === (q.projectType === 'optimization')) &&
-      (q.scope !== 'mine' || d.ownerId === actorId) &&
-      (!q.submitterId || d.ownerId === q.submitterId) &&
-      (!q.department || d.department === q.department) &&
+      (q.scope !== 'mine' || (d.project ? d.project.businessOwnerId === actorId : d.ownerId === actorId)) &&
+      (!q.submitterId || (d.project ? d.project.businessOwnerId === q.submitterId : d.ownerId === q.submitterId)) &&
+      (!q.department || (d.project?.department ?? d.department) === q.department) &&
       (!q.from || (!!d.submittedAt && businessDate(d.submittedAt) >= q.from)) &&
       (!q.to || (!!d.submittedAt && businessDate(d.submittedAt) <= q.to)) &&
       (!q.completion || demandCompletion(d.project).completionStatus === q.completion) &&
@@ -48,6 +49,7 @@ export async function demandStatistics(
   }))
   const users = userRows.map(mapUser)
   return {
+    workspaceRevision: revisionRows[0]?.revision ?? '',
     demands,
     typeCounts: projectTypeCounts(filtered),
     activeProjectCount: filtered.filter(d => d.project?.status === 'ACTIVE' && !d.project.archived).length,
@@ -66,11 +68,11 @@ export function demandDistribution(
     { key: string; name: string; value: number; demands: ReadDemand[] }
   >()
   demands.forEach((demand) => {
-    const key = by === 'department' ? demand.department : demand.submitterId
+    const key = by === 'department' ? demand.department : demand.currentOwnerId ?? ''
     const name =
       by === 'department'
         ? demand.department
-        : users.find((u) => u.id === key)?.name || '未知提出人'
+        : users.find((u) => u.id === key)?.name || '未设置业务负责人'
     const group = groups.get(key) || { key, name, value: 0, demands: [] }
     group.demands.push(demand)
     group.value++

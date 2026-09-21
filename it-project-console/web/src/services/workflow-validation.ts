@@ -1,5 +1,16 @@
 import type { DemoAttachment, PrototypeSnapshot } from '@/domain/prototype'
 export class WorkflowError extends Error {}
+const dateFieldLabels: Record<string, string> = {
+  originalLaunchDate: '原计划上线日期',
+  originalDeliveryDate: '原计划交付日期',
+  expectedLaunchDate: '预计上线日期',
+  expectedDeliveryDate: '预计交付日期',
+  approvedLaunchDate: '审批确认上线日期',
+  firstRequestedOn: '需求首次提出日期'
+}
+export function dateFieldLabel(field: string) {
+  return dateFieldLabels[field] ?? field
+}
 export function assertWrite(snapshot: PrototypeSnapshot) {
   if (snapshot.scenario === 'save-error')
     throw new WorkflowError('模拟保存失败，请重试；已保存数据不变')

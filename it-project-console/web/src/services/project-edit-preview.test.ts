@@ -146,6 +146,13 @@ describe('全局编辑本地预览', () => {
     expect(p.firstRequestedOn).toBe('')
     expect(isPrototypeSnapshot(snapshot)).toBe(true)
   })
+  it('项目日期校验只显示中文字段标签', () => {
+    const { snapshot, baseline, edit } = setup()
+    edit.expectedLaunchDate = '2026-02-30'
+    expect(() => saveProjectEditPreview(snapshot, edit, baseline, '核对日期', false)).toThrow(
+      '预计上线日期不是有效日期'
+    )
+  })
   it('仅改名可保存且保持原型数据有效，普通改名不解除核实', () => {
     const {snapshot,p,baseline,edit} = setup()
     edit.name = '修改后的名称'

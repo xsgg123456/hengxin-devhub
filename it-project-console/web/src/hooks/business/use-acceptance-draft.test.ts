@@ -60,4 +60,26 @@ describe('验收草稿与 workspace 刷新', () => {
     expect(draft.dirty.value).toBe(false)
     scope.stop()
   })
+
+  it('项目从 workspace 消失时保留验收草稿并标记为不可提交', async () => {
+    const scope = effectScope()
+    const p = ref({ ...fresh().database.projects[0], version: 8 })
+    const present = ref(true)
+    const draft = scope.run(() =>
+      useAcceptanceDraft(
+        () => p.value,
+        () => 'engineer',
+        () => present.value
+      )
+    )!
+    draft.summary.value = '项目删除前的验收草稿'
+    await nextTick()
+    present.value = false
+    await nextTick()
+    expect(draft.projectMissing.value).toBe(true)
+    expect(draft.staleDraft.value).toBe(true)
+    expect(draft.summary.value).toBe('项目删除前的验收草稿')
+    expect(draft.dirty.value).toBe(true)
+    scope.stop()
+  })
 })

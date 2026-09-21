@@ -126,6 +126,7 @@
   })
   const isOptimization = computed(() => props.optimization || !!form.parentProjectId)
   const rules = computed<FormRules>(() => ({
+    parentProjectId: [{ required: isOptimization.value, message: '请选择关联原项目', trigger: 'change' }],
     name: [{ required: true, whitespace: true, message: isOptimization.value ? '请填写优化标题' : '请填写项目名称', trigger: 'blur' }],
     description: [{ required: true, whitespace: true, message: '请说明要解决的问题', trigger: 'blur' }],
     optimizationOutcome: [{ required: true, whitespace: true, message: '请填写期望效果 / 验收标准', trigger: 'blur' }],

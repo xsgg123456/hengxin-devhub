@@ -25,7 +25,8 @@ export function bootstrapProduction(): void {
     const prototypeStore = usePrototypeStore(store)
     void prototypeStore
       .refreshLive()
-      .then(() => {
+      .then((result) => {
+        if (result.status !== 'applied') return
         syncPrototypeShell(prototypeStore.currentUser.role)
         return router.replace(
           initialPath && initialPath !== '/'

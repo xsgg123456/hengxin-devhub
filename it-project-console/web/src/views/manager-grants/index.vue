@@ -61,6 +61,19 @@
         <ElButton v-if="error && !runtimeConfig.isPrototype" class="mt-3" @click="load"
           >重新加载</ElButton
         >
+        <ElAlert
+          v-if="refreshError"
+          class="mt-4"
+          :title="refreshError"
+          type="warning"
+          :closable="false"
+        />
+        <ElButton
+          v-if="refreshError && !runtimeConfig.isPrototype"
+          class="mt-3"
+          @click="load"
+          >重新加载</ElButton
+        >
       </div>
       <ElDialog v-model="addOpen" title="添加管理人员" width="440px" :close-on-click-modal="false">
         <ElForm label-position="top"
@@ -114,6 +127,7 @@
   const managerQuery = useLiveQuery<LiveManager[]>('/manager-grants', () => ({}))
   const candidateQuery = useLiveQuery<Array<{ id: string; name: string; department: string }>>('/manager-grants/candidates', () => ({}))
   const loading = computed(() => managerQuery.loading.value || candidateQuery.loading.value)
+  const refreshError = computed(() => managerQuery.refreshError.value || candidateQuery.refreshError.value)
   watch([managerQuery.error, candidateQuery.error], ([first, second]) => { error.value = first || second })
   const canManage = computed(() => store.currentUser.role === 'manager')
   const managers = computed(() =>

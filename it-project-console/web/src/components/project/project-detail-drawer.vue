@@ -17,6 +17,13 @@
         >{{ projectCode(project) }} · {{ project.parentProjectId ? '优化审批通过' : project.source === 'direct' ? '直接创建' : '正式项目立项' }}</p
       >
       <RiskTag :risks="risks" />
+      <ElAlert
+        v-if="handoffRequired"
+        class="mt-3"
+        type="warning"
+        :closable="false"
+        title="当前账号的工程师资格已撤销，项目操作已暂停，请联系管理员完成交接。"
+      />
       <OptimizationPreview v-if="project.parentProjectId || project.status === 'completed'" :project="project" />
       <ElAlert
         v-if="approvedLaunchOverrun(project.approvedLaunchDate, project.expectedLaunchDate) > 0"
@@ -136,6 +143,7 @@
   import { displayTime, statusLabel } from '@/utils/project-display'
   import ProjectPlanDrawer from './project-plan-drawer.vue'
   import { needsPlan } from '@/services/stage-plan-service'
+  import { isEngineerEligible } from '@/utils/engineer-eligibility'
   const planOpen = ref(false)
   import AcceptancePanel from './acceptance-panel.vue'
   import StageHistory from './stage-history.vue'
@@ -181,14 +189,21 @@
         : computeProjectRisks(project.value, store.database?.scheduleChanges ?? [])
       : []
   )
+  const canAct = computed(() =>
+    store.currentUser.role === 'manager' ||
+    (store.currentUser.role === 'engineer' && isEngineerEligible(store.currentUser))
+  )
+  const handoffRequired = computed(
+    () => store.currentUser.role === 'engineer' && !canAct.value
+  )
   const isOverall = computed(
-    () =>
-      store.currentUser.role === 'manager' || store.currentUser.id === project.value?.primaryOwnerId
+    () => canAct.value && (store.currentUser.role === 'manager' || store.currentUser.id === project.value?.primaryOwnerId)
   )
   const canUpdate = computed(
     () =>
       project.value?.status === 'active' &&
       !project.value.archived &&
+      canAct.value &&
       (isOverall.value || project.value.collaboratorIds.includes(store.currentUser.id))
   )
 </script>

@@ -61,7 +61,7 @@ export async function refreshProjectRisks(
       payload: {
         projectId: id,
         projectName: project.name,
-        version,
+        riskVersion: version,
         risks: managers.some((manager) => manager.id === recipientId) ? risks : ownerAlerts,
         path: `/#/project-overview?projectId=${encodeURIComponent(id)}`
       }

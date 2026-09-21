@@ -22,13 +22,14 @@ beforeAll(async () => {
 const instant = (day: string, time = '09:00') => { days.push(day); return new Date(`${day}T${time}:00+08:00`) }
 const options = { agentId: '123', webOrigin: 'https://console.example.test', enabled: true }
 async function user(role: 'MANAGER' | 'ENGINEER') {
-  const row = await db.user.create({ data: { name: role === 'MANAGER' ? '汇总管理员' : '工程师甲', department: '测试部', role, dingUserId: randomUUID() } })
+  const row = await db.user.create({ data: { name: role === 'MANAGER' ? '汇总管理员' : '工程师甲', department: role === 'ENGINEER' ? 'IT部' : '测试部', role, dingUserId: randomUUID() } })
   users.push(row.id)
   return row
 }
 async function source(recipientId: string, projectId: string, at: Date) {
+  const project = await db.project.findUniqueOrThrow({ where: { id: projectId }, select: { riskVersion: true } })
   return db.notificationOutbox.create({ data: { recipientId, projectId, eventType: 'PROJECT_RISKS_CHANGED',
-    idempotencyKey: randomUUID(), payload: { risks: ['交付延期 2 天'] }, availableAt: at, createdAt: at } })
+    idempotencyKey: randomUUID(), payload: { riskVersion: project.riskVersion, risks: ['交付延期 2 天'] }, availableAt: at, createdAt: at } })
 }
 afterAll(async () => {
   await db.notificationOutbox.deleteMany({ where: { recipientId: { in: users } } })

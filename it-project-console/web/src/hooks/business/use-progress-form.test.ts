@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   runCommand: vi.fn(),
   refresh: vi.fn(),
   store: {
-    currentUser: { id: 'owner', role: 'engineer' },
+    currentUser: { id: 'owner', role: 'engineer', department: 'IT部' },
     visibleProjects: [] as DemoProject[],
     database: { stageHistories: [] }
   }
@@ -75,7 +75,7 @@ async function openForm() {
 describe('真实进度表单状态', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    mocks.store.currentUser = { id: 'owner', role: 'engineer' }
+    mocks.store.currentUser = { id: 'owner', role: 'engineer', department: 'IT部' }
     mocks.store.visibleProjects = reactive([{ ...project, version: 1 }])
     mocks.refresh.mockResolvedValue(undefined)
   })
@@ -106,7 +106,7 @@ describe('真实进度表单状态', () => {
     scope.stop()
   })
   it('协作只发送个人进展和阻塞，即使表单意外残留整体字段', async () => {
-    mocks.store.currentUser = { id: 'helper', role: 'engineer' }
+    mocks.store.currentUser = { id: 'helper', role: 'engineer', department: 'IT部' }
     const { form, scope } = await openForm()
     form.form.value.overallProgress = 100
     form.blocked.value = true

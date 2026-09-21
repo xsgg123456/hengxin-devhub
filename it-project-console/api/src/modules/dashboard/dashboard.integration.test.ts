@@ -23,7 +23,10 @@ const owner = 'user-engineer-wang',
   business = 'user-business-li'
 const cookies: Record<string, string> = {}
 const department = `聚合集成-${randomUUID()}`
+const currentDepartment = `${department}-当前归属`
 const ids: string[] = []
+type WorkloadResponse = { workspaceRevision: string; rows: ReturnType<typeof personWorkload> }
+type GanttResponse = { workspaceRevision: string; rows: ReturnType<typeof buildGanttRows> }
 async function get<T>(url: string, user = business) {
   const result = await runtime.app.inject({ url, headers: { cookie: cookies[user] } })
   expect(result.statusCode, result.body).toBe(200)
@@ -73,6 +76,23 @@ beforeAll(async () => {
         submittedAt: new Date(date!)
       }
     })
+  await db.demand.create({
+    data: {
+      name: '联动归属需求',
+      department: `${department}-历史提出部门`,
+      ownerId: business,
+      status: 'APPROVED',
+      submittedAt: new Date('2026-09-12T04:00:00Z'),
+      project: {
+        create: {
+          name: '联动归属项目',
+          department: currentDepartment,
+          primaryOwnerId: owner,
+          businessOwnerId: manager
+        }
+      }
+    }
+  })
 })
 afterAll(async () => {
   await runtime?.app.close()
@@ -107,23 +127,25 @@ it('AC017/018：三角色全员可读，负责人含协作、风险指标同源�
   expect(mine.total).toBe(0)
 })
 it('AC019/020：主责2协作1，多人项目只有唯一主责且项目明细对齐', async () => {
-  const data = await get<ReturnType<typeof personWorkload>>(
+  const data = await get<WorkloadResponse>(
     `/api/workload?${query('&month=2026-09')}`
   )
-  const row = data.find((r) => r.user.id === owner)!
+  expect(data.workspaceRevision).toBeTruthy()
+  const row = data.rows.find((r) => r.user.id === owner)!
   expect(row.primary).toHaveLength(2)
   expect(row.collaboration).toHaveLength(1)
   expect(row.projects).toHaveLength(3)
   expect(row.overlap).toBe(2)
-  expect(data.reduce((n, r) => n + r.primary.length, 0)).toBe(3)
+  expect(data.rows.reduce((n, r) => n + r.primary.length, 0)).toBe(3)
   expect(row.delayed.map((p) => p.id)).toEqual([ids[0]])
 })
 it('AC021/022：跨月计划裁剪，无人工百分比，原交付标记与持久风险文字保留', async () => {
-  const data = await get<ReturnType<typeof buildGanttRows>>(
+  const data = await get<GanttResponse>(
     `/api/gantt?${query('&month=2026-09&risk=delayed')}`
   )
-  expect(data).toHaveLength(1)
-  expect(data[0]).toMatchObject({
+  expect(data.workspaceRevision).toBeTruthy()
+  expect(data.rows).toHaveLength(1)
+  expect(data.rows[0]).toMatchObject({
     left: 0,
     width: 30,
     progressWidth: 0,
@@ -132,11 +154,11 @@ it('AC021/022：跨月计划裁剪，无人工百分比，原交付标记与持�
     outside: false,
     risks: ['项目延期 8 天']
   })
-  expect(data[0]?.project.overallProgress).toBe(50)
-  const ownerOnly = await get<ReturnType<typeof buildGanttRows>>(
+  expect(data.rows[0]?.project.overallProgress).toBe(50)
+  const ownerOnly = await get<GanttResponse>(
     `/api/gantt?${query(`&month=2026-09&ownerId=${owner}`)}`
   )
-  expect(ownerOnly).toHaveLength(2)
+  expect(ownerOnly.rows).toHaveLength(2)
 })
 it('需求统计筛选与明细一致，中间空月份补零', async () => {
   const data = await get<Awaited<ReturnType<typeof demandStatistics>>>(
@@ -160,6 +182,28 @@ it('需求统计筛选与明细一致，中间空月份补零', async () => {
     trend: { departments: [] }
   })
 })
+it('需求统计以已关联项目的当前部门和业务负责人为准，同时保留原提出人', async () => {
+  const current = await get<Awaited<ReturnType<typeof demandStatistics>>>(
+    `/api/demand-statistics?department=${encodeURIComponent(currentDepartment)}`
+  )
+  const row = current.demands.find((d) => d.name === '联动归属需求')
+  expect(row).toBeDefined()
+  expect(row).toMatchObject({
+    department: currentDepartment,
+    originalDepartment: `${department}-历史提出部门`,
+    submitterId: business,
+    originalSubmitterId: business,
+    currentOwnerId: manager,
+    businessOwnerId: manager
+  })
+  expect(current.submitters).toEqual(expect.arrayContaining([
+    expect.objectContaining({ key: manager, value: 1, demands: [expect.objectContaining({ id: row!.id })] })
+  ]))
+  const historical = await get<Awaited<ReturnType<typeof demandStatistics>>>(
+    `/api/demand-statistics?department=${encodeURIComponent(`${department}-历史提出部门`)}`
+  )
+  expect(historical.demands.some((d) => d.name === '联动归属需求')).toBe(false)
+})
 it('逾期项目仍计入当前月主责时间重叠', async () => {
   const today = businessDate(new Date()),
     month = today.slice(0, 7)
@@ -168,10 +212,10 @@ it('逾期项目仍计入当前月主责时间重叠', async () => {
     where: { id: { in: ids.slice(0, 2) } },
     data: { createdAt: new Date('2000-01-01'), currentDeliveryDate: previous }
   })
-  const data = await get<ReturnType<typeof personWorkload>>(
+  const data = await get<WorkloadResponse>(
     `/api/workload?${query(`&month=${month}`)}`
   )
-  expect(data.find((r) => r.user.id === owner)?.overlap).toBe(2)
+  expect(data.rows.find((r) => r.user.id === owner)?.overlap).toBe(2)
 })
 it('阻塞天数取连续整体历史上海日期，说明中的3不当作天数且个人更新不打断', async () => {
   const today = businessDate(new Date())

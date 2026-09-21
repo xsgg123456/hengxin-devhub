@@ -4,13 +4,14 @@ import { runtimeConfig } from '@/config/runtime'
 import { useLiveQuery } from './use-live-query'
 import { useDemandDeepLink } from './use-demand-deep-link'
 import type { DemandStatistics } from '@/services/live-dashboard-types'
-import { demandCompletion, completionLabels } from '@/services/demand-completion'
+import { completionLabels } from '@/services/demand-completion'
 import { shanghaiDay } from '@/services/workflow-validation'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { displayTime } from '@/utils/project-display'
 import type { DemoDemand, DemandStatus } from '@/domain/prototype'
 import { usePrototypeStore } from '@/store/modules/prototype'
+import { currentDemandOwner } from '@/services/demand-view'
 
 export function useDemandPage() {
   const prototypeStore = usePrototypeStore()
@@ -72,15 +73,14 @@ export function useDemandPage() {
     }
   )
   const departments = computed(() => [
-    ...new Set(prototypeStore.database?.demands.map((d) => d.department) || [])
+    ...new Set(prototypeStore.visibleDemands.map((d) => d.department))
   ])
   const prototypeDemands = computed(() =>
-    (prototypeStore.database?.demands || [])
-      .map((d) => ({ ...d, ...demandCompletion(linkedProject(d.id)) }))
+    prototypeStore.visibleDemands
       .filter(
         (d) =>
           (!projectType.value || (projectType.value === 'optimization') === !!d.parentProjectId) &&
-          (scope.value === 'all' || d.submitterId === prototypeStore.currentUser.id) &&
+          (scope.value === 'all' || currentDemandOwner(d) === prototypeStore.currentUser.id) &&
           (!status.value ||
             (status.value === 'pre_establishment'
               ? ['pending', 'awaiting_engineer'].includes(d.status)
@@ -102,6 +102,7 @@ export function useDemandPage() {
     data: statistics,
     loading,
     error,
+    refreshError,
     retry
   } = useLiveQuery<DemandStatistics>('/demand-statistics', () => ({
     projectType: projectType.value,
@@ -126,7 +127,7 @@ export function useDemandPage() {
     dateRange.value = null
   }
   const userName = (id: string) =>
-    prototypeStore.database?.users.find((user) => user.id === id)?.name || id
+    id ? prototypeStore.database?.users.find((user) => user.id === id)?.name || id : '未设置'
   const canEdit = (demand: DemoDemand) =>
     demand.submitterId === prototypeStore.currentUser.id &&
     ['draft', 'pending', 'returned', 'withdrawn'].includes(demand.status) &&
@@ -260,6 +261,7 @@ export function useDemandPage() {
     statistics,
     loading,
     error,
+    refreshError,
     retry
   }
 }

@@ -30,7 +30,7 @@ export async function prepareManagerRiskDigest(db: PrismaClient, now: Date, time
     }
     let count = 0
     for (const [recipientId, items] of grouped) {
-      const projects = new Map<string, { projectId: string; parentProjectId: string | null; stage: string; name: string; owner: string; risks: string[]; path: string }>()
+      const projects = new Map<string, { projectId: string; parentProjectId: string | null; stage: string; name: string; owner: string; risks: string[]; riskVersion: number; path: string }>()
       for (const item of items) {
         const project = item.project
         if (!project || !item.recipient.active || !item.recipient.dingUserId ||
@@ -39,7 +39,7 @@ export async function prepareManagerRiskDigest(db: PrismaClient, now: Date, time
         // Resolved projects have no current exception and do not belong in the digest.
         if (!risks.length) continue
         projects.set(project.id, { projectId: project.id, parentProjectId: project.parentProjectId, stage: project.stage, name: project.name, owner: project.primaryOwner.name,
-          risks, path: `/#/project-overview?projectId=${encodeURIComponent(project.id)}` })
+          risks, riskVersion: project.riskVersion, path: `/#/project-overview?projectId=${encodeURIComponent(project.id)}` })
       }
       const digest = projects.size ? await tx.notificationOutbox.create({ data: {
         recipientId, eventType: 'MANAGER_RISK_DIGEST', idempotencyKey: `${key}:${recipientId}`,

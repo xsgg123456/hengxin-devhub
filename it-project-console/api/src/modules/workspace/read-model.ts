@@ -16,7 +16,12 @@ export const mapUser = (user: User) => ({
   engineerEligible: isEngineerEligible(user),
   roleLabel: { MANAGER: '管理人员', BUSINESS: '业务人员', ENGINEER: 'IT工程师' }[user.role]
 })
-export const mapDemand = (demand: Demand & { attachments: Attachment[] }) => {
+type DemandReadSource = Demand & {
+  attachments: Attachment[]
+  project?: Pick<Project, 'id' | 'department' | 'businessOwnerId'> | null
+}
+
+export const mapDemand = (demand: DemandReadSource) => {
   const material = (url: string | null, attachmentId: string | null) => {
     if (url) return { kind: 'link', url, name: url, status: 'ready' }
     const file = demand.attachments.find(
@@ -33,6 +38,7 @@ export const mapDemand = (demand: Demand & { attachments: Attachment[] }) => {
         }
       : null
   }
+  const project = demand.project ?? null
   return {
     id: demand.id,
     code: demand.code,
@@ -41,8 +47,16 @@ export const mapDemand = (demand: Demand & { attachments: Attachment[] }) => {
     version: demand.version,
     name: demand.name,
     description: demand.description, parentProjectId: demand.parentProjectId, optimizationOutcome: demand.optimizationOutcome,
-    department: demand.department,
+    // A linked project is the current business record. Keep the demand owner
+    // separately so historical submission and current responsibility cannot
+    // be confused by list or chart consumers.
+    department: project?.department ?? demand.department,
+    originalDepartment: demand.department,
     submitterId: demand.ownerId,
+    originalSubmitterId: demand.ownerId,
+    currentOwnerId: project ? project.businessOwnerId : demand.ownerId,
+    businessOwnerId: project?.businessOwnerId ?? null,
+    projectId: project?.id ?? null,
     firstRequestedOn: date(demand.firstRequestedOn),
     expectedLaunchDate: date(demand.expectedLaunchDate),
     attachmentIds: demand.attachmentIds,

@@ -96,18 +96,18 @@ describe('交付后单节点优化真实API', () => {
     expect((await call(`/api/projects/${id}/correct`, { requestId: key(), version: 2, stage: '开发编码', reason: '绕过' }, manager)).statusCode).toBe(400)
     expect((await call(`/api/projects/${id}/historical-delivery`, { requestId: key(), version: 2, deliveredOn: '2026-09-15', reason: '绕过' }, manager)).statusCode).toBe(400)
     expect((await call(`/api/projects/${id}/progress`, { requestId: key(), version: 2, kind: 'overall', status: 'completed' }, engineer)).statusCode).toBe(400)
-    const workload = (await get('/api/workload?month=2099-12&projectType=optimization')).json().data
+    const workload = (await get('/api/workload?month=2099-12&projectType=optimization')).json().data.rows
     expect(workload.some((r: { projects: { id: string }[] }) => r.projects.some(p => p.id === id))).toBe(true)
     const load = workload.find((r: { user: { id: string } }) => r.user.id === engineer)
     expect(load.typeCounts.formal).toBe(0)
     expect(load.typeCounts.optimization).toBeGreaterThan(0)
     expect(load.stages).toEqual([{ stage: '优化完成验收', count: load.typeCounts.optimization }])
-    const gantt = (await get('/api/gantt?month=2099-12')).json().data
+    const gantt = (await get('/api/gantt?month=2099-12')).json().data.rows
     expect(gantt.some((r: { project: { id: string } }) => r.project.id === id)).toBe(true)
     const optimizedGantt = await get('/api/gantt?month=2099-12&projectType=optimization')
     expect(optimizedGantt.statusCode).toBe(200)
-    expect(optimizedGantt.json().data.every((r: { project: { parentProjectId: string | null } }) => !!r.project.parentProjectId)).toBe(true)
-    expect((await get('/api/gantt?month=2099-12&projectType=normal')).json().data.some((r: { project: { id: string } }) => r.project.id === id)).toBe(false)
+    expect(optimizedGantt.json().data.rows.every((r: { project: { parentProjectId: string | null } }) => !!r.project.parentProjectId)).toBe(true)
+    expect((await get('/api/gantt?month=2099-12&projectType=normal')).json().data.rows.some((r: { project: { id: string } }) => r.project.id === id)).toBe(false)
     expect((await action('submit')).statusCode).toBe(200)
     expect((await call(`/api/projects/${id}/plan`, { requestId: key(), version: 3, plans }, engineer)).statusCode).toBe(400)
     expect((await call(`/api/projects/${id}/edit`, await editInput(id, { stagePlans: [] }), manager)).statusCode).toBe(400)

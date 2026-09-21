@@ -5,6 +5,7 @@ import { AppError } from '../../lib/errors.js'
 import { invalid, lockedProject, unchanged, writable, type ProjectChanged } from '../progress/progress-state.js'
 import { planSchema, readStagePlans, remainingStages, validatePlanOrder } from './project-plan-state.js'
 import { STAGES } from '../progress/progress-schemas.js'
+import { isEngineerEligible } from '../../lib/it-department.js'
 
 export class ProjectPlanService {
   constructor(private readonly db: PrismaClient, private readonly onProjectChanged: ProjectChanged = unchanged) {}
@@ -13,7 +14,10 @@ export class ProjectPlanService {
     return command(this.db, actor, input.requestId, { operation: 'project-plan', id, input }, async tx => {
       const project = await lockedProject(tx, id, input.version)
       writable(project)
-      if (actor.role !== 'MANAGER' && actor.id !== project.primaryOwnerId) throw new AppError(403, 'FORBIDDEN', '只有主负责人或管理人员可以排期')
+      const currentActor = await tx.user.findUnique({ where: { id: actor.id } })
+      if (!currentActor?.active || (currentActor.role !== 'MANAGER' &&
+        !(currentActor.role === 'ENGINEER' && isEngineerEligible(currentActor) && actor.id === project.primaryOwnerId)))
+        throw new AppError(403, 'FORBIDDEN', '只有有效管理人员或具备工程师资格的主负责人可以排期')
       if (project.acceptanceStatus === 'pending') invalid('待验收期间请先撤回验收再调整排期')
       const required = remainingStages(project.stage), old = readStagePlans(project.stagePlans)
       if (input.plans.length !== required.length || input.plans.some((plan, index) => plan.stage !== required[index]))

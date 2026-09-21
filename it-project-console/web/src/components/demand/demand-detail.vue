@@ -8,8 +8,9 @@
   >
     <ElDescriptions :column="2" border class="mb-5">
       <ElDescriptionsItem label="需求编号">{{ demandCode(demand) }}</ElDescriptionsItem>
-      <ElDescriptionsItem label="需求部门">{{ demand.department }}</ElDescriptionsItem>
-      <ElDescriptionsItem label="提出人">{{ submitter }}</ElDescriptionsItem>
+      <ElDescriptionsItem label="当前需求部门">{{ demand.department }}</ElDescriptionsItem>
+      <ElDescriptionsItem label="业务负责人">{{ currentOwner }}</ElDescriptionsItem>
+      <ElDescriptionsItem label="原始提出人">{{ submitter }}</ElDescriptionsItem>
       <ElDescriptionsItem label="需求首次提出日期">{{ demand.firstRequestedOn || '待核实' }}</ElDescriptionsItem>
       <ElDescriptionsItem :label="demand.parentProjectId ? '期望完成' : '期望上线'">{{
         demand.expectedLaunchDate || '未填写'
@@ -55,7 +56,15 @@
   const router = useRouter()
   const submitter = computed(
     () =>
-      store.database?.users.find((user) => user.id === props.demand.submitterId)?.name ||
+      store.database?.users.find((user) => user.id === (props.demand.originalSubmitterId ?? props.demand.submitterId))?.name ||
       '未知人员'
+  )
+  const currentOwner = computed(
+    () => {
+      const ownerId = props.demand.projectId
+        ? props.demand.currentOwnerId
+        : props.demand.currentOwnerId ?? props.demand.submitterId
+      return ownerId ? store.database?.users.find((user) => user.id === ownerId)?.name || '未设置' : '未设置'
+    }
   )
 </script>

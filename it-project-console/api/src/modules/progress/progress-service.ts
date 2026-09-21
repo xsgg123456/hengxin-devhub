@@ -4,6 +4,7 @@ import { command } from '../../lib/business-command.js'
 import { AppError } from '../../lib/errors.js'
 import { assertScheduled } from '../projects/project-plan-state.js'
 import { progressSchema, STAGES } from './progress-schemas.js'
+import { isEngineerEligible } from '../../lib/it-department.js'
 import { enterStage, invalid, lockedProject, unchanged, writable, type ProjectChanged } from './progress-state.js'
 export class ProgressService {
   constructor(private readonly db: PrismaClient, private readonly onProjectChanged: ProjectChanged = unchanged) {}
@@ -15,9 +16,12 @@ export class ProgressService {
       if (source?.demandId) await tx.$queryRaw`SELECT id FROM demands WHERE id = ${source.demandId} FOR UPDATE`
       const project = await lockedProject(tx, id, input.version)
       writable(project)
-      const overall = actor.role === 'MANAGER' || actor.id === project.primaryOwnerId
+      const currentActor = await tx.user.findUnique({ where: { id: actor.id } })
+      if (!currentActor?.active) throw new AppError(403, 'FORBIDDEN', '账号已停用')
+      const engineer = currentActor.role === 'ENGINEER' && isEngineerEligible(currentActor)
+      const overall = currentActor.role === 'MANAGER' || (engineer && actor.id === project.primaryOwnerId)
       if ((input.kind === 'overall' && !overall) ||
-        (input.kind === 'personal' && !overall && !project.members.some(m => m.userId === actor.id)))
+        (input.kind === 'personal' && !overall && !(engineer && project.members.some(m => m.userId === actor.id))))
         throw new AppError(403, 'FORBIDDEN', '只有主负责人或管理人员能修改整体进度，项目成员可提交个人进展')
       const now = new Date(), status = input.status ?? 'in-progress', blocker = input.blocker ?? ''
       if (status === 'blocked' && !blocker) invalid('请填写阻塞说明')

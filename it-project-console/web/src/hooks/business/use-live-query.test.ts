@@ -103,6 +103,22 @@ describe('真实查询生命周期', () => {
     expect(query.data.value).toBeUndefined(); expect(query.loading.value).toBe(true)
     scope.stop()
   })
+  it('拒绝与工作区版本不一致的统计响应，工作区更新后再接受', async () => {
+    mocks.request.mockResolvedValueOnce({ workspaceRevision: '2', demands: ['过期统计'] })
+      .mockResolvedValueOnce({ workspaceRevision: '2', demands: ['当前统计'] })
+    const scope = effectScope()
+    const query = scope.run(() => useLiveQuery<{ workspaceRevision: string; demands: string[] }>(
+      '/demand-statistics', () => ({})
+    ))!
+    await vi.advanceTimersByTimeAsync(180)
+    expect(query.data.value).toBeUndefined()
+    expect(query.refreshError.value).toContain('版本不一致')
+    store.snapshot.revision = 2
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(180)
+    expect(query.data.value).toEqual({ workspaceRevision: '2', demands: ['当前统计'] })
+    scope.stop()
+  })
   it('账号变化立即清除旧账号结果，失败查询定时恢复', async () => {
     mocks.request.mockResolvedValueOnce(['旧账号']).mockRejectedValueOnce(new Error('暂时断网')).mockResolvedValueOnce(['新账号'])
     const scope = effectScope()

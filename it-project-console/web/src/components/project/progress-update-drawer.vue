@@ -9,6 +9,13 @@
     @update:model-value="emit('update:modelValue', $event)"
   >
     <ElAlert v-if="stale" :title="stale" type="warning" :closable="false" class="mb-4" />
+    <ElAlert
+      v-if="handoffRequired"
+      title="当前账号的工程师资格已撤销，当前操作已暂停，请联系管理员完成交接。"
+      type="warning"
+      :closable="false"
+      class="mb-4"
+    />
     <template v-if="project">
       <h3 class="mb-2 text-lg font-medium">{{ project.name }}</h3>
       <p class="mb-5 text-g-600">{{
@@ -29,7 +36,7 @@
         :model="form"
         :rules="rules"
         label-position="top"
-        :disabled="busy"
+        :disabled="busy || handoffRequired"
         @submit.prevent="save"
       >
         <template v-if="overall">
@@ -107,7 +114,7 @@
         v-if="!acceptanceMode"
         type="primary"
         :loading="busy"
-        :disabled="overall && !correction && unplanned"
+        :disabled="handoffRequired || (overall && !correction && unplanned)"
         @click="save"
         >{{ correction ? '保存纠正' : '保存更新' }}</ElButton
       >
@@ -154,8 +161,12 @@
     unplanned,
     currentPlan,
     rules,
-    save
+    save,
+    canAct
   } = useProgressForm(props, emit)
+  const handoffRequired = computed(
+    () => store.currentUser.role === 'engineer' && !canAct.value
+  )
   watch(() => props.modelValue, open => {
     if (open) acceptanceMode.value = !props.correction && currentProject.value?.stage === '验收交付' && overall.value
   })

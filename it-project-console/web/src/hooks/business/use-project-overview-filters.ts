@@ -8,6 +8,7 @@ import { useRouter } from 'vue-router'
 import { usePrototypeStore } from '@/store/modules/prototype'
 import { computeProjectRisks } from '@/services/risk-service'
 import { isEngineerEligible } from '@/utils/engineer-eligibility'
+import { currentDemandOwner } from '@/services/demand-view'
 
 export function useProjectOverviewFilters(personal = false) {
   const store = usePrototypeStore(),
@@ -114,7 +115,7 @@ export function useProjectOverviewFilters(personal = false) {
             ['pending', 'awaiting_engineer'].includes(d.status) &&
             (!projectType.value || (projectType.value === 'optimization') === !!d.parentProjectId) &&
             (!department.value || d.department === department.value) &&
-            (scope.value !== 'mine' || d.submitterId === store.currentUser.id)
+            (scope.value !== 'mine' || currentDemandOwner(d) === store.currentUser.id)
         ).length +
         (store.database?.projectProposals ?? []).filter(
           (p) =>
@@ -146,7 +147,7 @@ export function useProjectOverviewFilters(personal = false) {
   watch(query, () => {
     page.value = 1
   })
-  const { data, loading, error, retry } = useLiveQuery<DashboardResult>('/dashboard', () => ({
+  const { data, loading, error, refreshError, retry } = useLiveQuery<DashboardResult>('/dashboard', () => ({
     ...query.value,
     page: page.value,
     pageSize
@@ -264,6 +265,7 @@ export function useProjectOverviewFilters(personal = false) {
     total,
     loading,
     error,
+    refreshError,
     retry,
     projectType,
     scope,

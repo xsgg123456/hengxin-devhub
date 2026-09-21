@@ -24,8 +24,16 @@
       >
     </ElDescriptions>
     <ElAlert v-if="error" :title="error" type="error" :closable="false" role="alert" class="mb-3" />
+    <ElAlert v-if="saveNotice" :title="saveNotice" type="warning" :closable="false" class="mb-3" />
     <ElAlert
-      v-if="staleDraft"
+      v-if="projectMissing"
+      title="项目已被删除或移除，验收草稿已保留，无法提交。请关闭后刷新项目列表。"
+      type="warning"
+      :closable="false"
+      class="mb-3"
+    />
+    <ElAlert
+      v-else-if="staleDraft"
       title="项目已更新，验收草稿已保留。请核对最新信息后确认版本再提交。"
       type="warning"
       :closable="false"
@@ -134,17 +142,10 @@
   import { deliveryHref } from '@/utils/delivery-url'
   import { computed } from 'vue'
   import { useAcceptanceDraft } from '@/hooks/business/use-acceptance-draft'
-  import { ElMessage, ElMessageBox } from 'element-plus'
-  import type { AcceptanceAction, DemoProject } from '@/domain/prototype'
+  import type { DemoProject } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'
-  import {
-    acceptanceLabel,
-    actionAcceptance,
-    actionLiveAcceptance
-  } from '@/services/acceptance-service'
-  import { runtimeConfig } from '@/config/runtime'
-  import { ApiError } from '@/services/api-client'
-  import { liveOperationKey } from '@/services/live-demand-service'
+  import { acceptanceLabel } from '@/services/acceptance-service'
+  import { useAcceptanceAction } from '@/hooks/business/use-acceptance-action'
   import { displayTime } from '@/utils/project-display'
   import { needsPlan } from '@/services/stage-plan-service'
   import { isEngineerEligible } from '@/utils/engineer-eligibility'
@@ -153,7 +154,6 @@
   import { useUnsavedForm } from '@/hooks/business/use-unsaved-form'
   const props = defineProps<{ project: DemoProject }>()
   const store = usePrototypeStore()
-  let operationKey = liveOperationKey()
   const {
     baselineVersion,
     staleDraft,
@@ -164,11 +164,14 @@
     opinion,
     withdrawReason,
     error,
+    saveNotice,
     dirty,
-    resetForm
+    resetForm,
+    projectMissing
   } = useAcceptanceDraft(
     () => props.project,
-    () => store.currentUser.id
+    () => store.currentUser.id,
+    () => store.visibleProjects.some((item) => item.id === props.project.id)
   )
   const { beforeClose } = useUnsavedForm(
     'business-acceptance',
@@ -206,69 +209,20 @@
       : 0
   )
   const safeUrl = computed(() => deliveryHref(props.project.acceptanceUrl ?? ''))
-  async function save(action: AcceptanceAction) {
-    if (staleDraft.value) return
-    error.value = ''
-    const text = (
-      action === 'assign'
-        ? assignReason.value
-        : action === 'submit'
-          ? summary.value
-          : action === 'withdraw'
-            ? withdrawReason.value
-            : opinion.value
-    ).trim()
-    if (action !== 'accept' && !text) {
-      error.value = '请填写说明或原因'
-      return
-    }
-    if (action === 'assign' && !ownerId.value) {
-      error.value = '请选择业务验收负责人'
-      return
-    }
-    if (action === 'submit' && deliveryHref(url.value) === null) {
-      error.value = '请输入有效网页地址，支持HTTP/HTTPS和内网地址，请勿包含账号密码'
-      return
-    }
-    const input = {
-      projectId: props.project.id,
-      version: baselineVersion.value,
-      action,
-      summary: text,
-      ...(action === 'assign' ? { ownerId: ownerId.value } : {}),
-      ...(action === 'submit' ? { url: url.value.trim() } : {})
-    }
-    const command = { ...input, requestId: operationKey(input) }
-    if (action === 'withdraw') {
-      try {
-        await ElMessageBox.confirm(
-          `撤回「${props.project.name}」后，当前业务验收待办将失效。`,
-          '撤回验收？',
-          {
-            confirmButtonText: '确认撤回验收',
-            cancelButtonText: '继续验收',
-            type: 'warning'
-          }
-        )
-      } catch {
-        return
-      }
-    }
-    try {
-      if (runtimeConfig.isPrototype)
-        await store.runCommand((draft) => {
-          actionAcceptance(draft, command)
-        })
-      else await store.runLiveCommand(() => actionLiveAcceptance(command))
-      operationKey = liveOperationKey()
-      resetForm()
-      ElMessage.success('验收操作已保存')
-    } catch (cause) {
-      error.value = cause instanceof Error ? cause.message : '保存失败，请重试'
-      if (cause instanceof ApiError && cause.status === 409) {
-        await store.refreshLive().catch(() => undefined)
-        error.value += '；已尝试刷新项目，草稿已保留，请核对后重试'
-      }
-    }
-  }
+  const { save } = useAcceptanceAction({
+    project: () => props.project,
+    store,
+    baselineVersion,
+    projectMissing,
+    staleDraft,
+    ownerId,
+    assignReason,
+    summary,
+    url,
+    opinion,
+    withdrawReason,
+    error,
+    saveNotice,
+    resetForm
+  })
 </script>

@@ -68,6 +68,12 @@ describe('职责待办与确定性风险', () => {
       days: 4
     })
   })
+  it('工程师资格撤销后不再生成项目与验收待办', () => {
+    const db = setup()
+    const engineer = db.users.find((u) => u.id === 'user-engineer-wang')!
+    engineer.engineerEligible = false
+    expect(responsibilityTasks(db, engineer, now)).toEqual([])
+  })
   it('业务只看本人退回补充，归档与取消不产生异常任务', () => {
     const db = setup(),
       user = db.users.find((u) => u.role === 'business')!

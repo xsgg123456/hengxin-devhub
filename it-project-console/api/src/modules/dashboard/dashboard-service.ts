@@ -119,19 +119,30 @@ async function blockedDurations(tx: Prisma.TransactionClient, projects: ReadProj
 }
 export async function dashboard(tx: Prisma.TransactionClient, q: DashboardQuery, actorId: string) {
   const model = await readProjects(tx)
+  const revision = await tx.$queryRaw<Array<{ revision: string }>>
+    `SELECT revision::text FROM workspace_revision WHERE id = 1`
   const projects = filterProjects(model.projects, model.users, q, actorId)
   const blockedDays = await blockedDurations(tx, projects)
   const attentionDays = Object.fromEntries(
     projects.map((p) => [p.id, attentionRank(p, blockedDays).days])
   )
-  const pendingDemands = await tx.demand.count({
+  const pendingDemandRows = await tx.demand.findMany({
     where: {
       ...(q.projectType ? { parentProjectId: q.projectType === 'optimization' ? { not: null } : null } : {}),
-      status: { in: ['PENDING', 'AWAITING_ENGINEER'] },
-      ...(q.department ? { department: q.department } : {}),
-      ...(q.scope === 'mine' ? { ownerId: actorId } : {})
+      status: { in: ['PENDING', 'AWAITING_ENGINEER'] }
+    },
+    select: {
+      department: true,
+      ownerId: true,
+      project: { select: { department: true, businessOwnerId: true } }
     }
   })
+  const pendingDemands = pendingDemandRows.filter((demand) => {
+    const department = demand.project?.department ?? demand.department
+    const ownerId = demand.project ? demand.project.businessOwnerId : demand.ownerId
+    return (!q.department || department === q.department) &&
+      (q.scope !== 'mine' || ownerId === actorId)
+  }).length
   const pendingDirect = await tx.projectProposal.count({ where: { demandId: null, status: { in: ['pending', 'returned'] },
     ...(q.department ? { department: q.department } : {}),
     ...(q.scope === 'mine' ? { OR: [{ primaryOwnerId: actorId }, { createdBy: actorId }] } : {}) } })
@@ -164,6 +175,7 @@ export async function dashboard(tx: Prisma.TransactionClient, q: DashboardQuery,
       return x.priority - y.priority || y.days - x.days || b.updatedAt.localeCompare(a.updatedAt)
     })
   return {
+    revision: revision[0]?.revision ?? '',
     projects,
     typeCounts: projectTypeCounts(projects),
     distribution: projectDistribution(projects),

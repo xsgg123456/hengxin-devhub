@@ -68,6 +68,13 @@
       >
     </dl>
     <RiskTag :risks="risks" />
+    <ElAlert
+      v-if="handoffRequired"
+      class="mt-3"
+      type="warning"
+      :closable="false"
+      title="当前账号的工程师资格已撤销，项目操作已暂停，请联系管理员完成交接。"
+    />
     <StageProgress
       class="mt-3"
       :project="project"
@@ -113,6 +120,7 @@
   import { displayTime, statusLabel } from '@/utils/project-display'
   import ProjectPlanDrawer from './project-plan-drawer.vue'
   import { needsPlan } from '@/services/stage-plan-service'
+  import { isEngineerEligible } from '@/utils/engineer-eligibility'
   const planOpen = ref(false)
   import StageProgress from './stage-progress.vue'
   import RiskTag from './risk-tag.vue'
@@ -125,9 +133,15 @@
   const demand = computed(() =>
     store.database?.demands.find((d) => d.id === props.project.demandId)
   )
+  const canAct = computed(() =>
+    store.currentUser.role === 'manager' ||
+    (store.currentUser.role === 'engineer' && isEngineerEligible(store.currentUser))
+  )
+  const handoffRequired = computed(
+    () => store.currentUser.role === 'engineer' && !canAct.value
+  )
   const isOverall = computed(
-    () =>
-      store.currentUser.role === 'manager' || store.currentUser.id === props.project.primaryOwnerId
+    () => canAct.value && (store.currentUser.role === 'manager' || store.currentUser.id === props.project.primaryOwnerId)
   )
   const relationship = computed(() =>
     store.currentUser.id === props.project.primaryOwnerId
@@ -140,6 +154,7 @@
     () =>
       props.project.status === 'active' &&
       !props.project.archived &&
+      canAct.value &&
       (isOverall.value || relationship.value === '协作')
   )
   const risks = computed(() =>

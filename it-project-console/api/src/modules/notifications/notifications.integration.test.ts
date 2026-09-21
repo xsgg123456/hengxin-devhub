@@ -15,12 +15,12 @@ const options = { agentId: '123', webOrigin: 'https://console.example.test', ena
 const now = new Date('2030-01-01T00:00:00Z')
 const fixtureUsers: string[] = []
 async function fixture(eventType = 'PROJECT_RISKS_CHANGED', active = true) {
-  const user = await db.user.create({ data: { name: '测试负责人', department: '测试部',
+  const user = await db.user.create({ data: { name: '测试负责人', department: 'IT部',
     dingUserId: randomUUID(), role: 'ENGINEER', active } })
   fixtureUsers.push(user.id)
-  const project = await db.project.create({ data: { name: '通知测试项目', primaryOwnerId: user.id } })
+  const project = await db.project.create({ data: { name: '通知测试项目', primaryOwnerId: user.id, risks: ['交付延期 2 天'] } })
   const item = await db.notificationOutbox.create({ data: { recipientId: user.id, projectId: project.id,
-    eventType, idempotencyKey: randomUUID(), payload: { risks: ['交付延期 2 天'] },
+    eventType, idempotencyKey: randomUUID(), payload: { riskVersion: project.riskVersion, risks: ['交付延期 2 天'] },
     createdAt: new Date('2000-01-01'), availableAt: new Date('2000-01-01') } })
   return { user, project, item }
 }
@@ -100,6 +100,45 @@ it('停用/未绑定/样例/不支持事件跳过；日志随outbox级联删除'
   await db.notificationOutbox.delete({ where: { id: item.id } })
   expect(await db.notificationLog.count({ where: { outboxId: item.id } })).toBe(0)
 })
+it('风险通知缺版本或风险文本与当前快照不一致时，投递前直接失效', async () => {
+  const missing = await fixture()
+  await db.notificationOutbox.update({ where: { id: missing.item.id }, data: { payload: { risks: ['交付延期 2 天'] } } })
+  const stale = await fixture()
+  await db.notificationOutbox.update({ where: { id: stale.item.id }, data: { payload: { riskVersion: stale.project.riskVersion, risks: ['当前已阻塞'] } } })
+  const legacy = vi.fn()
+  await new NotificationService(db, { legacy }, options).flush(now)
+  expect((await log(missing.item.id)).state).toBe('SKIPPED')
+  expect((await log(stale.item.id)).state).toBe('SKIPPED')
+  expect(legacy).not.toHaveBeenCalled()
+})
+it('项目完成通知在投递前重新校验完成状态、当前负责人和收件人状态', async () => {
+  const completed = async (id: string) => db.project.update({ where: { id }, data: {
+    status: 'COMPLETED', archived: false, simpleStatus: 'completed', acceptanceStatus: 'accepted',
+    actualCompletedAt: now, overallProgress: 100
+  } })
+  const reopened = await fixture('PROJECT_COMPLETED')
+  await completed(reopened.project.id)
+  await db.project.update({ where: { id: reopened.project.id }, data: {
+    status: 'ACTIVE', simpleStatus: 'in-progress', acceptanceStatus: 'none', actualCompletedAt: null
+  } })
+  const reassigned = await fixture('PROJECT_COMPLETED')
+  await completed(reassigned.project.id)
+  const replacement = await db.user.create({ data: { name: '替代负责人', department: 'IT部',
+    dingUserId: randomUUID(), role: 'ENGINEER', active: true } })
+  fixtureUsers.push(replacement.id)
+  await db.project.update({ where: { id: reassigned.project.id }, data: { primaryOwnerId: replacement.id } })
+  const inactive = await fixture('PROJECT_COMPLETED')
+  await completed(inactive.project.id)
+  await db.user.update({ where: { id: inactive.user.id }, data: { active: false } })
+
+  const legacy = vi.fn()
+  const service = new NotificationService(db, { legacy }, options)
+  await service.flush(now)
+
+  for (const item of [reopened.item, reassigned.item, inactive.item])
+    expect((await log(item.id)).state).toBe('SKIPPED')
+  expect(legacy).not.toHaveBeenCalled()
+})
 it('数据库任务故障返回脱敏结果，不传播至业务调用', async () => {
   const service = new NotificationService(db, { legacy: vi.fn() }, options)
   vi.spyOn(service, 'flush').mockRejectedValue(new Error('sensitive token'))
@@ -177,7 +216,7 @@ it('认领后摘要删除项目，发送前重新读取裁剪后的payload', asy
   const { item, project, user } = await fixture('MANAGER_RISK_DIGEST')
   await db.user.update({ where: { id: user.id }, data: { role: 'MANAGER' } })
   await db.notificationOutbox.update({ where: { id: item.id }, data: { projectId: null, payload: { projects: [
-    { projectId: project.id, name: '必须移除的项目', owner: '测试', risks: ['延期'] },
+    { projectId: project.id, name: project.name, owner: user.name, risks: project.risks as string[], riskVersion: project.riskVersion },
     { projectId: 'retained-project', name: '必须保留的项目', owner: '测试', risks: ['阻塞'] }
   ] } } })
   const legacy = vi.fn().mockResolvedValue({ task_id: 202 })
@@ -250,7 +289,8 @@ it('已受理摘要删除唯一项目保留受理状态，确认失败后不重�
   const { item, project, user } = await fixture('MANAGER_RISK_DIGEST')
   await db.user.update({ where: { id: user.id }, data: { role: 'MANAGER' } })
   await db.notificationOutbox.update({ where: { id: item.id }, data: { projectId: null, payload: { projects: [
-    { projectId: project.id, name: '已删项目', owner: '测试', risks: ['延期'] }
+    { projectId: project.id, name: project.name, stage: project.stage, parentProjectId: project.parentProjectId,
+      owner: user.name, risks: project.risks as string[], riskVersion: project.riskVersion }
   ] } } })
   const legacy = vi.fn().mockResolvedValue({ task_id: 206 })
   const service = new NotificationService(db, { legacy }, options)

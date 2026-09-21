@@ -104,6 +104,9 @@
       <ElAlert v-if="error" :title="error" type="error" :closable="false" class="mb-5"
         ><ElButton @click="retry">重新加载</ElButton></ElAlert
       >
+      <ElAlert v-if="refreshError" :title="refreshError" type="warning" :closable="false" class="mb-5"
+        ><ElButton @click="retry">重新加载</ElButton></ElAlert
+      >
       <ElSkeleton v-if="loading" :rows="5" animated class="mb-5" />
       <ElAlert
         v-if="deepLinkError"
@@ -141,9 +144,9 @@
             ></ElTableColumn
           >
           <ElTableColumn label="类型 / 归属" min-width="150"><template #default="{ row }">{{ row.parentProjectId ? '项目优化 · ' + (prototypeStore.database?.projects.find(p => p.id === row.parentProjectId)?.name || row.parentProjectId) : '正式项目' }}</template></ElTableColumn>
-          <ElTableColumn prop="department" label="提出部门" min-width="105" />
-          <ElTableColumn label="提出人" min-width="80"
-            ><template #default="{ row }">{{ userName(row.submitterId) }}</template></ElTableColumn
+          <ElTableColumn prop="department" label="当前需求部门" min-width="115" />
+          <ElTableColumn label="业务负责人" min-width="95"
+            ><template #default="{ row }">{{ userName(row.projectId ? row.currentOwnerId || '' : row.currentOwnerId ?? row.submitterId) }}</template></ElTableColumn
           >
           <ElTableColumn label="需求状态" min-width="100"
             ><template #default="{ row }"
@@ -289,6 +292,7 @@
     statistics,
     loading,
     error,
+    refreshError,
     retry
   } = useDemandPage()
 </script>

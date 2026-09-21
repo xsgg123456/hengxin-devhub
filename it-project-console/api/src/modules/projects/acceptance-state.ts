@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import type { Prisma, Project } from '../../generated/prisma/client.js'
 import { AppError } from '../../lib/errors.js'
-export function acceptanceHistory(project: Project, action: string, actorId: string, now: Date, summary: string, ownerId = project.acceptanceOwnerId, round = project.acceptanceRound, url = ''): Prisma.InputJsonArray {
+export function acceptanceHistory(project: Project, action: string, actorId: string, now: Date, summary: string, ownerId = project.acceptanceOwnerId, round = project.acceptanceRound, url = '', requestId?: string): Prisma.InputJsonArray {
   const previous = Array.isArray(project.acceptanceHistory) ? project.acceptanceHistory : []
-  return [...previous, { id: randomUUID(), action, actorId, createdAt: now.toISOString(), round, summary, url, ownerId }] as Prisma.InputJsonArray
+  return [...previous, { id: randomUUID(), ...(requestId ? { requestId } : {}), action, actorId, createdAt: now.toISOString(), round, summary, url, ownerId }] as Prisma.InputJsonArray
 }
 export async function notificationLock(tx: Prisma.TransactionClient) {
   await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':notification-flush', 0))::text`

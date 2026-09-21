@@ -48,7 +48,7 @@ export class AcceptanceService {
       const ownerId = action === 'assign' ? input.ownerId : project.acceptanceOwnerId
       const url = action === 'submit' ? input.url ?? '' : ''
       const data: Prisma.ProjectUpdateInput = {
-        acceptanceHistory: acceptanceHistory(project, action, actor.id, now, summary, ownerId, round, url),
+        acceptanceHistory: acceptanceHistory(project, action, actor.id, now, summary, ownerId, round, url, input.requestId),
         version: { increment: 1 }, updatedAt: now
       }
       if (action === 'assign') data.acceptanceOwnerId = ownerId

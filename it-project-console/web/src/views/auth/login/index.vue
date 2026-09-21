@@ -59,7 +59,8 @@
   const desktopDingTalk = isDesktopDingTalk(window.navigator.userAgent)
   const { busy, error, config, start, cancel } = useDingTalkLogin(async () => {
     const target = window.location.hash.slice(1)
-    await store.refreshLive()
+    const result = await store.refreshLive()
+    if (result.status !== 'applied') return
     syncPrototypeShell(store.currentUser.role)
     await router.replace(
       target && target !== '/' && !target.startsWith('/auth/login')
