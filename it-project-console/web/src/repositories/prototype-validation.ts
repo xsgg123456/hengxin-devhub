@@ -106,6 +106,7 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
     !rows(db.projects) ||
     !rows(db.progressUpdates) ||
     !rows(db.scheduleChanges) ||
+    !rows(db.completionDateChanges) ||
     !rows(db.stageHistories, false) ||
     !rows(db.lifecycleEvents)
   )
@@ -257,6 +258,19 @@ export function isPrototypeSnapshot(value: unknown): value is PrototypeSnapshot 
         date(c.oldValue) &&
         date(c.newValue) &&
         strings(c, ['reason', 'description']) &&
+        timestamp(c.createdAt)
+    )
+  )
+    return false
+  if (
+    !db.completionDateChanges.every(
+      (c) =>
+        projectIds.has(c.projectId) &&
+        userIds.has(c.authorId) &&
+        stage(c.stage) &&
+        typeof c.oldValue === 'string' &&
+        date(c.newValue) &&
+        strings(c, ['reason']) &&
         timestamp(c.createdAt)
     )
   )

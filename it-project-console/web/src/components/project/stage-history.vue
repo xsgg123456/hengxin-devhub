@@ -55,6 +55,18 @@
         }}
       </p>
     </details>
+    <h4 class="mt-5 mb-3 font-medium">实际完成日期修订历史</h4>
+    <p v-if="!completionChanges.length" class="text-sm text-g-600">暂无节点实际完成日期修订</p>
+    <ElTimeline v-else>
+      <ElTimelineItem
+        v-for="item in completionChanges"
+        :key="item.id"
+        :timestamp="displayTime(item.createdAt)"
+      >
+        <p>{{ project?.parentProjectId ? '优化完成验收' : stageLabel(item.stage) }} · {{ userName(item.authorId) }} · {{ item.oldValue || '未填写' }} → {{ item.newValue }}</p>
+        <p class="whitespace-pre-wrap">原因：{{ item.reason }}</p>
+      </ElTimelineItem>
+    </ElTimeline>
     <h4 class="mt-5 mb-3 font-medium">业务验收历史</h4>
     <p v-if="!project?.acceptanceHistory?.length" class="text-sm text-g-600">{{
       project?.status === 'completed' ? '历史完成 / 无业务验收记录' : '暂无业务验收记录'
@@ -89,6 +101,7 @@
   import { stageExecutions } from '@/services/stage-execution'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { displayTime } from '@/utils/project-display'
+  import { stageLabel } from '@/utils/business-labels'
   const props = defineProps<{ projectId: string }>()
   const store = usePrototypeStore()
   const actionLabels = {
@@ -104,6 +117,11 @@
   const project = computed(() => store.visibleProjects.find((p) => p.id === props.projectId))
   const histories = computed(
     () => store.database?.stageHistories.filter((h) => h.projectId === props.projectId && (!project.value?.parentProjectId || h.stage === '验收交付')) ?? []
+  )
+  const completionChanges = computed(() =>
+    store.database?.completionDateChanges
+      ?.filter(change => change.projectId === props.projectId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)) ?? []
   )
   const rows = computed(() =>
     project.value ? stageExecutions(project.value, histories.value) : []

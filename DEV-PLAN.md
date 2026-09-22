@@ -665,6 +665,7 @@ Vitest 间接引用的 Vite 也有开发服务器漏洞，测试工具链与前�
 | `projects` | 6 | 来源、可空 demand_id、唯一整体百分比、阶段、上线/交付原始与当前日期、整体更新时间、归档和版本号 |
 | `project_members` | 6 | 主责/协作关系；数据库约束保证唯一主责 |
 | `stage_histories` | 7 | 七阶段开始、完成和状态历史 |
+| `completion_date_changes` | 11 | 指定管理人员修订节点实际完成日期的前后值、原因、操作人和时间 |
 | `progress_updates` | 7 | 整体/个人进度类型、百分比与阻塞记录，个人记录不重置整体更新时间 |
 | `schedule_changes` | 7 | 日期旧值、新值、原因、操作人和时间 |
 | `risk_snapshots` | 7 | 当前风险、风险版本、激活/失效和通知依据 |
@@ -700,6 +701,7 @@ Vitest 间接引用的 Vite 也有开发服务器漏洞，测试工具链与前�
 | REQ-010 项目详情与历史 | Phase 2、3、4 | Phase 7、10 |
 | REQ-011 删除、取消与归档 | Phase 3、4 | Phase 6、7、10 |
 | REQ-012 领导可评审的真实前端原型模式 | Phase 1、2、3、4 | 生产环境禁用，Phase 10 复核无残留 |
+| REQ-013 指定管理人员修订节点实际完成日期 | Phase 11 | Phase 11 API、原型/正式前端、集成及浏览器验收 |
 
 ---
 
@@ -729,6 +731,84 @@ Vitest 间接引用的 Vite 也有开发服务器漏洞，测试工具链与前�
 CSV替换已完成（2026-09-09 19:33）：新系统18 ACTIVE项目＋2 PENDING需求，旧75项目/1测试需求/2附件元数据/6队列已清理。10项映射测试、两阶段审查、隔离替换/幂等/20表全内容故障回滚、生产20行字段及审计核验通过；真实会话页面18项目/2需求/9月甘特9条验证。两人管理名单及通知关闭保留，演练库已清理。实际范围与占位说明见MIGRATION-ASSESSMENT最新一节。
 
 正式上线执行计划：1 完整备份及隔离恢复逐项核验；2 每日备份/保留14份（只清理本脚本成功批次）及失败日志；3 实际部署镜像漏洞扫描；4 旧代理原位切换及回退脚本，独立Nginx验收和代码审查；5 正式路由切换与真实浏览器验证。用户暂缓占位核实，通知仍关闭。
+
+---
+
+## Phase 11: 指定管理人员修订节点实际完成日期
+
+**状态**：实施中（2026-09-22），本地完成后不自动部署
+
+**依赖关系**：复用已完成的项目编辑抽屉、阶段历史、工作区读模型、指定立项审批人能力和原型事务；不修改普通项目编辑的授权范围，不新增前端平行页面。
+
+### Task 11.1：阶段实际日期数据与服务端写入
+
+**交付内容**：
+
+- 在 Prisma 中新增独立的 `completion_date_changes` 修订历史表；项目和阶段历史保持原模型，不把实际日期修订写成计划调整。
+- 新增节点实际日期请求 schema 和独立 API；使用项目版本锁、事务和现有 command 幂等机制。
+- 服务端只接受配置绑定且有效的指定管理人员；不使用姓名授权，也不能由迁移待核实工程师或普通项目编辑接口绕过。
+- 只更新已走过节点的最新有效 StageHistory；缺失历史记录时按已有阶段事实补齐，不修改当前环节、项目状态、验收、通知、计划日期或停更时间。第七节点在已完成项目中修订时同步 `projects.actual_completed_at`。
+- 校验上海时区今天、首次提出日期、阶段顺序、当前/未来节点限制、优化项目单节点限制、重复阶段和版本冲突；全量保存原子提交。
+
+**关键文件**：
+
+- `it-project-console/api/prisma/schema.prisma`
+- `it-project-console/api/prisma/migrations/<timestamp>_completion_date_changes/migration.sql`
+- `it-project-console/api/src/modules/projects/completion-date-schemas.ts`
+- `it-project-console/api/src/modules/projects/completion-date-service.ts`
+- `it-project-console/api/src/modules/projects/project-routes.ts`
+- `it-project-console/api/src/modules/workspace/workspace-routes.ts`
+- `it-project-console/api/src/modules/workspace/read-model.ts`
+
+**验收标准**：
+
+- 指定账号可修改进行中、已完成、已取消、已归档和历史项目的已走过节点；其他身份 UI 隐藏且服务端 403。
+- 新旧日期、原因、操作人和时间可查询；计划风险不会因该操作新增“计划有变”。
+- 重复 requestId 返回同一结果；旧版本提交 409；任一校验失败不改项目、阶段历史或修订历史。
+- 阶段重复进入时只修改最新有效阶段记录；旧记录保持原值。
+
+### Task 11.2：原型与正式编辑抽屉接入
+
+**交付内容**：
+
+- 在 `project-edit-drawer.vue` 的“阶段与日期”原位增加节点实际完成日期区域，不新建独立编辑页面。
+- 正式模式调用独立 API，原型模式复用同一校验语义和本地事务；两种模式均支持已有日期修改、历史缺失日期补录、加载/保存/失败/无权限/并发提示。
+- 七阶段项目展示七个节点，优化项目只展示“优化完成验收”；当前/未来节点不可通过该入口伪造完成。
+- 保存成功后通过现有工作区刷新或原型共享快照同步项目卡片、详情、阶段历史、甘特图和需求池；保持未保存表单和已有编辑/历史交付入口行为。
+- 在详情历史中展示节点实际日期修订记录，和计划日期调整历史分开。
+
+**关键文件**：
+
+- `it-project-console/web/src/domain/prototype.ts`
+- `it-project-console/web/src/components/project/project-edit-drawer.vue`
+- `it-project-console/web/src/components/project/stage-history.vue`
+- `it-project-console/web/src/components/project/project-detail-drawer.vue`
+- `it-project-console/web/src/services/live-project-service.ts`
+- `it-project-console/web/src/services/project-edit-preview.ts`
+- `it-project-console/web/src/store/modules/prototype.ts`
+- `it-project-console/web/src/repositories/prototype-validation.ts`
+- `it-project-console/web/src/repositories/prototype-migration.ts`
+
+**验收标准**：
+
+- 姚泽攀在编辑抽屉能看到并保存实际完成日期；其他账号看不到入口，原有普通编辑和项目日常进度不受影响。
+- 卡片、详情、阶段历史、甘特和需求池均显示同一实际日期；不新增假完成、验收通过、通知或计划变化风险。
+- 日期非法、原因为空、保存失败、网络失败、版本冲突时保留输入并显示中文提示。
+- 窄面板下七行日期控件不横向溢出，现有抽屉的取消、未保存提醒、历史交付按钮仍可用。
+
+### Task 11.3：回归验证与对抗式审查
+
+**交付内容**：
+
+- 补 API 单元/隔离集成测试：指定账号正反例、历史/进行中/完成/取消/归档项目、优化项目、空日期补录、旧阶段历史、七节点顺序、未来日期、首次日期、并发、幂等、失败原子性和第七节点同步。
+- 补 Web 单测与 Playwright/浏览器流程：原型和正式模式、姚泽攀与其他账号入口、保存成功/失败/冲突、详情/卡片/甘特/需求池联动。
+- 运行前后端类型检查、单元测试、隔离集成、构建、浏览器功能测试；用独立 code-reviewer 执行 Stage 1/Stage 2，对发现问题修复后重新审查。
+
+**完成标准**：
+
+- `pnpm typecheck`、`pnpm test`、`pnpm build`、API 隔离集成和 Web 核心浏览器流程全部通过。
+- 对抗式审查没有 HIGH 问题；权限、历史记录、版本、风险、通知和原型/正式一致性均有证据。
+- 只形成本地代码和验收记录；部署、发布、push 另等用户明确授权。
 
 2026-09-09正式收尾：21表＋2对象隔离恢复PASS，每日03:30完整备份、14批保留/PIN、失败状态与日志轮转已落地，新旧HTTPS候选200及清理PASS。实际镜像扫描未通过：5运行镜像32个CRITICAL命中，mc另3；正式切换门禁实测阻断，旧路由不变。镜像整改、底座许可/兼容决策及公开切换验收尚未完成，详见GO-LIVE-CHECK。
 

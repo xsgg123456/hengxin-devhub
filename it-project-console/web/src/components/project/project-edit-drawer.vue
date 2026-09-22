@@ -36,6 +36,19 @@
           <h4 class="mb-3">{{ project.parentProjectId ? '优化完成验收计划' : '七个环节计划' }}</h4>
           <div v-for="plan in form.stagePlans" :key="plan.stage" class="plan-row"><span>{{ project.parentProjectId ? '优化完成验收' : plan.stage }}</span><ElDatePicker v-model="plan.startDate" :aria-label="(project.parentProjectId ? '优化完成验收' : plan.stage) + '计划开始'" value-format="YYYY-MM-DD" placeholder="计划开始" /><ElDatePicker v-model="plan.endDate" :aria-label="(project.parentProjectId ? '优化完成验收' : plan.stage) + '计划交付'" value-format="YYYY-MM-DD" placeholder="计划结束" /></div>
           <p class="hint">{{ project.parentProjectId ? '历史实际发生记录保留；计划日期修改将记录本次原因，计划交付日期与优化完成验收节点的结束日期一致。' : '历史实际发生记录保留；计划日期修改将记录本次原因。各环节计划须按顺序衔接；已填写上线部署或验收交付计划时，预计上线、交付须与对应计划结束日期一致。' }}</p>
+          <div v-if="canEditActualCompletion" class="actual-section">
+            <h4 class="mb-3">节点实际完成日期</h4>
+            <p class="hint">只可修改已按流程走过的节点；当前节点和未来节点仍通过原进度/验收流程完成。历史项目也可补录缺失日期。</p>
+            <div v-for="row in actualRows" :key="row.stage" class="actual-row">
+              <span>{{ row.label }}</span>
+              <ElDatePicker v-model="actualDates[row.stage]" :aria-label="`${row.label}实际完成日期`" value-format="YYYY-MM-DD" type="date" :clearable="false" :disabled="busy || !row.editable" :disabled-date="futureDate" placeholder="未填写" />
+              <small v-if="row.blockedReason" class="hint">{{ row.blockedReason }}</small>
+              <small v-else-if="!row.editable" class="hint">当前不可补录</small>
+            </div>
+            <ElEmpty v-if="!actualRows.some(row => row.editable)" description="当前没有可修订的已完成节点" :image-size="60" />
+            <ElFormItem v-else label="实际日期修改原因" required class="mt-4"><ElInput v-model="actualReason" aria-label="实际日期修改原因" type="textarea" :rows="2" maxlength="300" placeholder="例如：按历史项目资料校正实际完成日期" /></ElFormItem>
+            <ElButton v-if="actualRows.some(row => row.editable)" type="primary" plain :loading="busy" :disabled="busy || !actualDirty || !actualReason.trim()" @click="saveActualDates">保存实际完成日期</ElButton>
+          </div>
         </section>
         <section v-show="tab === 'migration'">
           <ElAlert title="核实完成后，项目恢复正常管理" type="success" :closable="false">保存修改可分次整理；完成核实将去掉项目名称中的迁移标记，真实延期和阻塞仍保留。</ElAlert>
@@ -45,7 +58,7 @@
       </ElForm>
       <ElAlert v-if="error" class="mt-4" :title="error" type="error" :closable="false" show-icon />
     </template>
-    <template #footer><div class="edit-footer"><span class="hint">{{ dirty ? '有未保存的修改' : '尚未修改' }}</span><div><ElButton v-if="canRegisterHistory && !project.parentProjectId" :disabled="busy" @click="openHistorical">登记历史已交付</ElButton><ElButton :disabled="busy" @click="beforeClose(() => emit('update:modelValue', false))">取消</ElButton><ElButton :loading="busy" :disabled="!dirty" :type="pending ? 'default' : 'primary'" @click="prepare(false)">保存修改</ElButton><ElButton v-if="pending" type="primary" :loading="busy" @click="prepare(true)">保存并完成核实</ElButton></div></div></template>
+    <template #footer><div class="edit-footer"><span class="hint">{{ dirty ? '有未保存的修改' : '尚未修改' }}</span><div><ElButton v-if="canRegisterHistory && !project.parentProjectId" :disabled="busy" @click="openHistorical">登记历史已交付</ElButton><ElButton :disabled="busy" @click="beforeClose(() => emit('update:modelValue', false))">取消</ElButton><ElButton :loading="busy" :disabled="busy || !formDirty" :type="pending ? 'default' : 'primary'" @click="prepare(false)">保存修改</ElButton><ElButton v-if="pending" type="primary" :loading="busy" @click="prepare(true)">保存并完成核实</ElButton></div></div></template>
     <HistoricalDeliveryDialog v-model="historicalOpen" :project="project" :dirty="dirty" @completed="emit('update:modelValue', false)" />
     <ElDialog v-model="confirmOpen" title="确认本次修改" width="min(560px, 92vw)" append-to-body :close-on-click-modal="false" :show-close="!busy" :close-on-press-escape="!busy">
       <p class="mb-3">{{ verifying ? '保存全部修改，并解除迁移待核实标记。' : '以下修改将同步到项目相关页面。' }}</p>
@@ -62,10 +75,10 @@ import { computed, ref, watch } from 'vue'
 import HistoricalDeliveryDialog from './historical-delivery-dialog.vue'
 import { canEditProject } from '@/utils/project-edit-permission'
 import { runtimeConfig } from '@/config/runtime'
-import { editLiveProject } from '@/services/live-project-service'
+import { editLiveProject, updateLiveCompletionDates } from '@/services/live-project-service'
 import { liveOperationKey } from '@/services/live-demand-service'
 import { ElMessage } from 'element-plus'
-import { PROJECT_STAGES, type DemoProject, type SimpleStatus } from '@/domain/prototype'
+import { PROJECT_STAGES, type DemoProject, type ProjectStage, type SimpleStatus } from '@/domain/prototype'
 import { usePrototypeStore } from '@/store/modules/prototype'
 import { useUnsavedForm } from '@/hooks/business/use-unsaved-form'
 import { useRecordStaleness } from '@/hooks/business/use-record-staleness'
@@ -74,6 +87,10 @@ import { statusLabel } from '@/utils/project-display'
 import { isEngineerEligible } from '@/utils/engineer-eligibility'
 import { shanghaiDay } from '@/services/workflow-validation'
 import { isMigrationPending, saveProjectEditPreview } from '@/services/project-edit-preview'
+import { saveCompletionDatesPreview } from '@/services/completion-date-preview'
+import { completionDateRows } from '@/services/completion-date-service'
+import { canApproveProjects } from '@/utils/project-approver'
+import { dateValue, textValue } from '@/services/workflow-validation'
 const props = defineProps<{ modelValue: boolean; project: DemoProject }>()
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
 const store = usePrototypeStore()
@@ -82,19 +99,27 @@ const futureDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth
 const form = ref<DemoProject>()
 const stale = useRecordStaleness('project', () => form.value?.id, () => form.value?.version)
 const baseline = ref(''), initialForm = ref(''), tab = ref('basic'), reason = ref(''), error = ref('')
+const actualDates = ref<Partial<Record<ProjectStage, string>>>({})
+const initialActualDates = ref<Partial<Record<ProjectStage, string>>>({})
+const actualReason = ref('')
 const confirmOpen = ref(false), verifying = ref(false)
 const historicalOpen = ref(false)
 const canRegisterHistory = computed(() => canEditProject(store.currentUser, props.project) && props.project.status === 'active' && !props.project.archived)
+const canEditActualCompletion = computed(() => canApproveProjects(store.currentUser))
 function openHistorical() {
   if (dirty.value) { error.value = '有未保存的修改，请先保存或放弃修改，再登记历史交付'; return }
   error.value = ''; historicalOpen.value = true
 }
 const busy = computed(() => store.saving)
-const dirty = computed(() => props.modelValue && JSON.stringify(form.value) !== initialForm.value)
+const formDirty = computed(() => props.modelValue && JSON.stringify(form.value) !== initialForm.value)
+const actualDirty = computed(() => JSON.stringify(actualDates.value) !== JSON.stringify(initialActualDates.value))
+const dirty = computed(() => formDirty.value || actualDirty.value)
 const { beforeClose } = useUnsavedForm('project-edit', dirty, busy)
 const users = computed(() => store.database?.users ?? [])
 const engineers = computed(() => users.value.filter(isEngineerEligible))
 const pending = computed(() => isMigrationPending(props.project))
+const histories = computed(() => store.database?.stageHistories.filter(history => history.projectId === props.project.id) ?? [])
+const actualRows = computed(() => completionDateRows(props.project, histories.value))
 const editableStatuses = computed<SimpleStatus[]>(() => props.project.simpleStatus === 'completed' ? ['completed'] : ['not-started', 'in-progress', 'nearly-done', 'blocked'])
 const dateFields = [
   { key: 'approvedLaunchDate', label: '审批确认上线日期' }, { key: 'expectedLaunchDate', label: '预计上线' }, { key: 'expectedDeliveryDate', label: '预计交付' }, { key: 'originalLaunchDate', label: '原计划上线' }, { key: 'originalDeliveryDate', label: '原计划交付' }
@@ -136,9 +161,13 @@ watch(() => props.modelValue, open => {
   form.value.firstRequestedOn ||= store.database?.demands.find(d => d.id === form.value!.demandId)?.firstRequestedOn || ''
   form.value.stagePlans = (props.project.parentProjectId ? ['验收交付' as const] : PROJECT_STAGES).map(stage => form.value!.stagePlans?.find(p => p.stage === stage) ?? { stage, startDate: '', endDate: '' })
   initialForm.value = JSON.stringify(form.value)
+  actualDates.value = Object.fromEntries(actualRows.value.map(row => [row.stage, row.actualDate]))
+  initialActualDates.value = { ...actualDates.value }
+  actualReason.value = ''
   tab.value = 'basic'; reason.value = ''; error.value = ''; confirmOpen.value = false; historicalOpen.value = false
 }, { immediate: true })
 function prepare(verify: boolean) {
+  if (actualDirty.value) { error.value = '节点实际完成日期有未保存修改，请先保存或放弃修改'; return }
   if (stale.value) { error.value = stale.value; return }
   const delivery = form.value?.parentProjectId ? form.value.stagePlans?.find(p => p.stage === '验收交付' && p.startDate && p.endDate) : undefined
   if (delivery && form.value) form.value.expectedLaunchDate = form.value.expectedDeliveryDate = delivery.endDate
@@ -147,6 +176,7 @@ function prepare(verify: boolean) {
 async function save() {
   if (!form.value) return
   if (stale.value) { error.value = stale.value; return }
+  if (actualDirty.value) { error.value = '节点实际完成日期有未保存修改，请先保存或放弃修改'; return }
   error.value = ''
   try {
     const edited = JSON.parse(JSON.stringify(form.value)) as DemoProject
@@ -160,6 +190,41 @@ async function save() {
     confirmOpen.value = false
     emit('update:modelValue', false)
     ElMessage.success(verifying.value ? '核实完成，项目已恢复正常管理' : props.project.parentProjectId ? '项目优化已保存，相关页面已同步' : '正式项目已保存，相关页面已同步')
+  } catch (e) { error.value = e instanceof Error ? e.message : '保存失败，请重试' }
+}
+async function saveActualDates() {
+  if (!form.value || !actualDirty.value) return
+  if (stale.value) { error.value = stale.value; return }
+  error.value = ''
+  try {
+    const dates = actualRows.value
+      .filter(row => row.editable && actualDates.value[row.stage] !== initialActualDates.value[row.stage])
+      .map(row => ({ stage: row.stage, completedOn: actualDates.value[row.stage] ?? '' }))
+    for (const item of dates) dateValue(item.completedOn, `${item.stage}实际完成日期`)
+    const reasonText = textValue(actualReason.value, '实际日期修改原因')
+    const versionBeforeSave = form.value.version ?? 1
+    if (!runtimeConfig.isPrototype && !Number.isInteger(form.value.version)) throw new Error('项目版本缺失，请关闭后刷新重试')
+    const payload = { projectId: form.value.id, version: versionBeforeSave, dates, reason: reasonText }
+    let result: { version?: number } | undefined
+    if (runtimeConfig.isPrototype) {
+      await store.runCommand(draft => saveCompletionDatesPreview(draft, { ...payload }))
+    } else {
+      const requestId = operationKey({ type: 'completion-dates', ...payload })
+      result = await store.runLiveCommand(() => updateLiveCompletionDates({ ...payload, requestId }))
+    }
+    const latest = store.database?.projects.find(project => project.id === form.value!.id) ?? props.project
+    const version = result?.version ?? latest.version ?? (versionBeforeSave + 1)
+    form.value.version = version
+    form.value.actualCompletedAt = latest.actualCompletedAt
+    const baselineForm = JSON.parse(initialForm.value) as DemoProject
+    baselineForm.version = version
+    baselineForm.actualCompletedAt = latest.actualCompletedAt
+    initialForm.value = JSON.stringify(baselineForm)
+    const refreshedRows = completionDateRows(latest, store.database?.stageHistories.filter(history => history.projectId === latest.id) ?? [])
+    actualDates.value = Object.fromEntries(refreshedRows.map(row => [row.stage, row.actualDate]))
+    initialActualDates.value = { ...actualDates.value }
+    actualReason.value = ''
+    ElMessage.success('节点实际完成日期已保存，相关页面已同步')
   } catch (e) { error.value = e instanceof Error ? e.message : '保存失败，请重试' }
 }
 </script>
@@ -177,5 +242,8 @@ async function save() {
 .edit-footer > div { display:flex; flex-wrap:wrap; gap:8px; }
 .edit-footer :deep(.el-button + .el-button) { margin-left:0; }
 .change-row { padding:8px 0; border-bottom:1px solid var(--el-border-color-lighter); overflow-wrap:anywhere; }
+.actual-section { margin-top:24px; padding-top:20px; border-top:1px solid var(--el-border-color-lighter); }
+.actual-row { display:grid; grid-template-columns:150px minmax(180px, 1fr) minmax(100px, 1fr); gap:12px; align-items:center; margin-bottom:12px; }
 @media(max-width:600px) { .edit-grid { grid-template-columns:1fr; } .plan-row { grid-template-columns:1fr 1fr; } .plan-row > span { grid-column:1 / -1; } }
+@media(max-width:600px) { .actual-row { grid-template-columns:1fr 1fr; } .actual-row > span, .actual-row > small { grid-column:1 / -1; } }
 </style>

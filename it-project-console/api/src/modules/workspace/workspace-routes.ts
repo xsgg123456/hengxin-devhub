@@ -11,7 +11,7 @@ export function registerWorkspaceRoutes(
   app.get('/api/workspace', { preHandler: authenticate }, async (request) => {
     const workspace = await db.$transaction(
       async (tx) => {
-        const [users, demands, projects, progressUpdates, scheduleChanges, lifecycleEvents, projectProposals] =
+        const [users, demands, projects, progressUpdates, scheduleChanges, completionDateChanges, lifecycleEvents, projectProposals] =
           await Promise.all([
             tx.user.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
             tx.demand.findMany({
@@ -27,6 +27,7 @@ export function registerWorkspaceRoutes(
             }),
             tx.progressUpdate.findMany({ orderBy: { createdAt: 'desc' } }),
             tx.scheduleChange.findMany({ orderBy: { createdAt: 'desc' } }),
+            tx.completionDateChange.findMany({ orderBy: { createdAt: 'desc' } }),
             tx.lifecycleEvent.findMany({ orderBy: { createdAt: 'desc' } }),
             tx.projectProposal.findMany({ orderBy: { createdAt: 'desc' } })
           ])
@@ -63,6 +64,10 @@ export function registerWorkspaceRoutes(
               createdAt: row.createdAt.toISOString()
             })),
             scheduleChanges: scheduleChanges.map((row) => ({
+              ...row,
+              createdAt: row.createdAt.toISOString()
+            })),
+            completionDateChanges: completionDateChanges.map((row) => ({
               ...row,
               createdAt: row.createdAt.toISOString()
             })),

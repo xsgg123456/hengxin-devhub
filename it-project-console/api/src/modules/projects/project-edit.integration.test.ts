@@ -8,6 +8,7 @@ import { projectEditSchema } from './project-edit-schemas.js'
 import { ProjectEditService } from './project-edit-service.js'
 import { AcceptanceService } from './acceptance-service.js'
 import { assigned } from '../dashboard/dashboard-service.js'
+import { workspaceRevision } from '../workspace/workspace-sync.js'
 const env = parseEnv(process.env), url = new URL(env.DATABASE_URL)
 if (env.NODE_ENV !== 'test' || !['localhost','127.0.0.1'].includes(url.hostname) ||
   !url.searchParams.get('schema')?.startsWith('itpc_test_') || !env.S3_BUCKET.startsWith('itpc-test-')) throw new Error('必须使用隔离测试环境')
@@ -38,6 +39,7 @@ function input(p:Awaited<ReturnType<typeof row>>,extra:Record<string,unknown>={}
   return {...fields,requestId:key(),version:p.version,reason:'按业务原始资料核对',verify:false,...extra}
 }
 const save=(id:string,payload:Record<string,unknown>,user=manager)=>runtime.app.inject({method:'POST',url:`/api/projects/${id}/edit`,payload,headers:{cookie:cookies[user],origin:env.WEB_ORIGIN}})
+const saveCompletionDates=(id:string,payload:Record<string,unknown>,user=manager,cookie=cookies[user])=>runtime.app.inject({method:'POST',url:`/api/projects/${id}/completion-dates`,payload,headers:{cookie,origin:env.WEB_ORIGIN}})
 describe('正式完整编辑API',()=>{
   it('最终名称和日期只同步来源需求一次，保留子优化及历史，并发旧版本全部拒绝',async()=>{
     const p=await fixture(false), demand=await db.demand.findUniqueOrThrow({where:{id:p.demandId!}})
@@ -198,5 +200,124 @@ describe('正式完整编辑API',()=>{
     const plans=stages.map(stage=>({stage,startDate:'2026-12-01',endDate:'2026-12-01'}))
     expect((await save(fresh.id,input(fresh,{stagePlans:plans,expectedDeliveryDate:'2026-12-01'}))).statusCode).toBe(200)
     expect(mapProject(await row(fresh.id)).stagePlans).toHaveLength(7)
+  })
+  it('节点实际完成日期只允许指定管理员，修改最新阶段历史并保留旧历史',async()=>{
+    const p=await fixture(false)
+    await db.project.update({where:{id:p.id},data:{stage:'开发编码',simpleStatus:'in-progress'}})
+    const old=await db.stageHistory.create({data:{projectId:p.id,stage:'方案设计',status:'completed',completedAt:new Date('2024-01-12')}})
+    const latest=await db.stageHistory.create({data:{projectId:p.id,stage:'方案设计',status:'completed',completedAt:new Date('2024-01-13')}})
+    await db.stageHistory.create({data:{projectId:p.id,stage:'需求受理',status:'completed'}})
+    const body={requestId:key(),version:p.version,dates:[
+      {stage:'需求受理',completedOn:'2024-01-11'},
+      {stage:'方案设计',completedOn:'2024-02-01'}
+    ],reason:'按历史项目资料校正节点实际完成日期'}
+    expect((await saveCompletionDates(p.id,body,engineer)).statusCode).toBe(403)
+    await db.user.update({where:{id:collab},data:{role:'MANAGER',dingUserId:randomUUID()}})
+    try {
+      expect((await saveCompletionDates(p.id,body,collab,cookies[collab])).statusCode).toBe(403)
+    } finally {
+      await db.user.update({where:{id:collab},data:{role:'ENGINEER',dingUserId:null}})
+    }
+    const response=await saveCompletionDates(p.id,body)
+    expect(response.statusCode).toBe(200)
+    const replay=await saveCompletionDates(p.id,body)
+    expect(replay.json()).toEqual(response.json())
+    const changed=await row(p.id)
+    expect(changed.version).toBe(p.version+1)
+    expect((await db.stageHistory.findUniqueOrThrow({where:{id:old.id}})).completedAt).toEqual(new Date('2024-01-12'))
+    expect((await db.stageHistory.findUniqueOrThrow({where:{id:latest.id}})).completedAt).toEqual(new Date('2024-02-01'))
+    expect((await db.stageHistory.findFirstOrThrow({where:{projectId:p.id,stage:'需求受理'}})).completedAt).toEqual(new Date('2024-01-11'))
+    expect(await db.completionDateChange.count({where:{projectId:p.id}})).toBe(2)
+    expect((await db.auditLog.findFirstOrThrow({where:{entityId:p.id,action:'completion-date-edit'}})).actorId).toBe(manager)
+  })
+  it('拒绝未来、首次提出日前、节点倒序和当前节点日期，失败不写入',async()=>{
+    const p=await fixture(false)
+    await db.project.update({where:{id:p.id},data:{stage:'开发编码',simpleStatus:'in-progress'}})
+    await db.stageHistory.create({data:{projectId:p.id,stage:'方案设计',status:'current',enteredAt:new Date('2024-01-10')}})
+    const base=await row(p.id), count=()=>db.completionDateChange.count({where:{projectId:p.id}})
+    for(const dates of [
+      [{stage:'方案设计',completedOn:'2099-01-01'}],
+      [{stage:'方案设计',completedOn:'2023-12-31'}],
+      [{stage:'开发编码',completedOn:'2024-02-01'}],
+      [{stage:'需求受理',completedOn:'2024-03-01'},{stage:'方案设计',completedOn:'2024-02-01'}]
+    ]) {
+      expect((await saveCompletionDates(p.id,{requestId:key(),version:base.version,dates,reason:'非法日期测试'})).statusCode).toBe(400)
+    }
+    expect(await row(p.id)).toEqual(base)
+    expect(await count()).toBe(0)
+  })
+  it('已完成归档项目可修订第七节点并同步项目实际完成日，不触发验收',async()=>{
+    const p=await fixture(false)
+    const oldDate=new Date('2024-02-01')
+    await db.project.update({where:{id:p.id},data:{status:'COMPLETED',archived:true,stage:'验收交付',simpleStatus:'completed',actualCompletedAt:oldDate,overallProgress:100}})
+    await db.stageHistory.create({data:{projectId:p.id,stage:'验收交付',status:'completed',completedAt:oldDate,progress:100}})
+    const current=await row(p.id)
+    const body={requestId:key(),version:current.version,dates:[{stage:'验收交付',completedOn:'2024-02-10'}],reason:'修正历史项目实际完成日期'}
+    expect((await saveCompletionDates(p.id,body)).statusCode).toBe(200)
+    const changed=await row(p.id)
+    expect(changed.status).toBe('COMPLETED')
+    expect(changed.archived).toBe(true)
+    expect(changed.actualCompletedAt).toEqual(new Date('2024-02-10'))
+    expect(await db.notificationOutbox.count({where:{projectId:p.id,eventType:'PROJECT_COMPLETED'}})).toBe(0)
+    expect(await db.completionDateChange.count({where:{projectId:p.id}})).toBe(1)
+  })
+  it('优化项目仅可修订优化验收节点，取消项目和工作区同步也受同一规则保护',async()=>{
+    const parent=await fixture(false)
+    await db.project.update({where:{id:parent.id},data:{status:'COMPLETED',stage:'验收交付',simpleStatus:'completed',overallProgress:100}})
+    const oldDate=new Date('2024-03-01')
+    const optimization=await db.project.create({data:{
+      name:'历史优化项目',parentProjectId:parent.id,primaryOwnerId:engineer,firstRequestedOn:new Date('2024-01-01'),
+      status:'COMPLETED',stage:'验收交付',simpleStatus:'completed',overallProgress:100,actualCompletedAt:oldDate,
+      stageHistories:{create:{stage:'验收交付',status:'completed',completedAt:oldDate,progress:100}}
+    }})
+    const optimizationBody={requestId:key(),version:optimization.version,dates:[{stage:'验收交付',completedOn:'2024-03-05'}],reason:'修正优化项目历史验收日期'}
+    expect((await saveCompletionDates(optimization.id,optimizationBody)).statusCode).toBe(200)
+    expect((await saveCompletionDates(optimization.id,{...optimizationBody,requestId:key(),version:optimization.version+1,dates:[{stage:'方案设计',completedOn:'2024-03-05'}]})).statusCode).toBe(400)
+    expect((await row(optimization.id)).status).toBe('COMPLETED')
+    expect((await db.project.findUniqueOrThrow({where:{id:optimization.id}})).actualCompletedAt).toEqual(new Date('2024-03-05'))
+    expect(await db.completionDateChange.count({where:{projectId:optimization.id}})).toBe(1)
+
+    const cancelled=await fixture(false)
+    await db.project.update({where:{id:cancelled.id},data:{status:'CANCELLED',stage:'开发编码',simpleStatus:'not-started'}})
+    await db.stageHistory.create({data:{projectId:cancelled.id,stage:'方案设计',status:'completed',completedAt:oldDate,progress:100}})
+    const beforeRevision=await workspaceRevision(db)
+    const cancelledBody={requestId:key(),version:cancelled.version,dates:[{stage:'方案设计',completedOn:'2024-03-06'}],reason:'补录取消项目历史节点日期'}
+    expect((await saveCompletionDates(cancelled.id,cancelledBody)).statusCode).toBe(200)
+    expect((await db.project.findUniqueOrThrow({where:{id:cancelled.id}})).status).toBe('CANCELLED')
+    expect(await workspaceRevision(db)).not.toBe(beforeRevision)
+    const workspace=await runtime.app.inject({method:'GET',url:'/api/workspace',headers:{cookie:cookies[manager],origin:env.WEB_ORIGIN}})
+    expect(workspace.statusCode).toBe(200)
+    expect(workspace.json().data.database.completionDateChanges).toEqual(expect.arrayContaining([
+      expect.objectContaining({projectId:cancelled.id,stage:'方案设计',newValue:'2024-03-06',reason:cancelledBody.reason})
+    ]))
+    expect((await saveCompletionDates(cancelled.id,{...cancelledBody,requestId:key(),version:cancelled.version})).statusCode).toBe(409)
+  })
+  it('future阶段占位记录和多日期写入故障均不被静默改写，事务失败可完整重试',async()=>{
+    const future=await fixture(false)
+    await db.project.update({where:{id:future.id},data:{stage:'开发编码',simpleStatus:'in-progress'}})
+    await db.stageHistory.create({data:{projectId:future.id,stage:'方案设计',status:'future',progress:0}})
+    const futureBefore=await db.stageHistory.findFirstOrThrow({where:{projectId:future.id,stage:'方案设计'}})
+    expect((await saveCompletionDates(future.id,{requestId:key(),version:future.version,dates:[{stage:'方案设计',completedOn:'2024-03-07'}],reason:'不得覆盖未来占位'})).statusCode).toBe(400)
+    expect(await db.stageHistory.findUniqueOrThrow({where:{id:futureBefore.id}})).toEqual(futureBefore)
+    expect(await db.completionDateChange.count({where:{projectId:future.id}})).toBe(0)
+
+    const atomic=await fixture(false)
+    await db.project.update({where:{id:atomic.id},data:{stage:'开发编码',simpleStatus:'in-progress'}})
+    const first=await db.stageHistory.create({data:{projectId:atomic.id,stage:'需求受理',status:'completed',completedAt:new Date('2024-01-10'),progress:100}})
+    const second=await db.stageHistory.create({data:{projectId:atomic.id,stage:'立项评审',status:'completed',completedAt:new Date('2024-01-11'),progress:100}})
+    const atomicBefore=await row(atomic.id), historyBefore=[first,second], revisionBefore=await workspaceRevision(db)
+    const atomicBody={requestId:key(),version:atomic.version,dates:[
+      {stage:'需求受理',completedOn:'2024-03-08'},{stage:'立项评审',completedOn:'2024-03-09'}
+    ],reason:'验证多节点事务回滚'}
+    await db.$executeRaw`ALTER TABLE completion_date_changes ADD CONSTRAINT completion_date_edit_test_fault CHECK (new_value <> '2024-03-09') NOT VALID`
+    try {
+      expect((await saveCompletionDates(atomic.id,atomicBody)).statusCode).toBe(500)
+      expect(await row(atomic.id)).toEqual(atomicBefore)
+      expect(await db.stageHistory.findMany({where:{id:{in:[first.id,second.id]}},orderBy:{id:'asc'}})).toEqual(historyBefore.sort((a,b)=>a.id.localeCompare(b.id)))
+      expect(await db.completionDateChange.count({where:{projectId:atomic.id}})).toBe(0)
+      expect(await workspaceRevision(db)).toBe(revisionBefore)
+    } finally { await db.$executeRaw`ALTER TABLE completion_date_changes DROP CONSTRAINT completion_date_edit_test_fault` }
+    expect((await saveCompletionDates(atomic.id,atomicBody)).statusCode).toBe(200)
+    expect(await db.completionDateChange.count({where:{projectId:atomic.id}})).toBe(2)
   })
 })

@@ -46,6 +46,7 @@ it('has deferred coverage for all workspace and risk/permission source tables', 
   expect(rows.map(row => row.table_name).sort()).toEqual([
     'users', 'departments', 'manager_grants', 'demands', 'projects', 'project_proposals',
     'project_members', 'attachments', 'stage_histories', 'progress_updates',
+    'completion_date_changes',
     'schedule_changes', 'lifecycle_events', 'risk_snapshots', 'system_settings'
   ].sort())
 })

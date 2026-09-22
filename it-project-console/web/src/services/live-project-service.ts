@@ -94,3 +94,16 @@ export function editLiveProject(
     }
   })
 }
+
+export function updateLiveCompletionDates(input: {
+  projectId: string
+  version: number
+  dates: Array<{ stage: import('@/domain/prototype').ProjectStage; completedOn: string }>
+  reason: string
+  requestId: string
+}) {
+  const { projectId, ...body } = input
+  return apiRequest<LiveWriteResult>(`/projects/${projectId}/completion-dates`, {
+    method: 'POST', body
+  })
+}

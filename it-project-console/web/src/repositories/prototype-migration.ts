@@ -48,6 +48,7 @@ export function migratePrototypeSnapshot(value: unknown): PrototypeSnapshot {
     }
   })
   snapshot.database.lifecycleEvents ??= []
+  snapshot.database.completionDateChanges ??= []
   if (legacy) {
     snapshot.database.stageHistories ??= []
     snapshot.database.scheduleChanges ??= []
@@ -89,6 +90,7 @@ export function migratePrototypeSnapshot(value: unknown): PrototypeSnapshot {
   if (
     !Array.isArray(snapshot.database.stageHistories) ||
     !Array.isArray(snapshot.database.scheduleChanges) ||
+    !Array.isArray(snapshot.database.completionDateChanges) ||
     !Array.isArray(snapshot.database.lifecycleEvents)
   )
     throw new Error('历史记录无效')

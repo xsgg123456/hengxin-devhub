@@ -10,12 +10,16 @@ import { projectSchema, proposalConfirmSchema, proposalResubmitSchema } from './
 import { ProjectService } from './project-service.js'
 import { ProposalService } from './proposal-service.js'
 import { commandSchema } from '../demands/demand-schemas.js'
+import { CompletionDateService } from './completion-date-service.js'
+import { completionDateSchema } from './completion-date-schemas.js'
 export async function registerProjectRoutes(app: FastifyInstance, db: PrismaClient, authenticate: preHandlerHookHandler, approverId = '') {
   const api = app.withTypeProvider<ZodTypeProvider>()
   const service = new ProjectService(db, approverId)
   const editor = new ProjectEditService(db, approverId)
   const historical = new HistoricalDeliveryService(db, approverId)
+  const completionDates = new CompletionDateService(db, approverId)
   api.post<{ Params: { id: string } }>('/api/projects/:id/historical-delivery', { preHandler: authenticate, schema: { body: historicalDeliverySchema } }, async request => ({ data: await historical.complete(request.actor!, request.params.id, request.body) }))
+  api.post<{ Params: { id: string } }>('/api/projects/:id/completion-dates', { preHandler: authenticate, schema: { body: completionDateSchema } }, async request => ({ data: await completionDates.save(request.actor!, request.params.id, request.body) }))
   api.post<{ Params: { id: string } }>('/api/projects/:id/edit', { preHandler: authenticate, schema: { body: projectEditSchema } }, async request => ({ data: await editor.save(request.actor!, request.params.id, request.body) }))
   const acceptance = new AcceptanceService(db)
   api.post<{ Params: { id: string } }>('/api/projects/:id/acceptance', { preHandler: authenticate, schema: { body: acceptanceSchema } }, async request => ({ data: await acceptance.act(request.actor!, request.params.id, request.body) }))

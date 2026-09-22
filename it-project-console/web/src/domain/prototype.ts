@@ -171,6 +171,16 @@ export interface DemoStageHistory {
   completedAt: string | null
   interruptedAt?: string
 }
+export interface DemoCompletionDateChange {
+  id: string
+  projectId: string
+  stage: ProjectStage
+  oldValue: string
+  newValue: string
+  reason: string
+  authorId: string
+  createdAt: string
+}
 export interface DemoScheduleChange {
   id: string
   projectId: string
@@ -199,6 +209,7 @@ export interface PrototypeDatabase {
   progressUpdates: DemoProgressUpdate[]
   stageHistories: DemoStageHistory[]
   scheduleChanges: DemoScheduleChange[]
+  completionDateChanges?: DemoCompletionDateChange[]
   lifecycleEvents: DemoLifecycleEvent[]
 }
 export interface DemoLifecycleEvent {
