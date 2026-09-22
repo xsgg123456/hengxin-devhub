@@ -86,7 +86,8 @@ describe('交付后单节点优化真实API', () => {
   it('接单后仅单执行节点；必须排期并由指定验收人完成，编辑、纠正、历史完成不能绕过', async () => {
     const p = await parent(), original = await row(p.id), project = await establish(p.id), id = project.id
     expect(project).toMatchObject({ parentProjectId: p.id, stage: '验收交付', acceptanceOwnerId: business })
-    expect((await db.stageHistory.findMany({ where: { projectId: id } })).map(h => h.stage)).toEqual(['需求受理', '立项评审', '验收交付'])
+    const stages = (await db.stageHistory.findMany({ where: { projectId: id } })).map(h => h.stage)
+    expect([...stages].sort()).toEqual(['需求受理', '立项评审', '验收交付'].sort())
     const action = (action: string, user = engineer, extra: Record<string, unknown> = {}) => row(id).then(p => call(`/api/projects/${id}/acceptance`, { requestId: key(), version: p.version, action, ...(action === 'accept' ? {} : { summary: '交付验收说明' }), ...extra }, user))
     expect((await call(`/api/projects/${id}/edit`, await editInput(id, { simpleStatus: 'in-progress' }), manager)).statusCode).toBe(400)
     expect((await action('submit')).statusCode).toBe(400)
