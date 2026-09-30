@@ -27,7 +27,7 @@ export function bootstrapProduction(): void {
       .refreshLive()
       .then((result) => {
         if (result.status !== 'applied') return
-        syncPrototypeShell(prototypeStore.currentUser.role)
+        syncPrototypeShell(prototypeStore.currentUser)
         return router.replace(
           initialPath && initialPath !== '/'
             ? initialPath
@@ -35,7 +35,7 @@ export function bootstrapProduction(): void {
         )
       })
       .catch(() => {})
-    syncPrototypeShell(prototypeStore.currentUser.role)
+    syncPrototypeShell(prototypeStore.currentUser)
   }
 
   initRouter(app)

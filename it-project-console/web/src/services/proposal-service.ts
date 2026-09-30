@@ -1,3 +1,4 @@
+import { hasManagementPermissions } from '@/utils/management-permission'
 import { canApproveProjects } from '@/utils/project-approver'
 import type { ProjectProposal, PrototypeSnapshot } from '@/domain/prototype'
 import type { ProjectInput } from './project-service'
@@ -187,7 +188,7 @@ export function resubmitProjectProposal(
 export function deleteProjectProposal(snapshot: PrototypeSnapshot, id: string, version: number) {
   const actor = assertWrite(snapshot)
   const proposal = snapshot.database.projectProposals?.find((row) => row.id === id)
-  if (actor.role !== 'manager') throw new WorkflowError('只有管理人员可以删除')
+  if (!hasManagementPermissions(actor)) throw new WorkflowError('只有管理人员可以删除')
   if (
     !proposal ||
     proposal.version !== version ||

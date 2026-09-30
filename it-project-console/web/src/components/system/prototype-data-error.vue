@@ -36,7 +36,7 @@
         error.value = '仍无法读取，请检查浏览器存储权限，或确认后重置演示数据。'
         return
       }
-      syncPrototypeShell(prototypeStore.currentUser.role)
+      syncPrototypeShell(prototypeStore.currentUser)
       await router.replace(getHomePath(prototypeStore.currentUser.role))
     } catch {
       error.value = '重新读取失败，请稍后重试。'
@@ -57,7 +57,7 @@
     error.value = ''
     try {
       prototypeStore.reset()
-      syncPrototypeShell(prototypeStore.currentUser.role)
+      syncPrototypeShell(prototypeStore.currentUser)
       await router.replace(getHomePath(prototypeStore.currentUser.role))
     } catch {
       error.value = '重置失败，原数据未恢复。请检查浏览器存储权限后重试。'

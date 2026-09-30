@@ -1,3 +1,4 @@
+import { hasManagementPermissions } from '@/utils/management-permission'
 import {
   PROJECT_STAGES,
   type ProjectStage,
@@ -30,7 +31,7 @@ export interface CorrectionInput {
 }
 export function setManager(snapshot: PrototypeSnapshot, input: ManagerInput) {
   const actor = assertWrite(snapshot)
-  if (actor.role !== 'manager') throw new WorkflowError('只有管理人员可以维护名单')
+  if (!hasManagementPermissions(actor)) throw new WorkflowError('只有管理人员可以维护名单')
   const user = snapshot.database.users.find((row) => row.id === input.userId)
   if (!user) throw new WorkflowError('请选择已有组织用户')
   if (typeof input.enabled !== 'boolean') throw new WorkflowError('授权操作无效')
@@ -54,7 +55,7 @@ export function setManager(snapshot: PrototypeSnapshot, input: ManagerInput) {
 }
 export function correctProject(snapshot: PrototypeSnapshot, input: CorrectionInput) {
   const actor = assertWrite(snapshot)
-  if (actor.role !== 'manager') throw new WorkflowError('只有管理人员可以纠正项目')
+  if (!hasManagementPermissions(actor)) throw new WorkflowError('只有管理人员可以纠正项目')
   const project = snapshot.database.projects.find((row) => row.id === input.projectId)
   if (!project) throw new WorkflowError('项目不存在')
   if (project.status !== 'active' || project.archived) throw new WorkflowError('请先重新打开项目')

@@ -54,10 +54,17 @@ it.each(['信息技术部', 'IT部'])('%s：完整快照、稳定身份、角色
     await expect(setEngineerOverride(db, { ...override, dingUserId: 'wrong' })).rejects.toMatchObject({ code: 'IDENTITY_MISMATCH' })
     await expect(setEngineerOverride(db, { ...override, actorId: business.id })).rejects.toMatchObject({ statusCode: 403 })
     await setEngineerOverride(db, override)
+    await db.user.update({ where: { id: business.id }, data: { maintenanceAdmin: true } })
     await directory.sync()
     const engineer = await directory.resolve(businessIdentity)
     expect(engineer.department).toBe('市场部')
     expect(engineer.role).toBe('ENGINEER')
+    expect(engineer.maintenanceAdmin).toBe(true)
+    await directory.sync(engineer.id)
+    expect((await directory.resolve(businessIdentity)).role).toBe('ENGINEER')
+    await db.user.update({ where: { id: engineer.id }, data: { maintenanceAdmin: false } })
+    engineer.maintenanceAdmin = false
+    await expect(directory.sync(engineer.id)).rejects.toMatchObject({ statusCode: 403 })
     expect(isEngineerEligible(engineer)).toBe(true)
     expect(mapUser(engineer).engineerEligible).toBe(true)
     const projectInput = { approvedLaunchDate: '2099-12-31', requestId: randomUUID(), name: '例外资格分派验证', department: '市场部', priority: 'P2' as const,

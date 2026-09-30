@@ -71,7 +71,7 @@
       menuError.value = error instanceof Error ? error.message : '身份切换失败'
       return
     }
-    syncPrototypeShell(prototypeStore.currentUser.role)
+    syncPrototypeShell(prototypeStore.currentUser)
     emit('close')
     await router.push(getHomePath(prototypeStore.currentUser.role))
   }
@@ -86,7 +86,7 @@
         type: 'warning'
       })
       prototypeStore.reset()
-      syncPrototypeShell(prototypeStore.currentUser.role)
+      syncPrototypeShell(prototypeStore.currentUser)
       emit('close')
       await router.push(getHomePath(prototypeStore.currentUser.role))
       ElMessage.success('演示数据已重置')

@@ -1,3 +1,4 @@
+import { hasManagementPermissions } from '../../lib/management-permissions.js'
 import { directoryRole } from '../../lib/it-department.js'
 import type { PrismaClient } from '../../generated/prisma/client.js'
 import type { Actor } from '../../plugins/auth.js'
@@ -29,9 +30,9 @@ export class ManagerGrantService {
   async candidates(actor: Actor) {
     assertManager(actor)
     const enterprise = await this.db.systemSetting.findUnique({ where: { key: 'dingtalk.directory' } })
-    if (enterprise) {
+    {
       const current = await this.db.user.findUnique({ where: { id: actor.id }, include: { managerGrant: true } })
-      if (!current?.active || !current.dingUnionId || current.role !== 'MANAGER' || !current.managerGrant?.active)
+      if (!hasManagementPermissions(current) || (enterprise && (!current?.dingUnionId || (!current.maintenanceAdmin && !current.managerGrant?.active))))
         throw new AppError(403, 'FORBIDDEN', '需要有效管理人员权限')
     }
     return this.db.user.findMany({
@@ -61,7 +62,7 @@ export class ManagerGrantService {
           where: { id: actor.id },
           include: { managerGrant: true }
         })
-        if (!current?.active || current.role !== 'MANAGER' || !current.managerGrant?.active || (enterprise && !current.dingUnionId))
+        if (!current?.active || !hasManagementPermissions(current) || (!current.maintenanceAdmin && !current.managerGrant?.active) || (enterprise && !current.dingUnionId))
           throw new AppError(403, 'FORBIDDEN', '需要有效管理人员权限')
         const user = await tx.user.findUnique({
           where: { id: input.userId },

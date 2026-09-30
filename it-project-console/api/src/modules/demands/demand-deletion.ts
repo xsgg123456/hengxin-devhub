@@ -1,3 +1,4 @@
+import { hasManagementPermissions } from '../../lib/management-permissions.js'
 import type { Prisma, PrismaClient } from '../../generated/prisma/client.js'
 import type { Actor } from '../../plugins/auth.js'
 import { command, lockedDemand } from '../../lib/business-command.js'
@@ -8,7 +9,7 @@ import { commandSchema } from './demand-schemas.js'
 import { queueAttachmentDeletion } from './demand-materials.js'
 
 function assertDelete(actor: Actor, ownerId?: string) {
-  if (actor.role !== 'MANAGER' && !(actor.role === 'BUSINESS' && actor.id === ownerId))
+  if (!hasManagementPermissions(actor) && !(actor.role === 'BUSINESS' && actor.id === ownerId))
     throw new AppError(403, 'FORBIDDEN', '只有管理人员或需求本人业务提交人可以删除')
 }
 function cancellable(row: { status: string; deliveryLog: { state: string; taskId: string | null } | null }) {

@@ -44,6 +44,8 @@
   </section>
 </template>
 <script setup lang="ts">
+  import { hasManagementPermissions } from '@/utils/management-permission'
+
   import { optimizationStatus } from '@/utils/optimization-display'
   import { computed, ref } from 'vue'
   import { runtimeConfig } from '@/config/runtime'
@@ -62,7 +64,7 @@
   const confirming = ref(false)
   const error = ref(''),
     correctionOpen = ref(false)
-  const manager = computed(() => store.currentUser.role === 'manager')
+  const manager = computed(() => hasManagementPermissions(store.currentUser))
   const active = computed(() => props.project.status === 'active' && !props.project.archived)
   const stateLabel = computed(
     () => props.project.parentProjectId ? optimizationStatus(props.project) : ({ active: '进行中', completed: '已完成', cancelled: '已取消' })[props.project.status]

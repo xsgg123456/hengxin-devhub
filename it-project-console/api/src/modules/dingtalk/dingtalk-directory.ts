@@ -1,3 +1,4 @@
+import { hasManagementPermissions } from '../../lib/management-permissions.js'
 import { directoryRole, isItDepartment } from '../../lib/it-department.js'
 import type { PrismaClient, Prisma } from '../../generated/prisma/client.js'
 import { AppError } from '../../lib/errors.js'
@@ -81,13 +82,18 @@ export class DingtalkDirectory {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended('dingtalk-directory', 0))::text`
       if (actorId) {
         const actor = await tx.user.findUnique({ where: { id: actorId }, include: { managerGrant: true } })
-        if (!actor?.active || !actor.managerGrant?.active) throw denied()
+        if (!actor?.active || !hasManagementPermissions(actor) || (!actor.maintenanceAdmin && !actor.managerGrant?.active)) throw denied()
       }
       const snapshot = await fetchDirectory(this.client)
+      let authorizationSource = 'system'
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended('manager-grants', 0))::text`
       if (actorId) {
         const actor = await tx.user.findUnique({ where: { id: actorId }, include: { managerGrant: true } })
-        if (!actor?.active || !actor.managerGrant?.active) throw denied()
+        if (!actor?.active || !hasManagementPermissions(actor) || (!actor.maintenanceAdmin && !actor.managerGrant?.active)) throw denied()
+      }
+      if (actorId) {
+        const actor = await tx.user.findUniqueOrThrow({ where: { id: actorId } })
+        authorizationSource = actor.maintenanceAdmin ? 'maintenanceAdmin' : 'managerGrant'
       }
       const setting = await tx.systemSetting.findUnique({ where: { key: 'dingtalk.directory' } })
       if (setting && record(setting.value).corpId !== this.options.corpId) throw conflict()
@@ -121,7 +127,7 @@ export class DingtalkDirectory {
         managerMissing: await tx.managerGrant.count({ where: { active: true, user: { active: true, dingUnionId:{not:null} } } }) === 0 }
       const value = { corpId: this.options.corpId, userIds: ids, departmentTree: snapshot.departments, ...result }
       await tx.systemSetting.upsert({ where: { key: 'dingtalk.directory' }, create: { key: 'dingtalk.directory', value }, update: { value } })
-      await tx.auditLog.create({ data: { actorId, action: 'sync', entityType: 'dingtalk_directory', entityId: this.options.corpId, payload: result } })
+      await tx.auditLog.create({ data: { actorId, action: 'sync', entityType: 'dingtalk_directory', entityId: this.options.corpId, payload: { ...result, authorizationSource } } })
       return result
     }, { maxWait: 10000, timeout: 180000 })
   }

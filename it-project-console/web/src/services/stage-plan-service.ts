@@ -1,3 +1,4 @@
+import { hasManagementPermissions } from '@/utils/management-permission'
 import {
   PROJECT_STAGES,
   SCHEDULE_REASONS,
@@ -65,7 +66,7 @@ export function saveProjectPlan(snapshot: PrototypeSnapshot, input: PlanInput) {
   const project = snapshot.database.projects.find((p) => p.id === input.projectId)
   if (!project) throw new WorkflowError('项目不存在')
   if (
-    actor.role !== 'manager' &&
+    !hasManagementPermissions(actor) &&
     !(actor.role === 'engineer' && isEngineerEligible(actor) && actor.id === project.primaryOwnerId)
   )
     throw new WorkflowError('只有主负责人或管理人员可以制定计划')

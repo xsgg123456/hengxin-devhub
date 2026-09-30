@@ -47,7 +47,7 @@ export const usePrototypeStore = defineStore('prototypeStore', () => {
     )
   })
 
-  const navigationItems = computed(() => getNavigation(currentUser.value.role))
+  const navigationItems = computed(() => getNavigation(currentUser.value.role, currentUser.value))
   const database = computed(() =>
     snapshot.value
       ? (getPrototypeDriver()?.database(snapshot.value) ?? snapshot.value.database)

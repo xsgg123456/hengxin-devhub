@@ -127,6 +127,8 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
+  import { hasManagementPermissions } from '@/utils/management-permission'
+
   import { approvedLaunchOverrun } from '@/utils/approved-launch'
   import { scheduleFieldLabel as fieldLabel } from '@/utils/business-labels'
   import { projectCode } from '@/utils/project-code'
@@ -190,14 +192,14 @@
       : []
   )
   const canAct = computed(() =>
-    store.currentUser.role === 'manager' ||
+    hasManagementPermissions(store.currentUser) ||
     (store.currentUser.role === 'engineer' && isEngineerEligible(store.currentUser))
   )
   const handoffRequired = computed(
     () => store.currentUser.role === 'engineer' && !canAct.value
   )
   const isOverall = computed(
-    () => canAct.value && (store.currentUser.role === 'manager' || store.currentUser.id === project.value?.primaryOwnerId)
+    () => canAct.value && (hasManagementPermissions(store.currentUser) || store.currentUser.id === project.value?.primaryOwnerId)
   )
   const canUpdate = computed(
     () =>

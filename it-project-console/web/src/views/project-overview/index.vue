@@ -13,7 +13,7 @@
             ><ElRadioButton value="mine">我负责 / 参与</ElRadioButton
             ><ElRadioButton value="all">全部项目</ElRadioButton></ElRadioGroup
           ><ElButton
-            v-if="store.currentUser.role === 'manager'"
+            v-if="hasManagementPermissions(store.currentUser)"
             @click="router.push('/manager-grants')"
             >管理人员名单</ElButton
           ><ElButton
@@ -177,6 +177,8 @@
   </BusinessPageState>
 </template>
 <script setup lang="ts">
+  import { hasManagementPermissions } from '@/utils/management-permission'
+
   import { canApproveProjects } from '@/utils/project-approver'
   import { dateRangeShortcuts } from '@/utils/date-range-shortcuts'
   import BusinessPageState from '@/components/system/business-page-state.vue'

@@ -1,3 +1,4 @@
+import { hasManagementPermissions } from '../../lib/management-permissions.js'
 import type { PrismaClient } from '../../generated/prisma/client.js'
 import type { Actor } from '../../plugins/auth.js'
 import { command } from '../../lib/business-command.js'
@@ -15,7 +16,7 @@ export class ProjectPlanService {
       const project = await lockedProject(tx, id, input.version)
       writable(project)
       const currentActor = await tx.user.findUnique({ where: { id: actor.id } })
-      if (!currentActor?.active || (currentActor.role !== 'MANAGER' &&
+      if (!currentActor?.active || (!hasManagementPermissions(currentActor) &&
         !(currentActor.role === 'ENGINEER' && isEngineerEligible(currentActor) && actor.id === project.primaryOwnerId)))
         throw new AppError(403, 'FORBIDDEN', '只有有效管理人员或具备工程师资格的主负责人可以排期')
       if (project.acceptanceStatus === 'pending') invalid('待验收期间请先撤回验收再调整排期')

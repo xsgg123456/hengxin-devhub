@@ -32,6 +32,7 @@ export function migratePrototypeSnapshot(value: unknown): PrototypeSnapshot {
     // Normalize the obsolete shape without resetting persisted manager grants.
     return {
       id: user.id,
+      ...(typeof user.maintenanceAdmin === 'boolean' ? { maintenanceAdmin: user.maintenanceAdmin } : {}),
       ...(typeof user.canApproveProjects === 'boolean'
         ? { canApproveProjects: user.canApproveProjects }
         : known?.id === 'user-manager-chen'

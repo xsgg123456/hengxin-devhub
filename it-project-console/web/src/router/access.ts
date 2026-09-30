@@ -1,4 +1,5 @@
-import type { SystemRole } from '@/domain/prototype'
+import { hasManagementPermissions } from '@/utils/management-permission'
+import type { DemoUser, SystemRole } from '@/domain/prototype'
 
 export interface NavigationItem {
   label: string
@@ -37,8 +38,20 @@ export function getHomePath(role: SystemRole): string {
   return HOME_PATHS[role]
 }
 
-export function getNavigation(role: SystemRole): NavigationItem[] {
-  return NAVIGATION[role]
+export function getNavigation(role: SystemRole, user?: DemoUser): NavigationItem[] {
+  const items = NAVIGATION[role]
+  if (user && role !== 'manager' && hasManagementPermissions(user)) {
+    return [...items,
+      { label: '项目总览', path: '/project-overview', icon: 'ri:dashboard-3-line' },
+      { label: '管理人员名单', path: '/manager-grants', icon: 'ri:user-settings-line' }
+    ]
+  }
+  return items
+}
+
+export function canAccessUser(user: DemoUser, allowedRoles?: readonly unknown[]): boolean {
+  return !allowedRoles || allowedRoles.includes(user.role) ||
+    (allowedRoles.includes('manager') && hasManagementPermissions(user))
 }
 
 export function canAccessRole(role: SystemRole, allowedRoles?: SystemRole[]): boolean {

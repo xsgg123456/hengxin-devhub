@@ -38,7 +38,7 @@
     <div
       v-if="
         proposal &&
-        store.currentUser.role === 'manager' &&
+        hasManagementPermissions(store.currentUser) &&
         !proposal.demandId &&
         proposal.status !== 'confirmed'
       "
@@ -74,6 +74,8 @@
   </ElDrawer>
 </template>
 <script setup lang="ts">
+  import { hasManagementPermissions } from '@/utils/management-permission'
+
   import { canApproveProjects } from '@/utils/project-approver'
   import { runtimeConfig } from '@/config/runtime'
   import PrototypeSaveRecovery from '@/components/system/prototype-save-recovery.vue'

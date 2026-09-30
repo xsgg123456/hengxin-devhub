@@ -3,7 +3,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import type { SystemRole } from '@/domain/prototype'
 import { usePrototypeStore } from '@/store/modules/prototype'
 import { isSupportedDevice } from '@/utils/device'
-import { canAccessRole, getHomePath } from './access'
+import { canAccessUser, getHomePath } from './access'
 import { asyncRoutes } from './routes/asyncRoutes'
 import { ElMessageBox } from 'element-plus'
 
@@ -67,7 +67,7 @@ router.beforeEach(async (to, from) => {
       )
     : undefined
 
-  if (!canAccessRole(prototypeStore.currentUser.role, allowedRoles)) {
+  if (!canAccessUser(prototypeStore.currentUser, allowedRoles)) {
     return { path: '/403', query: { from: to.fullPath } }
   }
   return true

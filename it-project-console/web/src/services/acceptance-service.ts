@@ -1,3 +1,4 @@
+import { hasManagementPermissions } from '@/utils/management-permission'
 import { deliveryHref } from '@/utils/delivery-url'
 import type {
   AcceptanceAction,
@@ -108,7 +109,7 @@ export function actionAcceptance(snapshot: PrototypeSnapshot, input: AcceptanceI
     throw new WorkflowError('仅验收交付环节可操作验收')
   if (input.action === 'accept' && needsPlan(p)) throw new WorkflowError('请先制定完整计划')
   if (input.action === 'assign') {
-    if (actor.role !== 'manager') throw new WorkflowError('只有管理人员可指定验收负责人')
+    if (!hasManagementPermissions(actor)) throw new WorkflowError('只有管理人员可指定验收负责人')
     if (!snapshot.database.users.some((u) => u.id === input.ownerId))
       throw new WorkflowError('请选择有效公司人员')
     if (input.ownerId === p.acceptanceOwnerId) throw new WorkflowError('验收负责人未改变')

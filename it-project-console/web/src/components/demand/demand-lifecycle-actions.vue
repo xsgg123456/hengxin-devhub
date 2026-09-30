@@ -12,6 +12,8 @@
   </ElDropdown>
 </template>
 <script setup lang="ts">
+  import { hasManagementPermissions } from '@/utils/management-permission'
+
   import { runtimeConfig } from '@/config/runtime'
   import { actionLiveDemand } from '@/services/live-demand-service'
   import { computed, ref } from 'vue'
@@ -27,7 +29,7 @@
   const own = computed(() => props.demand.submitterId === store.currentUser.id)
   const deletable = computed(
     () =>
-      store.currentUser.role === 'manager' || (store.currentUser.role === 'business' && own.value)
+      hasManagementPermissions(store.currentUser) || (store.currentUser.role === 'business' && own.value)
   )
   const withdrawable = computed(
     () =>

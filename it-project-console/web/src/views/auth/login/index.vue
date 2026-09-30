@@ -61,7 +61,7 @@
     const target = window.location.hash.slice(1)
     const result = await store.refreshLive()
     if (result.status !== 'applied') return
-    syncPrototypeShell(store.currentUser.role)
+    syncPrototypeShell(store.currentUser)
     await router.replace(
       target && target !== '/' && !target.startsWith('/auth/login')
         ? target

@@ -1,3 +1,4 @@
+import { hasManagementPermissions } from '@/utils/management-permission'
 import { needsPlan } from './stage-plan-service'
 import { projectState, recordLifecycle } from './lifecycle-service'
 import { PROJECT_STAGES, type PrototypeSnapshot, type SimpleStatus } from '@/domain/prototype'
@@ -26,7 +27,7 @@ export function updateProgress(snapshot: PrototypeSnapshot, input: ProgressInput
   if (!project) throw new WorkflowError('项目不存在')
   if (project.status !== 'active' || project.archived) throw new WorkflowError('当前项目只读')
   const engineer = actor.role === 'engineer' && isEngineerEligible(actor)
-  const overall = actor.role === 'manager' || (engineer && actor.id === project.primaryOwnerId)
+  const overall = hasManagementPermissions(actor) || (engineer && actor.id === project.primaryOwnerId)
   if (input.kind === 'overall' && !overall)
     throw new WorkflowError('只有主负责人或管理人员能更新整体进度')
   if (input.kind === 'personal' && !overall && !(engineer && project.collaboratorIds.includes(actor.id)))

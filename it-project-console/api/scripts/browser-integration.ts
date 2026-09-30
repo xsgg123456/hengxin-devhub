@@ -1,3 +1,4 @@
+import { createPrisma } from '../src/plugins/prisma.js'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { resolve } from 'node:path'
 import { createServer } from 'node:net'
@@ -38,7 +39,12 @@ async function stop(child: ChildProcess) {
 }
 async function runSuite(args: string[]) {
 await isolatedIntegration(async ({ env }) => {
-  if (args.includes('project-edit.spec.ts')) await seedProjectEditFixture(env)
+  if (args.includes('project-edit.spec.ts') || args.includes('maintenance-access.spec.ts')) await seedProjectEditFixture(env)
+  if (args.includes('maintenance-access.spec.ts')) {
+    const db = createPrisma(env.DATABASE_URL!)
+    try { await db.user.update({ where: { id: 'user-engineer-wang' }, data: { maintenanceAdmin: true } }) }
+    finally { await db.$disconnect() }
+  }
   const apiRoot = process.cwd(), webRoot = resolve('../web')
   const port = await freePort()
   const origin = 'http://127.0.0.1:4325'

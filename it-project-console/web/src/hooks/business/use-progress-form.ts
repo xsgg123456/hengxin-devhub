@@ -1,3 +1,4 @@
+import { hasManagementPermissions } from '@/utils/management-permission'
 import { needsPlan } from '@/services/stage-plan-service'
 import { runtimeConfig } from '@/config/runtime'
 import { ApiError } from '@/services/api-client'
@@ -25,11 +26,11 @@ export function useProgressForm(
   const version = ref<number>()
   const stale = useRecordStaleness('project', () => props.project?.id, () => version.value)
   const canAct = computed(() =>
-    store.currentUser.role === 'manager' ||
+    hasManagementPermissions(store.currentUser) ||
     (store.currentUser.role === 'engineer' && isEngineerEligible(store.currentUser))
   )
   const overall = computed(
-    () => canAct.value && (store.currentUser.role === 'manager' || store.currentUser.id === props.project?.primaryOwnerId)
+    () => canAct.value && (hasManagementPermissions(store.currentUser) || store.currentUser.id === props.project?.primaryOwnerId)
   )
   const form = ref<ProgressInput>({ projectId: '', kind: 'overall', summary: '' })
   const correctionStage = ref<ProjectStage>('方案设计')

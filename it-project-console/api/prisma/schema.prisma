@@ -70,6 +70,7 @@ model User {
   dingUnionId      String?              @unique @map("ding_union_id")
   role             Role                 @default(BUSINESS)
   active           Boolean              @default(true)
+  maintenanceAdmin Boolean             @default(false) @map("maintenance_admin")
   engineerOverride Boolean              @default(false) @map("engineer_override")
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)

@@ -196,7 +196,7 @@ test('真实看板筛选分页、三角色读取、甘特与需求统计、错�
     `/api/gantt?month=${month}&department=${encodeURIComponent('看板验收部')}`
   )
   expect(gantt.ok()).toBeTruthy()
-  expect((await gantt.json()).data).toHaveLength(21)
+  expect((await gantt.json()).data.rows).toHaveLength(21)
   console.log(
     `Phase8 本地样本：最大创建反馈 ${Math.max(...timings)}ms；甘特查询 ${Date.now() - start}ms`
   )

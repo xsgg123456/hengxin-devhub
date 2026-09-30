@@ -13,6 +13,7 @@ export const mapUser = (user: User) => ({
   name: user.name,
   department: user.department,
   role: user.role.toLowerCase(),
+  maintenanceAdmin: user.maintenanceAdmin,
   engineerEligible: isEngineerEligible(user),
   roleLabel: { MANAGER: '管理人员', BUSINESS: '业务人员', ENGINEER: 'IT工程师' }[user.role]
 })

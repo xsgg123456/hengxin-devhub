@@ -96,7 +96,7 @@
     type StagePlan
   } from '@/domain/prototype'
   import { usePrototypeStore } from '@/store/modules/prototype'
-  import { canApproveProjects } from '@/utils/project-approver'
+  import { hasManagementPermissions } from '@/utils/management-permission'
   import { isEngineerEligible } from '@/utils/engineer-eligibility'
   import { useUnsavedForm } from '@/hooks/business/use-unsaved-form'
   import { useRecordStaleness } from '@/hooks/business/use-record-staleness'
@@ -121,7 +121,7 @@
   let operationKey = liveOperationKey()
   const stale = useRecordStaleness('project', () => props.project?.id, () => version.value)
   const canOperate = computed(() =>
-    canApproveProjects(store.currentUser) ||
+    hasManagementPermissions(store.currentUser) ||
     (store.currentUser.role === 'engineer' && isEngineerEligible(store.currentUser) &&
       store.currentUser.id === props.project?.primaryOwnerId)
   )

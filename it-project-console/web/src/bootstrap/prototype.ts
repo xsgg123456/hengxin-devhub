@@ -18,7 +18,7 @@ export function bootstrapPrototype(): void {
   if (isSupportedDevice()) {
     const prototypeStore = usePrototypeStore(store)
     prototypeStore.initialize()
-    syncPrototypeShell(prototypeStore.currentUser.role)
+    syncPrototypeShell(prototypeStore.currentUser)
   }
 
   initRouter(app)

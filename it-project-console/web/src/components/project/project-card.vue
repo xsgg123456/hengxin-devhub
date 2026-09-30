@@ -106,6 +106,8 @@
   </article>
 </template>
 <script setup lang="ts">
+  import { hasManagementPermissions } from '@/utils/management-permission'
+
   import { computed, ref } from 'vue'
   import OptimizationPreview from './optimization-preview.vue'
   import { projectStageLabel, optimizationStatus } from '@/utils/optimization-display'
@@ -134,14 +136,14 @@
     store.database?.demands.find((d) => d.id === props.project.demandId)
   )
   const canAct = computed(() =>
-    store.currentUser.role === 'manager' ||
+    hasManagementPermissions(store.currentUser) ||
     (store.currentUser.role === 'engineer' && isEngineerEligible(store.currentUser))
   )
   const handoffRequired = computed(
     () => store.currentUser.role === 'engineer' && !canAct.value
   )
   const isOverall = computed(
-    () => canAct.value && (store.currentUser.role === 'manager' || store.currentUser.id === props.project.primaryOwnerId)
+    () => canAct.value && (hasManagementPermissions(store.currentUser) || store.currentUser.id === props.project.primaryOwnerId)
   )
   const relationship = computed(() =>
     store.currentUser.id === props.project.primaryOwnerId

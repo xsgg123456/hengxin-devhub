@@ -47,7 +47,7 @@
       :disabled="store.saving || staleDraft"
       @submit.prevent
     >
-      <template v-if="store.currentUser.role === 'manager'">
+      <template v-if="hasManagementPermissions(store.currentUser)">
         <ElFormItem label="业务验收负责人"
           ><ElSelect
             class="w-full"
@@ -138,6 +138,8 @@
   </section>
 </template>
 <script setup lang="ts">
+  import { hasManagementPermissions } from '@/utils/management-permission'
+
   import { optimizationStatus } from '@/utils/optimization-display'
   import { deliveryHref } from '@/utils/delivery-url'
   import { computed } from 'vue'

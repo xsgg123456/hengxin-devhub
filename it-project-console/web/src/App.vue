@@ -28,7 +28,7 @@
   import { RouterView, useRouter } from 'vue-router'
   import { usePrototypeStore } from '@/store/modules/prototype'
   import { useWorkspaceSync } from '@/hooks/business/use-workspace-sync'
-  import { getHomePath } from '@/router/access'
+  import { canAccessUser, getHomePath } from '@/router/access'
   import { syncPrototypeShell } from '@/prototype/sync-shell'
   import { isSupportedDevice } from '@/utils/device'
   import { initializeTheme } from '@/hooks/core/useTheme'
@@ -44,10 +44,10 @@
   useWorkspaceSync()
   const routeAllowed = computed(() => {
     const roles = router.currentRoute.value.meta.roles
-    return !Array.isArray(roles) || roles.includes(prototypeStore.currentUser.role)
+    return canAccessUser(prototypeStore.currentUser, Array.isArray(roles) ? roles : undefined)
   })
-  watch(() => prototypeStore.currentUser.role, role => {
-    if (prototypeStore.ready) syncPrototypeShell(role)
+  watch(() => [prototypeStore.currentUser.role, prototypeStore.currentUser.maintenanceAdmin], () => {
+    if (prototypeStore.ready) syncPrototypeShell(prototypeStore.currentUser)
   })
   const deviceSupported = ref(isSupportedDevice())
 
@@ -55,7 +55,7 @@
     try {
       const result = await prototypeStore.refreshLive()
       if (result.status !== 'applied') return
-      syncPrototypeShell(prototypeStore.currentUser.role)
+      syncPrototypeShell(prototypeStore.currentUser)
       await router.replace(getHomePath(prototypeStore.currentUser.role))
     } catch {
       /* error remains visible */
@@ -72,7 +72,7 @@
         return
       }
       prototypeStore.initialize()
-      syncPrototypeShell(prototypeStore.currentUser.role)
+      syncPrototypeShell(prototypeStore.currentUser)
       router.replace(getHomePath(prototypeStore.currentUser.role))
     }
   }

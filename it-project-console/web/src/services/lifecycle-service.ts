@@ -1,3 +1,4 @@
+import { hasManagementPermissions } from '@/utils/management-permission'
 import { recordProposalDeletion } from './proposal-service'
 import { invalidateAcceptance } from './acceptance-service'
 import type { DemoLifecycleEvent, DemoProject, PrototypeSnapshot } from '@/domain/prototype'
@@ -67,7 +68,7 @@ export function actionDemand(snapshot: PrototypeSnapshot, input: DemandActionInp
   if (!['withdraw', 'delete'].includes(input.action)) throw new WorkflowError('需求操作无效')
   const project = snapshot.database.projects.find((row) => row.demandId === demand.id)
   if (input.action === 'delete') {
-    if (actor.role !== 'manager' && !(actor.role === 'business' && demand.submitterId === actor.id))
+    if (!hasManagementPermissions(actor) && !(actor.role === 'business' && demand.submitterId === actor.id))
       throw new WorkflowError('只有管理人员或需求本人业务提交人可以删除')
     removeGroup(snapshot, demand.id, project?.id)
     if (project)
@@ -115,11 +116,11 @@ export function actionProject(snapshot: PrototypeSnapshot, input: ProjectActionI
   } else if (input.action === 'delete') {
     const demand = snapshot.database.demands.find((row) => row.id === project.demandId)
     if (
-      actor.role !== 'manager' &&
+      !hasManagementPermissions(actor) &&
       !(actor.role === 'business' && demand?.submitterId === actor.id)
     )
       throw new WorkflowError('只有管理人员或需求本人业务提交人可以删除')
-  } else if (actor.role !== 'manager') throw new WorkflowError('只有管理人员可以执行此操作')
+  } else if (!hasManagementPermissions(actor)) throw new WorkflowError('只有管理人员可以执行此操作')
   if (input.action === 'cancel' && (project.status !== 'active' || project.archived))
     throw new WorkflowError('只有未归档的进行中项目可以取消')
   if (input.action === 'archive' && project.archived) throw new WorkflowError('项目已经归档')

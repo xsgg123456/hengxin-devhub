@@ -5,6 +5,8 @@ import { usePrototypeStore } from './modules/prototype'
 import { useWorkspaceSync } from '@/hooks/business/use-workspace-sync'
 import { apiRequest, ApiError } from '@/services/api-client'
 import { createInitialPrototypeSnapshot } from '@/mocks/seed'
+import { canApproveProjects } from '@/utils/project-approver'
+import { canAccessUser } from '@/router/access'
 vi.mock('@/services/api-client', async (importOriginal) => {
   const module = await importOriginal<typeof import('@/services/api-client')>()
   return { ...module, apiRequest: vi.fn() }
@@ -20,6 +22,27 @@ class RuntimeStream extends EventTarget {
 beforeEach(() => {
   setActivePinia(createPinia())
   vi.clearAllMocks()
+})
+it('服务器工作区刷新保留工程师维护授权，撤销后立即收回入口与审批能力', async () => {
+  const snapshot = createInitialPrototypeSnapshot()
+  snapshot.activeUserId = 'user-engineer-wang'
+  const engineer = snapshot.database.users.find(u => u.id === snapshot.activeUserId)!
+  engineer.maintenanceAdmin = true
+  engineer.canApproveProjects = true
+  vi.mocked(apiRequest).mockResolvedValueOnce(structuredClone(snapshot))
+  const store = usePrototypeStore()
+  await store.refreshLive()
+  expect(store.currentUser).toMatchObject({ role: 'engineer', roleLabel: 'IT工程师', maintenanceAdmin: true })
+  expect(canApproveProjects(store.currentUser)).toBe(true)
+  expect(store.navigationItems.some(item => item.path === '/manager-grants')).toBe(true)
+  engineer.maintenanceAdmin = false
+  engineer.canApproveProjects = false
+  vi.mocked(apiRequest).mockResolvedValueOnce(snapshot)
+  await store.refreshLive({ background: true })
+  expect(store.currentUser.role).toBe('engineer')
+  expect(canApproveProjects(store.currentUser)).toBe(false)
+  expect(canAccessUser(store.currentUser, ['manager'])).toBe(false)
+  expect(store.navigationItems.some(item => item.path === '/manager-grants')).toBe(false)
 })
 it('真实读取采用服务器身份，未安装原型驱动时禁止模拟写入', async () => {
   const snapshot = createInitialPrototypeSnapshot()

@@ -2,6 +2,7 @@ packages:
   - web
   - api
 overrides:
+  'brace-expansion@>=4.0.0 <5.0.12': 5.0.12
   'vitest>vite': 7.3.6
   '@vitest/mocker>vite': 7.3.6
   '@prisma/config>deepmerge-ts': 8.0.0

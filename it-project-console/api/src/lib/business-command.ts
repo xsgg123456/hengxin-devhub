@@ -1,3 +1,4 @@
+import { hasManagementPermissions } from './management-permissions.js'
 import { createHash } from 'node:crypto'
 import type { Prisma, PrismaClient } from '../generated/prisma/client.js'
 import type { Actor } from '../plugins/auth.js'
@@ -8,7 +9,7 @@ export function assertActive(actor: Actor) {
 }
 export function assertManager(actor: Actor) {
   assertActive(actor)
-  if (actor.role !== 'MANAGER') throw new AppError(403, 'FORBIDDEN', '需要管理人员权限')
+  if (!hasManagementPermissions(actor)) throw new AppError(403, 'FORBIDDEN', '需要管理人员权限')
 }
 export async function lockedDemand(tx: Prisma.TransactionClient, id: string, version: number) {
   await tx.$queryRaw`SELECT id FROM demands WHERE id = ${id} FOR UPDATE`
@@ -33,12 +34,24 @@ export async function command<T extends Prisma.InputJsonObject>(
   return db.$transaction(async (tx) => {
     // A transaction-scoped advisory lock serializes even the first request before a receipt exists.
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${actor.id + ':' + key}, 0))::text`
+    const current = await tx.user.findUnique({ where: { id: actor.id } })
+    if (!current?.active || (hasManagementPermissions(actor) && !hasManagementPermissions(current)))
+      throw new AppError(403, 'FORBIDDEN', '账号已停用或管理权限已撤销')
+    actor.role = current.role
+    actor.maintenanceAdmin = current.maintenanceAdmin
     const previous = await tx.commandReceipt.findUnique({ where: { actorId_key: { actorId: actor.id, key } } })
     if (previous) {
+      if (!current.maintenanceAdmin && await tx.auditLog.findFirst({ where: {
+        actorId: current.id, action: 'maintenance-command', entityType: 'command', entityId: key
+      }, select: { id: true } })) throw new AppError(403, 'FORBIDDEN', '原操作的维护授权已撤销')
       if (previous.hash !== hash) throw new AppError(409, 'REQUEST_CONFLICT', '请求编号已用于不同内容')
       return previous.response as T
     }
     const result = await action(tx)
+    if (current.maintenanceAdmin) await tx.auditLog.create({ data: {
+      actorId: current.id, action: 'maintenance-command', entityType: 'command', entityId: key,
+      payload: { authorizationSource: 'maintenanceAdmin', role: current.role, input: JSON.parse(canonical(input)) }
+    } })
     await tx.commandReceipt.create({ data: { actorId: actor.id, key, hash, response: result } })
     return result
   }, { timeout: 15_000 })

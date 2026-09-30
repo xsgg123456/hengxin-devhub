@@ -1,3 +1,4 @@
+import { hasManagementPermissions } from '../../lib/management-permissions.js'
 import { cancelAcceptanceNotifications } from '../notifications/acceptance-notifications.js'
 import type { Prisma, PrismaClient } from '../../generated/prisma/client.js'
 import type { Actor } from '../../plugins/auth.js'
@@ -25,7 +26,7 @@ export class AcceptanceService {
       if (!currentActor?.active) throw new AppError(403, 'FORBIDDEN', '账号已停用')
       const { action } = input, now = new Date(), summary = input.summary ?? ''
       if (action === 'assign') {
-        if (currentActor.role !== 'MANAGER') throw new AppError(403, 'FORBIDDEN', '只有管理人员可改派验收人')
+        if (!hasManagementPermissions(currentActor)) throw new AppError(403, 'FORBIDDEN', '只有管理人员可改派验收人')
         await validAcceptanceOwner(tx, input.ownerId)
         if (input.ownerId === project.acceptanceOwnerId) invalid('验收负责人未变化')
       } else {

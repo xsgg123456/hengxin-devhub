@@ -1,3 +1,4 @@
+import { hasManagementPermissions } from '../lib/management-permissions.js'
 import { canApproveProjects } from '../lib/project-approver.js'
 import { createHash, randomBytes } from 'node:crypto'
 import type { FastifyRequest, FastifyReply } from 'fastify'
@@ -10,6 +11,7 @@ export type Actor = {
   name: string
   department: string
   role: 'MANAGER' | 'ENGINEER' | 'BUSINESS'
+  maintenanceAdmin?: boolean
   canApproveProjects?: boolean
   active: boolean
 }
@@ -31,8 +33,8 @@ export function authService(db: PrismaClient, env: Env) {
     })
     if (!session || session.expiresAt <= new Date() || !session.user.active)
       throw new AppError(401, 'SESSION_EXPIRED', '登录已过期，请重新登录')
-    const { id, name, department, role, active } = session.user
-    request.actor = { id, name, department, role, active, canApproveProjects: canApproveProjects(session.user, env.PROJECT_APPROVER_DING_USER_ID) }
+    const { id, name, department, role, active, maintenanceAdmin } = session.user
+    request.actor = { id, name, department, role, active, maintenanceAdmin, canApproveProjects: canApproveProjects(session.user, env.PROJECT_APPROVER_DING_USER_ID) }
   }
   async function login(userId: string, request: FastifyRequest, reply: FastifyReply) {
     const user = await db.user.findUnique({ where: { id: userId } })
@@ -58,6 +60,7 @@ export function authService(db: PrismaClient, env: Env) {
       id: user.id,
       name: user.name,
       department: user.department,
+      maintenanceAdmin: user.maintenanceAdmin,
       role: user.role
     }
   }
@@ -74,7 +77,7 @@ export function authService(db: PrismaClient, env: Env) {
   return { authenticate, login, logout }
 }
 export async function requireManager(request: FastifyRequest) {
-  if (request.actor?.role !== 'MANAGER') throw new AppError(403, 'FORBIDDEN', '需要管理人员权限')
+  if (!hasManagementPermissions(request.actor)) throw new AppError(403, 'FORBIDDEN', '需要管理人员权限')
 }
 export function assertProjectWrite(
   actor: Actor,
@@ -84,7 +87,7 @@ export function assertProjectWrite(
 ) {
   if (!actor.active || project.archived || project.status !== 'ACTIVE')
     throw new AppError(403, 'READ_ONLY', '项目当前只读')
-  if (actor.role === 'MANAGER') return
+  if (hasManagementPermissions(actor)) return
   if (
     actor.role === 'ENGINEER' &&
     (project.primaryOwnerId === actor.id || (!overall && collaborators.includes(actor.id)))

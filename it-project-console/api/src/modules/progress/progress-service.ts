@@ -1,3 +1,4 @@
+import { hasManagementPermissions } from '../../lib/management-permissions.js'
 import type { PrismaClient } from '../../generated/prisma/client.js'
 import type { Actor } from '../../plugins/auth.js'
 import { command } from '../../lib/business-command.js'
@@ -19,7 +20,7 @@ export class ProgressService {
       const currentActor = await tx.user.findUnique({ where: { id: actor.id } })
       if (!currentActor?.active) throw new AppError(403, 'FORBIDDEN', '账号已停用')
       const engineer = currentActor.role === 'ENGINEER' && isEngineerEligible(currentActor)
-      const overall = currentActor.role === 'MANAGER' || (engineer && actor.id === project.primaryOwnerId)
+      const overall = hasManagementPermissions(currentActor) || (engineer && actor.id === project.primaryOwnerId)
       if ((input.kind === 'overall' && !overall) ||
         (input.kind === 'personal' && !overall && !(engineer && project.members.some(m => m.userId === actor.id))))
         throw new AppError(403, 'FORBIDDEN', '只有主负责人或管理人员能修改整体进度，项目成员可提交个人进展')

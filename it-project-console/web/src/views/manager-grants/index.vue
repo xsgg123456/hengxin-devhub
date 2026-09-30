@@ -103,6 +103,8 @@
   </BusinessPageState>
 </template>
 <script setup lang="ts">
+  import { hasManagementPermissions } from '@/utils/management-permission'
+
   import {
     setLiveManager,
     type LiveManager
@@ -129,7 +131,7 @@
   const loading = computed(() => managerQuery.loading.value || candidateQuery.loading.value)
   const refreshError = computed(() => managerQuery.refreshError.value || candidateQuery.refreshError.value)
   watch([managerQuery.error, candidateQuery.error], ([first, second]) => { error.value = first || second })
-  const canManage = computed(() => store.currentUser.role === 'manager')
+  const canManage = computed(() => hasManagementPermissions(store.currentUser))
   const managers = computed(() =>
     runtimeConfig.isPrototype
       ? (store.database?.users.filter((u) => u.role === 'manager') ?? [])
@@ -210,8 +212,8 @@
           setManager(draft, { userId, enabled: false })
         })
       else await saveLive(userId, false)
-      syncPrototypeShell(store.currentUser.role)
-      if (store.currentUser.role !== 'manager')
+      syncPrototypeShell(store.currentUser)
+      if (!hasManagementPermissions(store.currentUser))
         await router.replace(getHomePath(store.currentUser.role))
       ElMessage.success('管理权限已移除')
     } catch (cause) {

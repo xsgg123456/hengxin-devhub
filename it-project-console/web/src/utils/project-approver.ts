@@ -1,5 +1,6 @@
 import type { DemoUser } from '@/domain/prototype'
+import { hasManagementPermissions } from './management-permission'
 
 export function canApproveProjects(user: DemoUser) {
-  return user.role === 'manager' && user.canApproveProjects === true
+  return hasManagementPermissions(user) && user.canApproveProjects === true
 }

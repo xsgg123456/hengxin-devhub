@@ -4,7 +4,7 @@
       <ElAlert v-if="stale" :title="stale" type="warning" :closable="false" class="mb-4" />
       <div class="edit-heading"><div><h3>{{ project.name }}</h3><p>{{ projectCode(project) }} · 全局编辑</p></div><ElTag :type="pending ? 'warning' : 'success'">{{ pending ? '迁移待核实' : '正常项目' }}</ElTag></div>
       <ElAlert v-if="runtimeConfig.isPrototype" title="交互预览：修改保存在当前浏览器，未接入生产数据和通知。" type="info" :closable="false" class="mb-4" />
-      <ElAlert v-if="store.currentUser.role === 'engineer'" title="主负责工程师可整理本项目的迁移资料；完成核实或转交主责后，恢复原有日常权限。" type="warning" :closable="false" class="mb-4" />
+      <ElAlert v-if="store.currentUser.role === 'engineer' && !canApproveProjects(store.currentUser)" title="主负责工程师可整理本项目的迁移资料；完成核实或转交主责后，恢复原有日常权限。" type="warning" :closable="false" class="mb-4" />
       <ElTabs v-model="tab">
         <ElTabPane label="基本资料" name="basic" />
         <ElTabPane label="人员关联" name="people" />
@@ -62,7 +62,7 @@
     <HistoricalDeliveryDialog v-model="historicalOpen" :project="project" :dirty="dirty" @completed="emit('update:modelValue', false)" />
     <ElDialog v-model="confirmOpen" title="确认本次修改" width="min(560px, 92vw)" append-to-body :close-on-click-modal="false" :show-close="!busy" :close-on-press-escape="!busy">
       <p class="mb-3">{{ verifying ? '保存全部修改，并解除迁移待核实标记。' : '以下修改将同步到项目相关页面。' }}</p>
-      <ElAlert v-if="store.currentUser.role === 'engineer' && (verifying || form?.primaryOwnerId !== store.currentUser.id)" title="保存后你将不再拥有此项目的完整编辑权限；后续资料纠正可联系指定管理员。" type="warning" :closable="false" class="mb-3" />
+      <ElAlert v-if="store.currentUser.role === 'engineer' && !canApproveProjects(store.currentUser) && (verifying || form?.primaryOwnerId !== store.currentUser.id)" title="保存后你将不再拥有此项目的完整编辑权限；后续资料纠正可联系指定管理员。" type="warning" :closable="false" class="mb-3" />
       <div v-for="line in changes" :key="line" class="change-row">{{ line }}</div>
       <ElFormItem label="修改原因" required class="mt-4"><ElInput v-model="reason" aria-label="修改原因" type="textarea" :rows="3" maxlength="300" placeholder="例如：按旧系统实际资料核实项目" /></ElFormItem>
       <ElAlert v-if="error" :title="error" type="error" :closable="false" />

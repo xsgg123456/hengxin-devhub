@@ -1,11 +1,12 @@
-import type { SystemRole } from '@/domain/prototype'
+import type { DemoUser } from '@/domain/prototype'
 import type { AppRouteRecord } from '@/types/router'
 import { useMenuStore } from '@/store/modules/menu'
 import { getHomePath, getNavigation } from '@/router/access'
 
-export function syncPrototypeShell(role: SystemRole): void {
+export function syncPrototypeShell(user: DemoUser): void {
+  const role = user.role
   const menuStore = useMenuStore()
-  const menuList: AppRouteRecord[] = getNavigation(role).map((item) => ({
+  const menuList: AppRouteRecord[] = getNavigation(role, user).map((item) => ({
     path: item.path,
     name: item.path.slice(1),
     component: () => Promise.resolve({}),
